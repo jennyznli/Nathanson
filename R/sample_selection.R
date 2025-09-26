@@ -5,43 +5,39 @@
 # using ICD codes, filtering by visit frequency, time span
 # between first and last occurrence, gender, and age.
 #
-# Requires these files in the pmbb_dir input
-#   PMBB-Release-2024-3.0_phenotype_condition_occurrence.txt
-#   PMBB-Release-2024-3.0_covariates.txt
-#   PMBB-Release-2024-3.0_phenotype_person.txt
-#
 # Usage:
 #   select_samples(
 #       sample_name = "breast",              # Name of the type as string
 #       icd_codes = c("^C50", "^Z85.3"),     # ICD9/10 code patterns (regex-compatible), or NULL if taking all ICD codes
-#       gender_filter = "All",               # "Male", "Female", or NULL
+#       gender_filter = NULL,                # "Male", "Female", or NULL
 #       crep_filter = TRUE,                  # TRUE - include only CREP samples, FALSE - exclude CREP samples, NULL - no filter for CREP
-#       age_filter = NULL,                   # int - minimum age, vector - range of edges, NULL
-#       min_instances = 3,                   # Minimum number of diagnosis entries
+#       age_filter = NULL,                   # int - minimum age, vector - range of edges, or NULL for no filter
+#       min_instances = 3,                   # Minimum instances of ICD codes
 #       min_timespan = NULL,                 # Minimum timespan between first and last diagnosis occurrence (days)
 #       exclude = FALSE,                     # Whether to exclude patients with certain ICD codes (e. g. those w/ history of other cancer)
-#       exclude_codes = ...,                 # If excluding patients, ICD codes to exclude
+#       exclude_codes = ...,                 # If excluding patients, ICD codes to exclude (like cancer codes)
 #       min_exclude_instances = 2,           # If excluding patients, minimum instances for exclusion
-#       min_exclude_timespan = NULL,         # If excluding patients, minimum timespan
+#       min_exclude_timespan = NULL,         # If excluding patients, minimum timespan between first and last diagnosis occurrence (days)
 #       data_dir = NULL,                     # Directory for outputs
 #       pmbb_dir = NULL,                     # Directory for PMBB input w/ covariates, condition_occurrences, demographic tables
 #       log_dir = NULL,                      # Directory for log files
 #       output_prefix = NULL                 # Filename prefix (defaults to sample_name)
 #   )
 #
+# Requires:
+#   PMBB-Release-2024-3.0_phenotype_condition_occurrence.txt
+#   PMBB-Release-2024-3.0_covariates.txt
+#   PMBB-Release-2024-3.0_phenotype_person.txt
+#
 # Output:
 #   - All matched patients and filtered patient lists
 #   - Log file w/ selection steps and stats
-#
-# Notes:
-#   - PMBB files must follow OMOP CDM-compatible format
-#   - For use with PMBB v3.0 phenotype files
 # ============================================================
 
 select_samples <- function(
         sample_name,
         icd_codes,
-        gender_filter = "All",
+        gender_filter = NULL,
         crep_filter = NULL,
         min_instances = 3,
         min_timespan = NULL,
