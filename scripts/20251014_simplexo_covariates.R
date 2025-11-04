@@ -1,6 +1,7 @@
 # ========================
-# SIMPLEXO - CASE & CONTROL SELECTION
+# SIMPLEXO - AGE EXTRACTION & COVARIATE CREATION
 # ========================
+
 library(here)
 setwd(here("simplexo"))
 
@@ -11,30 +12,28 @@ source(here("R", "control_selection.R"))
 # ========================
 # FILE PATHS
 # ========================
+
 PMBB_DIR <- here("PMBB", "3.0")
 OCC_FILE <- here(PMBB_DIR, "PMBB-Release-2024-3.0_phenotype_condition_occurrence.txt")
 COV_FILE <- here(PMBB_DIR, "PMBB-Release-2024-3.0_covariates.txt")
 PER_FILE <- here(PMBB_DIR, "PMBB-Release-2024-3.0_phenotype_person.txt")
 EXOME_FILE <- here(PMBB_DIR, "PMBB-Release-2024-3.0_genetic_exome.norm.commonsnps.eigenvec")
 IMP_FILE <- here(PMBB_DIR, "PMBB-Release-2024-3.0_genetic_imputed.eigenvec")
+
 # ========================
 # LOAD ALL DATA FILES
 # ========================
-# PMBB base files
+
 cov <- fread(COV_FILE, header = TRUE)
 person <- fread(PER_FILE, header = TRUE)
 exome <- fread(EXOME_FILE, header = TRUE)[, 1:11]
 imp <- fread(IMP_FILE, header = TRUE)[, 1:11]
 
-# Case IDs and ICD data
 all_ids <- unique(read.table(here("simplexo", "data", "simplexo_overall_v1_case_ids.txt"))$V1)
 icd_cases <- fread(here("simplexo", "data", "simplexo_cancer_filtered_patients.txt"))
 icd_case_ids <- readLines(here("simplexo", "data", "simplexo_cancer_filtered_patients_ids.txt"))
 
-# PMCR (Cancer Registry) data
 pmcr <- read.csv(here("simplexo", "ss", "pmbb_147_pmcrbreastage.csv"))
-
-# Progeny data
 progeny_pmbb <- read.csv(here("simplexo", "data", "simplexo_progeny_pmbb.txt"))
 
 # ========================
@@ -45,23 +44,27 @@ pmbb_dob <- person %>% select(person_id, birth_datetime)
 dob_dx <- merge(icd_cases, pmbb_dob, by = "person_id", all.x = TRUE)
 
 # Calculate diagnosis age (years)
-dob_dx$CaDxAge_ICD <- as.numeric(difftime(dob_dx$first_date, dob_dx$birth_datetime, units = "days")) / 365
+dob_dx$CaDxAge_ICD <- as.numeric(difftime(
+    dob_dx$first_date,
+    dob_dx$birth_datetime,
+    units = "days"
+)) / 365.25
+
 icd_ages <- dob_dx %>% select(person_id, CaDxAge_ICD)
 
-cat("ICD ages extracted:", nrow(icd_ages), "records\n")
-# 3448
+cat("ICD ages extracted:", nrow(icd_ages), "records\n") # 3448
 
 # ========================
 # EXTRACT DIAGNOSIS AGES FROM PMCR (Cancer Registry)
 # ========================
+
 pmcr_case <- pmcr %>% filter(PmcrBreastFlag == 1)
 
 pmcr_ages <- pmcr_case %>%
     select(PMBB_ID, PmcrBreastFirstDxDate_age) %>%
-    rename(CaDxAge_Colleen = PmcrBreastFirstDxDate_age)
+    rename(CaDxAge_PMCR = PmcrBreastFirstDxDate_age)
 
-cat("PMCR cases:", nrow(pmcr_case), "records\n")
-# 2510
+cat("PMCR cases:", nrow(pmcr_case), "records\n") # 2510
 
 # ========================
 # EXTRACT DIAGNOSIS AGES FROM PROGENY
@@ -93,33 +96,38 @@ progeny_pmbb$CaDxAge_Progeny <- sapply(progeny_pmbb$CaDxAge, get_earliest_age)
 progeny_pmbb$CaDxAge_Progeny[is.infinite(progeny_pmbb$CaDxAge_Progeny)] <- NA
 
 progeny_ages <- progeny_pmbb %>% select(PMBB_ID, CaDxAge_Progeny)
-cat("Progeny records:", nrow(progeny_pmbb), "records\n")
-# 1520
+
+cat("Progeny records:", nrow(progeny_pmbb), "records\n") # 1520
 
 # ========================
 # MERGE ALL DIAGNOSIS AGES
 # ========================
+
 base_df <- data.frame(PMBB_ID = all_ids)
+
 merged <- base_df %>%
     left_join(progeny_ages, by = "PMBB_ID") %>%
     left_join(pmcr_ages, by = "PMBB_ID") %>%
     left_join(icd_ages, by = c("PMBB_ID" = "person_id")) %>%
     mutate(
         # Priority order: Progeny > PMCR > ICD
-        Age = coalesce(CaDxAge_Progeny, CaDxAge_Colleen, CaDxAge_ICD),
+        Age = coalesce(CaDxAge_Progeny, CaDxAge_PMCR, CaDxAge_ICD),
         # Find earliest diagnosis across all sources
-        EarliestDiagnosis = pmin(CaDxAge_Progeny, CaDxAge_Colleen, CaDxAge_ICD, na.rm = TRUE),
+        EarliestDiagnosis = pmin(CaDxAge_Progeny, CaDxAge_PMCR, CaDxAge_ICD, na.rm = TRUE),
         # Flag cases where selected age differs from earliest by >2 years
         AgeDifference = abs(Age - EarliestDiagnosis) > 2
     )
-dim(merged)
+
+dim(merged) # 4063
+
 write.table(merged,
             here("simplexo", "data", "simplexo_overall_case_ages_merged.txt"),
-            row.names = FALSE, quote = FALSE)
+            row.names = FALSE, quote = FALSE, sep = "\t")
 
 # ========================
 # SELECT FINAL CASE IDs WITH AGES
 # ========================
+
 merged_sel <- merged %>%
     select(PMBB_ID, Age) %>%
     filter(!is.na(Age)) %>%
@@ -133,8 +141,9 @@ write.table(sort(merged_sel$PMBB_ID),
             row.names = FALSE, col.names = FALSE, quote = FALSE)
 
 # ========================
-# CREATE FINAL COVARIATE FILEs
+# CREATE FINAL COVARIATE FILES
 # ========================
+
 # Start with sample ages for all PMBB participants
 pmbb_ages <- cov %>%
     select(person_id, Sample_age) %>%
@@ -145,13 +154,13 @@ case_ages <- merged_sel %>%
     select(PMBB_ID, Age) %>%
     rename(Case_Age = Age)
 
-# prioritize case diagnosis age, fall back to sample age
+# Prioritize case diagnosis age, fall back to sample age
 all_ages <- pmbb_ages %>%
     left_join(case_ages, by = "PMBB_ID") %>%
     mutate(Age = coalesce(Case_Age, Age)) %>%
     select(PMBB_ID, Age)
 
-# add PCs
+# Add PCs (10)
 cov_imp_exome <- all_ages %>%
     left_join(exome, by = c("PMBB_ID" = "person_id")) %>%
     left_join(imp, by = c("PMBB_ID" = "person_id")) %>%
@@ -167,36 +176,39 @@ cov_exome <- all_ages %>%
 
 write.table(cov_imp_exome,
             here("simplexo", "data", "simplexo_imp10_exome10_covariates.txt"),
-            row.names = FALSE, col.names = TRUE, quote = FALSE)
+            row.names = FALSE, col.names = TRUE, quote = FALSE, sep = "\t")
+
 write.table(cov_imp,
             here("simplexo", "data", "simplexo_imp10_covariates.txt"),
-            row.names = FALSE, col.names = TRUE, quote = FALSE)
+            row.names = FALSE, col.names = TRUE, quote = FALSE, sep = "\t")
+
 write.table(cov_exome,
             here("simplexo", "data", "simplexo_exome10_covariates.txt"),
-            row.names = FALSE, col.names = TRUE, quote = FALSE)
+            row.names = FALSE, col.names = TRUE, quote = FALSE, sep = "\t")
 
-# try less PCs
+# Add PCs (5)
 cov_imp5_exome5 <- all_ages %>%
-    left_join(exome[,1:6], by = c("PMBB_ID" = "person_id")) %>%
-    left_join(imp[,1:6], by = c("PMBB_ID" = "person_id")) %>%
+    left_join(exome[, 1:6], by = c("PMBB_ID" = "person_id")) %>%
+    left_join(imp[, 1:6], by = c("PMBB_ID" = "person_id")) %>%
     rename(IID = PMBB_ID)
 
 cov_imp5 <- all_ages %>%
-    left_join(imp[,1:6], by = c("PMBB_ID" = "person_id")) %>%
+    left_join(imp[, 1:6], by = c("PMBB_ID" = "person_id")) %>%
     rename(IID = PMBB_ID)
 
 cov_exome5 <- all_ages %>%
-    left_join(exome[,1:6], by = c("PMBB_ID" = "person_id")) %>%
+    left_join(exome[, 1:6], by = c("PMBB_ID" = "person_id")) %>%
     rename(IID = PMBB_ID)
 
 write.table(cov_imp5_exome5,
             here("simplexo", "data", "simplexo_imp5_exome5_covariates.txt"),
-            row.names = FALSE, col.names = TRUE, quote = FALSE)
+            row.names = FALSE, col.names = TRUE, quote = FALSE, sep = "\t")
+
 write.table(cov_imp5,
             here("simplexo", "data", "simplexo_imp5_covariates.txt"),
-            row.names = FALSE, col.names = TRUE, quote = FALSE)
+            row.names = FALSE, col.names = TRUE, quote = FALSE, sep = "\t")
+
 write.table(cov_exome5,
             here("simplexo", "data", "simplexo_exome5_covariates.txt"),
-            row.names = FALSE, col.names = TRUE, quote = FALSE)
-
+            row.names = FALSE, col.names = TRUE, quote = FALSE, sep = "\t")
 
