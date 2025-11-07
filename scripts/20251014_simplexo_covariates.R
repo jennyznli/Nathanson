@@ -76,7 +76,7 @@ get_earliest_age <- function(age_str) {
     }
 
     age_str <- as.character(age_str)
-    age_parts <- strsplit(age_str, "; ")[[1]]
+    age_parts <- strsplit(age_str, ";")[[1]]
     ages <- suppressWarnings(as.numeric(age_parts))
     valid_ages <- ages[!is.na(ages)]
 
@@ -117,9 +117,6 @@ merged <- base_df %>%
         # Flag cases where selected age differs from earliest by >2 years
         AgeDifference = abs(Age - EarliestDiagnosis) > 2
     )
-
-dim(merged) # 4063
-
 write.table(merged,
             here("simplexo", "data", "simplexo_overall_case_ages_merged.txt"),
             row.names = FALSE, quote = FALSE, sep = "\t")
@@ -127,12 +124,14 @@ write.table(merged,
 # ========================
 # SELECT FINAL CASE IDs WITH AGES
 # ========================
-
 merged_sel <- merged %>%
     select(PMBB_ID, Age) %>%
     filter(!is.na(Age)) %>%
     mutate(Age = round(Age, 2))
 
+no_age <- merged %>%
+    select(PMBB_ID, Age) %>%
+    filter(is.na(Age))
 cat("Final cases with age:", nrow(merged_sel), "records\n")
 cat("Cases without age:", nrow(base_df) - nrow(merged_sel), "records\n")
 
@@ -144,71 +143,55 @@ write.table(sort(merged_sel$PMBB_ID),
 # CREATE FINAL COVARIATE FILES
 # ========================
 
-# Start with sample ages for all PMBB participants
-pmbb_ages <- cov %>%
-    select(person_id, Sample_age) %>%
-    rename(PMBB_ID = person_id, Age = Sample_age)
-
-# Prepare case ages
-case_ages <- merged_sel %>%
-    select(PMBB_ID, Age) %>%
-    rename(Case_Age = Age)
-
-# Prioritize case diagnosis age, fall back to sample age
-all_ages <- pmbb_ages %>%
-    left_join(case_ages, by = "PMBB_ID") %>%
-    mutate(Age = coalesce(Case_Age, Age)) %>%
-    select(PMBB_ID, Age)
-
-# Add PCs (10)
-cov_imp_exome <- all_ages %>%
-    left_join(exome, by = c("PMBB_ID" = "person_id")) %>%
-    left_join(imp, by = c("PMBB_ID" = "person_id")) %>%
+# Add PCs (10) with inner join
+cov_imp_exome <- merged_sel %>%
+    merge(exome, by.x = "PMBB_ID", by.y = "person_id") %>%
+    merge(imp, by.x = "PMBB_ID", by.y = "person_id") %>%
     rename(IID = PMBB_ID)
 
-cov_imp <- all_ages %>%
-    left_join(imp, by = c("PMBB_ID" = "person_id")) %>%
+cov_imp <- merged_sel %>%
+    merge(imp, by.x = "PMBB_ID", by.y = "person_id") %>%
     rename(IID = PMBB_ID)
 
-cov_exome <- all_ages %>%
-    left_join(exome, by = c("PMBB_ID" = "person_id")) %>%
+cov_exome <- merged_sel %>%
+    merge(exome, by.x = "PMBB_ID", by.y = "person_id") %>%
     rename(IID = PMBB_ID)
 
 write.table(cov_imp_exome,
             here("simplexo", "data", "simplexo_imp10_exome10_covariates.txt"),
-            row.names = FALSE, col.names = TRUE, quote = FALSE, sep = "\t")
+            row.names = FALSE, col.names = TRUE, quote = FALSE, sep = " ")
 
 write.table(cov_imp,
             here("simplexo", "data", "simplexo_imp10_covariates.txt"),
-            row.names = FALSE, col.names = TRUE, quote = FALSE, sep = "\t")
+            row.names = FALSE, col.names = TRUE, quote = FALSE, sep = " ")
 
 write.table(cov_exome,
             here("simplexo", "data", "simplexo_exome10_covariates.txt"),
-            row.names = FALSE, col.names = TRUE, quote = FALSE, sep = "\t")
+            row.names = FALSE, col.names = TRUE, quote = FALSE, sep = " ")
 
-# Add PCs (5)
-cov_imp5_exome5 <- all_ages %>%
-    left_join(exome[, 1:6], by = c("PMBB_ID" = "person_id")) %>%
-    left_join(imp[, 1:6], by = c("PMBB_ID" = "person_id")) %>%
+# Add PCs (5) with inner join
+cov_imp5_exome5 <- merged_sel %>%
+    merge(exome[, 1:6], by.x = "PMBB_ID", by.y = "person_id") %>%
+    merge(imp[, 1:6], by.x = "PMBB_ID", by.y = "person_id") %>%
     rename(IID = PMBB_ID)
 
-cov_imp5 <- all_ages %>%
-    left_join(imp[, 1:6], by = c("PMBB_ID" = "person_id")) %>%
+cov_imp5 <- merged_sel %>%
+    merge(imp[, 1:6], by.x = "PMBB_ID", by.y = "person_id") %>%
     rename(IID = PMBB_ID)
 
-cov_exome5 <- all_ages %>%
-    left_join(exome[, 1:6], by = c("PMBB_ID" = "person_id")) %>%
+cov_exome5 <- merged_sel %>%
+    merge(exome[, 1:6], by.x = "PMBB_ID", by.y = "person_id") %>%
     rename(IID = PMBB_ID)
 
 write.table(cov_imp5_exome5,
             here("simplexo", "data", "simplexo_imp5_exome5_covariates.txt"),
-            row.names = FALSE, col.names = TRUE, quote = FALSE, sep = "\t")
+            row.names = FALSE, col.names = TRUE, quote = FALSE, sep = " ")
 
 write.table(cov_imp5,
             here("simplexo", "data", "simplexo_imp5_covariates.txt"),
-            row.names = FALSE, col.names = TRUE, quote = FALSE, sep = "\t")
+            row.names = FALSE, col.names = TRUE, quote = FALSE, sep = " ")
 
 write.table(cov_exome5,
             here("simplexo", "data", "simplexo_exome5_covariates.txt"),
-            row.names = FALSE, col.names = TRUE, quote = FALSE, sep = "\t")
+            row.names = FALSE, col.names = TRUE, quote = FALSE, sep = " ")
 

@@ -9,6 +9,20 @@ source(here("R", "load_packages.R"))
 source(here("R", "sample_selection.R"))
 source(here("R", "control_selection.R"))
 
+
+# ========================
+# FUNCTIONS
+# ========================
+# USAGE: progeny_er_merged <- merge_duplicates(progeny_er, "SampNum")
+merge_duplicates <- function(df, group_col) {
+    df %>%
+        group_by(across(all_of(group_col))) %>%
+        summarise(
+            across(-any_of(group_col), ~ paste(unique(as.character(.x)), collapse = ";")),
+            .groups = "drop"
+        )
+}
+
 # ========================
 # BREAST CANCER ICD SELECTION
 # ========================
@@ -111,24 +125,16 @@ write.csv(up, here("simplexo", "data", "simplexo_up_map.csv"), row.names = FALSE
 # PROGENY - CASE PULL
 # ========================
 
+progeny_case_merged <- merge_duplicates(progeny_case, "SampNum")
+
 print(paste("Initial Progeny cases:", nrow(progeny_case)))  # 5046
-
-# Merge duplicate rows (separate entries for each breast)
 print(paste("Duplicate entries:", sum(duplicated(progeny_case$SampNum))))
-
-progeny_case_merged <- progeny_case %>%
-    group_by(SampNum) %>%
-    summarise(
-        across(-any_of("SampNum"), ~ paste(unique(as.character(.x)), collapse = "; ")),
-        .groups = "drop"
-    )
-
 print(paste("Unique Progeny cases after merging:", nrow(progeny_case_merged)))  # 4273
 
 # ========================
 # FINAL CASES - MERGE ALL
 # ========================
-### merge Progeny with PMBB ###
+### left join Progeny with PMBB ###
 progeny_pmbb <- merge(progeny_case_merged, up, by = "SampNum")
 print(paste("Progeny samples with PMBB IDs:", nrow(progeny_pmbb)))  # 1561
 
@@ -174,6 +180,10 @@ write.table(controls$person_id,
 # FAMILY HISTORY
 # ========================================================================
 
+all_ids <- readLines(here("simplexo", "data", "simplexo_overall_case_ids.txt"))
+length(all_ids)
+# 4059
+
 ###### PROGENY ######
 progeny_fh <- read_excel(
     here("simplexo", "ss", "br_pts_for_exwas_10022025.xlsx")
@@ -181,21 +191,16 @@ progeny_fh <- read_excel(
 
 print(paste("Progeny family history entries:", nrow(progeny_fh)))  # 5046
 
-# Merge duplicate rows
-progeny_fh <- progeny_fh %>%
-    group_by(SampNum) %>%
-    summarise(
-        Gender = unique(Gender),
-        NumFDR = unique(NumFDR),
-        NumFDR_BC = unique(NumFDR_BC),
-        NumSDR = unique(NumSDR),
-        NumSDR_BC = unique(NumSDR_BC),
-        .groups = "drop"
-    )
+progeny_fh <- merge_duplicates(progeny_fh, "SampNum")
 
 print(paste("Unique Progeny family history cases:", nrow(progeny_fh)))  # 4273
 
 # Convert 888 (unknown) to NA
+progeny_fh$NumFDR <- as.numeric(progeny_fh$NumFDR)
+progeny_fh$NumFDR_BC <- as.numeric(progeny_fh$NumFDR_BC)
+progeny_fh$NumSDR <- as.numeric(progeny_fh$NumSDR)
+progeny_fh$NumSDR_BC <- as.numeric(progeny_fh$NumSDR_BC)
+
 progeny_fh <- progeny_fh %>%
     mutate(
         NumFDR = na_if(NumFDR, 888),
@@ -213,21 +218,18 @@ progeny_fh <- progeny_fh %>%
         )
     )
 
-sum(progeny_fh$Family_History == 1)
-dim(progeny_fh)
-# 2606/4273 in progeny w/ family history
-
 # merge with PMBB
-progeny_pmbb_fh <- merge(progeny_fh, up, by = "SampNum")
-dim(progeny_pmbb)
+progeny_pmbb_fh <- merge(progeny_fh, up, by = "SampNum") %>% filter(Gender == "F")
+dim(progeny_pmbb_fh)
+
 # 1520 total progeny in pmbb
 progeny_pmbb_fh <- progeny_pmbb_fh %>% filter(Family_History == 1)
 dim(progeny_pmbb_fh)
-# 1126
-progeny_pmbb_fh <- progeny_pmbb_fh %>% filter(Gender == "F")
-dim(progeny_pmbb_fh)
-# 1100/1561
+# 1100
 
+progeny_pmbb_fh <- progeny_pmbb_fh %>% filter(PMBB_ID %in% all_ids)
+dim(progeny_pmbb_fh)
+# 1096
 write.csv(progeny_pmbb_fh, here("simplexo", "data", "simplexo_progeny_family_history_df.csv"))
 
 ###### PMCR ######
@@ -239,17 +241,17 @@ print(paste("Unique individuals with family history:", length(unique(hx$PMBB_ID)
 
 # Filter for breast cancer family history
 breast_hx <- hx %>% filter(grepl("breast", MEDICAL_HX, ignore.case = TRUE))
-pmcr_hx_ids <- unique(breast_hx$PMBB_ID)
-
-print(paste("Cases with breast cancer family history:", length(pmcr_hx_ids)))  # 2228
+breast_hx <- breast_hx %>% filter(!(RELATION %in% c("null", "Negative History")))
+print(paste("Cases with breast cancer family history:", length(unique(breast_hx$PMBB_ID))))  # 1611
 
 # Combine all family history IDs from Progeny and PMCR
+pmcr_hx_ids <- unique(breast_hx$PMBB_ID)
 hx_ids <- sort(unique(c(progeny_pmbb_fh$PMBB_ID, pmcr_hx_ids)))
-print(paste("Total unique family history IDs:", length(hx_ids)))  # 3063
+print(paste("Total unique family history IDs:", length(hx_ids)))  # 2448
 
 # Intersect with final case IDs (because initial list given to Colleen was w/ 3 instances)
 final_hx_ids <- sort(intersect(all_ids, hx_ids))
-print(paste("Final family history case IDs:", length(final_hx_ids)))  # 2980
+print(paste("Final family history case IDs:", length(final_hx_ids)))  # 2382
 
 write.table(final_hx_ids,
             here("simplexo", "data", "simplexo_fhx_case_ids.txt"),
@@ -274,81 +276,84 @@ write.table(final_hx_ids,
 # ========================================================================
 # ER STATUS
 # ========================================================================
-
 ##### PROGENY #####
 # take the unmerged version, filter out the Not Done, Not Reported, NA, Not Reported
-progeny_pmbb_unmerged <- merge(progeny_case, up, by = "SampNum")
-progeny_pmbb_unmerged <- progeny_pmbb_unmerged %>% filter(Gender == "F")
-print(paste("Female Progeny samples:", nrow(progeny_pmbb_unmerged)))  # 1841
+progeny_pmbb_unmerged <- merge(progeny_case, up, by = "SampNum") %>% filter(Gender == "F")
+print(paste("Female Progeny cases:", nrow(progeny_pmbb_unmerged)))  # 1841
 
-progeny_er <- progeny_pmbb_unmerged %>% filter(ERstatus %in% c("Positive", "Negative"))
-dim(progeny_er)
-# 1023
+# Filter to valid ER status
+progeny_er <- progeny_pmbb_unmerged %>%
+    filter(ERstatus %in% c("Positive", "Negative"))
+cat("Progeny with ER status:", nrow(progeny_er), "\n") # 1023
 
-progeny_er_merged <- progeny_er %>%
-    group_by(SampNum) %>%
-    summarise(
-        across(-any_of("SampNum"), ~ paste(unique(as.character(.x)), collapse = ";")),
-        .groups = "drop"
-    )
-dim(progeny_er_merged)
-# 919
+# Merge duplicates
+progeny_er_merged <- merge_duplicates(progeny_er, "SampNum")
+cat("After merging duplicates:", nrow(progeny_er_merged), "\n") # 919
 
-# filter out those w/ both positive and negative status
-progeny_er_merged <- progeny_er_merged %>% filter(!(ERstatus %in% c("Positive;Negative","Negative;Positive")))
-dim(progeny_er_merged)
-# 898
+# Remove conflicting status (both positive and negative)
+conflicting_progeny <- progeny_er_merged %>%
+    filter(ERstatus %in% c("Positive;Negative", "Negative;Positive"))
+cat("Progeny with conflicting ER status:", nrow(conflicting_progeny), "\n") # 21
 
-progeny_er_neg <- progeny_er_merged %>% filter(ERstatus == "Negative")
-progeny_er_pos <- progeny_er_merged %>% filter(ERstatus == "Positive")
+progeny_er_clean <- progeny_er_merged %>%
+    filter(!(ERstatus %in% c("Positive;Negative", "Negative;Positive")))
 
-print(paste("Progeny ER positive:", nrow(progeny_er_pos)))  # 593
-print(paste("Progeny ER negative:", nrow(progeny_er_neg)))  # 305
+progeny_er_pos <- progeny_er_clean %>% filter(ERstatus == "Positive")
+progeny_er_neg <- progeny_er_clean %>% filter(ERstatus == "Negative")
+cat("Progeny ER+:", nrow(progeny_er_pos), "\n") # 593
+cat("Progeny ER-:", nrow(progeny_er_neg), "\n") # 305
 
 ##### PMCR #####
-
 er <- read.csv(here("simplexo", "ss", "pmbb_1093_brca_er_20251024.csv"))
-
 print(paste("Total ER status records:", nrow(er)))  # 4563
 print(paste("Unique individuals:", length(unique(er$PMBB_ID))))  # 4285
 
-# filter out indeterminates and nulls
+# Filter to valid ER status
 er <- er %>% filter(EstrogenReceptorSummarry %in% c("Positive", "Negative"))
-
-# Collapse data by PMBB_ID
-er_merged <- er %>%
-    group_by(PMBB_ID) %>%
-    summarise(across(everything(), ~ {
-        if (length(unique(.)) == 1) {
-            unique(.)[1]
-        } else {
-            paste(unique(.), collapse = ";")
-        }
-    }))
-dim(er_merged)
+er_merged <- merge_duplicates(er, "PMBB_ID")
+cat("After merging duplicates:", nrow(er_merged), "\n")
 # 1849
 
-# filter out those w/ both positive and negative status
-er_merged <- er_merged %>% filter(!(EstrogenReceptorSummarry %in% c("Positive;Negative","Negative;Positive")))
-dim(er_merged)
-# 1834
+# Remove conflicting status
+conflicting_pmcr <- er_merged %>%
+    filter(EstrogenReceptorSummarry %in% c("Positive;Negative", "Negative;Positive"))
+cat("PMCR with conflicting ER status:", nrow(conflicting_pmcr), "\n") # 15
 
-er_pos <- er_merged %>% filter(EstrogenReceptorSummarry == "Positive")
-er_neg <- er_merged %>% filter(EstrogenReceptorSummarry == "Negative")
-length(er_pos$PMBB_ID) # 1468
-length(er_neg$PMBB_ID) # 366
+er_clean <- er_merged %>%
+    filter(!(EstrogenReceptorSummarry %in% c("Positive;Negative", "Negative;Positive")))
 
-# Combine ER status from both sources but intersect w/ overall case list
-pos_ids <- sort(intersect(unique(c(er_pos$PMBB_ID, progeny_er_pos$PMBB_ID)), all_ids))
-neg_ids <- sort(intersect(unique(c(er_neg$PMBB_ID, progeny_er_neg$PMBB_ID)), all_ids))
+er_pos <- er_clean %>% filter(EstrogenReceptorSummarry == "Positive")
+er_neg <- er_clean %>% filter(EstrogenReceptorSummarry == "Negative")
+cat("PMCR ER+:", nrow(er_pos), "\n") # 1468
+cat("PMCR ER-:", nrow(er_neg), "\n") # 366
 
-print(paste("Final ER positive cases:", length(pos_ids))) # 1876
-print(paste("Final ER negative cases:", length(neg_ids))) # 620
+##### COMBINE #####
+pos_ids_combined <- unique(c(er_pos$PMBB_ID, progeny_er_pos$PMBB_ID))
+neg_ids_combined <- unique(c(er_neg$PMBB_ID, progeny_er_neg$PMBB_ID))
+
+# Check for conflicts between sources
+conflicts <- intersect(pos_ids_combined, neg_ids_combined)
+cat("\nConflicts between sources:", length(conflicts), "\n") # 5
+
+if (length(conflicts) > 0) {
+    cat("WARNING: Some people have conflicting ER status between Progeny and PMCR\n")
+    cat("Excluding these", length(conflicts), "individuals from both lists\n")
+    pos_ids_combined <- setdiff(pos_ids_combined, conflicts)
+    neg_ids_combined <- setdiff(neg_ids_combined, conflicts)
+}
+
+# Intersect with overall case list
+pos_ids <- sort(intersect(pos_ids_combined, all_ids))
+neg_ids <- sort(intersect(neg_ids_combined, all_ids))
+
+cat("\nFinal counts:\n")
+cat("ER+ cases:", length(pos_ids), "\n") #1871
+cat("ER- cases:", length(neg_ids), "\n") #615
+cat("Overlap (in both lists):", length(intersect(pos_ids, neg_ids)), "\n")
 
 write.table(pos_ids,
             here("simplexo", "data", "simplexo_er_pos_case_ids.txt"),
             quote = FALSE, row.names = FALSE, col.names = FALSE)
-
 write.table(neg_ids,
             here("simplexo", "data", "simplexo_er_neg_case_ids.txt"),
             quote = FALSE, row.names = FALSE, col.names = FALSE)
@@ -373,7 +378,7 @@ inv_only <- select_samples(
 )
 
 ##### PROGENY #####
-progeny_pmbb_insitu <- progeny_pmbb %>%
+progeny_pmbb_flag <- progeny_pmbb_unmerged %>%
     mutate(
         is_insitu_dx = str_detect(
             Diagnosis,
@@ -389,17 +394,23 @@ progeny_pmbb_insitu <- progeny_pmbb %>%
         is_insitu = replace_na(is_insitu, FALSE)
     )
 
-# Exclude in situ cases
-progeny_no_insitu <- progeny_pmbb_insitu %>% filter(!is_insitu)
+# Exclude in situ cases and benign...
+progeny_invasive_records <- progeny_pmbb_flag %>%
+    filter(!is_insitu) %>%
+    filter(!(Diagnosis %in% c("Normal Benign Tissue", "99.Not Reported", "Not Reported"))) %>%
+    filter(Gender == "F")
 
-print(paste("Progeny invasive only:", nrow(progeny_no_insitu)))  # 1261
+cat("Progeny invasive records (before merge):", nrow(progeny_invasive_records), "\n")
+progeny_invasive <- merge_duplicates(progeny_invasive_records, "SampNum")
+cat("Unique Progeny patients with invasive:", nrow(progeny_invasive), "\n")
 
-# Combine invasive cases
-inv_only_ids <- unique(c(progeny_no_insitu$PMBB_ID, inv_only$filtered_patients$person_id))
+##### COMBINE #####
+icd_ids <- inv_only$filtered_patients$person_id
+inv_only_ids <- unique(c(progeny_invasive$PMBB_ID, icd_ids))
+final_inv_ids <- sort(intersect(inv_only_ids, all_ids))
+cat("Final patients w/ invasive:", length(final_inv_ids), "\n") # 3791
 
-print(paste("Total invasive only cases:", length(inv_only_ids)))  # 3780
-
-write.table(sort(inv_only_ids),
+write.table(final_inv_ids,
             here("simplexo", "data", "simplexo_malig_case_ids.txt"),
             quote = FALSE, row.names = FALSE, col.names = FALSE)
 
@@ -416,11 +427,11 @@ ages <- ages %>%
 
 print(paste("Cases with age information:", nrow(ages)))
 
-young <- ages %>% filter(Age <= 50)
+young <- ages %>% filter(Age <= 50) %>% filter(PMBB_ID %in% all_ids)
 
-print(paste("Cases age <= 50:", nrow(young)))  # 1900
+print(paste("Cases age <= 50:", length(unique(young$PMBB_ID))))  # 1900
 
-write.table(sort(young$PMBB_ID),
+write.table(sort(unique(young$PMBB_ID)),
             here("simplexo", "data", "simplexo_50_case_ids.txt"),
             quote = FALSE, row.names = FALSE, col.names = FALSE)
 
