@@ -400,9 +400,9 @@ progeny_invasive_records <- progeny_pmbb_flag %>%
     filter(!(Diagnosis %in% c("Normal Benign Tissue", "99.Not Reported", "Not Reported"))) %>%
     filter(Gender == "F")
 
-cat("Progeny invasive records (before merge):", nrow(progeny_invasive_records), "\n")
+cat("Progeny invasive records (before merge):", nrow(progeny_invasive_records), "\n") # 1529
 progeny_invasive <- merge_duplicates(progeny_invasive_records, "SampNum")
-cat("Unique Progeny patients with invasive:", nrow(progeny_invasive), "\n")
+cat("Unique Progeny patients with invasive:", nrow(progeny_invasive), "\n") # 1320
 
 ##### COMBINE #####
 icd_ids <- inv_only$filtered_patients$person_id

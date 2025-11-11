@@ -121,19 +121,18 @@ write.table(merged,
             here("simplexo", "data", "simplexo_overall_case_ages_merged.txt"),
             row.names = FALSE, quote = FALSE, sep = "\t")
 
+
 # ========================
 # SELECT FINAL CASE IDs WITH AGES
 # ========================
+
 merged_sel <- merged %>%
     select(PMBB_ID, Age) %>%
     filter(!is.na(Age)) %>%
     mutate(Age = round(Age, 2))
 
-no_age <- merged %>%
-    select(PMBB_ID, Age) %>%
-    filter(is.na(Age))
-cat("Final cases with age:", nrow(merged_sel), "records\n")
-cat("Cases without age:", nrow(base_df) - nrow(merged_sel), "records\n")
+cat("Final cases with age:", nrow(merged_sel), "records\n") # 4059
+cat("Cases without age:", nrow(base_df) - nrow(merged_sel), "records\n") # 4
 
 write.table(sort(merged_sel$PMBB_ID),
             here("simplexo", "data", "simplexo_overall_case_ids.txt"),
@@ -143,55 +142,122 @@ write.table(sort(merged_sel$PMBB_ID),
 # CREATE FINAL COVARIATE FILES
 # ========================
 
-# Add PCs (10) with inner join
-cov_imp_exome <- merged_sel %>%
-    merge(exome, by.x = "PMBB_ID", by.y = "person_id") %>%
-    merge(imp, by.x = "PMBB_ID", by.y = "person_id") %>%
+# Start with sample ages for all PMBB participants
+pmbb_ages <- cov %>%
+    select(person_id, Sample_age) %>%
+    rename(PMBB_ID = person_id, Age = Sample_age)
+
+# Prepare case ages
+case_ages <- merged_sel %>%
+    select(PMBB_ID, Age) %>%
+    rename(Case_Age = Age)
+
+# Prioritize case diagnosis age, fall back to sample age
+all_ages <- pmbb_ages %>%
+    left_join(case_ages, by = "PMBB_ID") %>%
+    mutate(Age = coalesce(Case_Age, Age)) %>%
+    select(PMBB_ID, Age)
+
+# Add PCs (10)
+# cov_imp_exome <- all_ages %>%
+#     left_join(exome, by = c("PMBB_ID" = "person_id")) %>%
+#     left_join(imp, by = c("PMBB_ID" = "person_id")) %>%
+#     rename(IID = PMBB_ID)
+
+cov_imp <- all_ages %>%
+    inner_join(imp, by = c("PMBB_ID" = "person_id")) %>%
     rename(IID = PMBB_ID)
 
-cov_imp <- merged_sel %>%
-    merge(imp, by.x = "PMBB_ID", by.y = "person_id") %>%
-    rename(IID = PMBB_ID)
+# cov_exome <- all_ages %>%
+#     left_join(exome, by = c("PMBB_ID" = "person_id")) %>%
+#     rename(IID = PMBB_ID)
 
-cov_exome <- merged_sel %>%
-    merge(exome, by.x = "PMBB_ID", by.y = "person_id") %>%
-    rename(IID = PMBB_ID)
-
-write.table(cov_imp_exome,
-            here("simplexo", "data", "simplexo_imp10_exome10_covariates.txt"),
-            row.names = FALSE, col.names = TRUE, quote = FALSE, sep = " ")
-
+# write.table(cov_imp_exome,
+#             here("simplexo", "data", "simplexo_imp10_exome10_covariates.txt"),
+#             row.names = FALSE, col.names = TRUE, quote = FALSE, sep = "\t")
+#
 write.table(cov_imp,
-            here("simplexo", "data", "simplexo_imp10_covariates.txt"),
-            row.names = FALSE, col.names = TRUE, quote = FALSE, sep = " ")
+            here("simplexo", "data", "simplexo_all_imp10_covariates.txt"),
+            row.names = FALSE, col.names = TRUE, quote = FALSE, sep = "\t")
 
-write.table(cov_exome,
-            here("simplexo", "data", "simplexo_exome10_covariates.txt"),
-            row.names = FALSE, col.names = TRUE, quote = FALSE, sep = " ")
+# write.table(cov_exome,
+#             here("simplexo", "data", "simplexo_all_exome10_covariates.txt"),
+#             row.names = FALSE, col.names = TRUE, quote = FALSE, sep = "\t")
 
-# Add PCs (5) with inner join
-cov_imp5_exome5 <- merged_sel %>%
-    merge(exome[, 1:6], by.x = "PMBB_ID", by.y = "person_id") %>%
-    merge(imp[, 1:6], by.x = "PMBB_ID", by.y = "person_id") %>%
-    rename(IID = PMBB_ID)
+# # Add PCs (5)
+# cov_imp5_exome5 <- all_ages %>%
+#     left_join(exome[, 1:6], by = c("PMBB_ID" = "person_id")) %>%
+#     left_join(imp[, 1:6], by = c("PMBB_ID" = "person_id")) %>%
+#     rename(IID = PMBB_ID)
+#
+# cov_imp5 <- all_ages %>%
+#     left_join(imp[, 1:6], by = c("PMBB_ID" = "person_id")) %>%
+#     rename(IID = PMBB_ID)
+#
+# cov_exome5 <- all_ages %>%
+#     left_join(exome[, 1:6], by = c("PMBB_ID" = "person_id")) %>%
+#     rename(IID = PMBB_ID)
+#
+# write.table(cov_imp5_exome5,
+#             here("simplexo", "data", "simplexo_imp5_exome5_covariates.txt"),
+#             row.names = FALSE, col.names = TRUE, quote = FALSE, sep = "\t")
+#
+# write.table(cov_imp5,
+#             here("simplexo", "data", "simplexo_imp5_covariates.txt"),
+#             row.names = FALSE, col.names = TRUE, quote = FALSE, sep = "\t")
+#
+# write.table(cov_exome5,
+#             here("simplexo", "data", "simplexo_exome5_covariates.txt"),
+#             row.names = FALSE, col.names = TRUE, quote = FALSE, sep = "\t")
 
-cov_imp5 <- merged_sel %>%
-    merge(imp[, 1:6], by.x = "PMBB_ID", by.y = "person_id") %>%
-    rename(IID = PMBB_ID)
 
-cov_exome5 <- merged_sel %>%
-    merge(exome[, 1:6], by.x = "PMBB_ID", by.y = "person_id") %>%
-    rename(IID = PMBB_ID)
+# ========================
+# CREATE STRATIFIED COVARIATE FILES
+# ========================
+imp <- imp %>% filter(!is.na(imputed_PC1))
+dim(imp)
 
-write.table(cov_imp5_exome5,
-            here("simplexo", "data", "simplexo_imp5_exome5_covariates.txt"),
-            row.names = FALSE, col.names = TRUE, quote = FALSE, sep = " ")
+scase_50 <- readLines(here("simplexo", "data", "simplexo_50_case_ids.txt"))
+case_malig <- readLines(here("simplexo", "data", "simplexo_malig_case_ids.txt"))
+case_er_neg <- readLines(here("simplexo", "data", "simplexo_er_neg_case_ids.txt"))
+case_er_pos <- readLines(here("simplexo", "data", "simplexo_er_pos_case_ids.txt"))
+case_fhx <- readLines(here("simplexo", "data", "simplexo_fhx_case_ids.txt"))
 
-write.table(cov_imp5,
-            here("simplexo", "data", "simplexo_imp5_covariates.txt"),
-            row.names = FALSE, col.names = TRUE, quote = FALSE, sep = " ")
+cat("Loaded stratified case lists:\n")
+cat("  Age ≤50:", length(case_50), "\n")
+cat("  Invasive:", length(case_malig), "\n")
+cat("  ER-:", length(case_er_neg), "\n")
+cat("  ER+:", length(case_er_pos), "\n")
+cat("  Family history:", length(case_fhx), "\n")
 
-write.table(cov_exome5,
-            here("simplexo", "data", "simplexo_exome5_covariates.txt"),
-            row.names = FALSE, col.names = TRUE, quote = FALSE, sep = " ")
+create_stratified_covariates <- function(case_ids, analysis_name) {
+    # Filter case ages for this subset
+    subset_case_ages <- merged_sel %>%
+        filter(PMBB_ID %in% case_ids) %>%
+        select(PMBB_ID, Age) %>%
+        rename(Case_Age = Age)
+
+    # Get all PMBB ages and prioritize case diagnosis age
+    subset_all_ages <- pmbb_ages %>%
+        left_join(subset_case_ages, by = "PMBB_ID") %>%
+        mutate(Age = coalesce(Case_Age, Age)) %>%
+        select(PMBB_ID, Age)
+
+    # Add imputed PCs (10)
+    subset_cov_imp <- subset_all_ages %>%
+        inner_join(imp, by = c("PMBB_ID" = "person_id")) %>%
+        rename(IID = PMBB_ID)
+
+    write.table(subset_cov_imp,
+                here("simplexo", "data", paste0("simplexo_", analysis_name, "_imp10_covariates.txt")),
+                row.names = FALSE, col.names = TRUE, quote = FALSE, sep = " ")
+
+    return(subset_cov_imp)
+}
+
+create_stratified_covariates(case_50, "50")
+create_stratified_covariates(case_malig, "malig")
+create_stratified_covariates(case_er_neg, "er_neg")
+create_stratified_covariates(case_er_pos, "er_pos")
+create_stratified_covariates(case_fhx, "fhx")
 

@@ -27,7 +27,7 @@ library(here)
 source(here("R", "sample_selection.R"))
 
 tgct_results <- select_samples(
-    cancer_name = "tgct",
+    sample_name = "tgct",
     icd_codes = c("^C62", "^Z80.43", "^186", "^V10.47"),
     gender_filter = "Male",
     crep_filter = NULL,
@@ -109,6 +109,9 @@ write.csv(kt_mrn, here("PMBB", "3.0", "pmbb3_kt_key.csv"))
 # ========================
 # COMPARE W/ ICD CODES
 # ========================
+#
+icd_df <- fread(here("tgct", "data", "tgct_cancer_filtered_patients.txt"), header = TRUE)
+
 length(icds) # 779
 # length(unique(icds))
 
@@ -127,13 +130,32 @@ length(icd_not_kt)
 # left join the kt not icd codes w/ their kt ids
 kt_not_icd_df <- kt_mrn %>% filter(PMBB_ID %in% kt_not_icd)
 dim(kt_not_icd_df)
-# sum(is.na(kt_not_icd_df$`2_hup_mrn`))
 
-# colnames(kt_not_icd_df) <- c("PMBB_ID", "KT_ID", "ID", "SampNum")
+# join all 779 samples
+# or maybe merge the kt_mrn with the icd_df
+x <- left_join(icd_df[,1], kt_mrn, by = c("person_id" = "PMBB_ID"))
+dim(x)
+write.csv(x, here("tgct", "data", "tgct_icd_mrn_df.csv"), row.names = FALSE, quote = FALSE)
+
+x <- kt_mrn %>% filter(PMBB_ID %in% icd_df$person_id)
+dim(icd_df)
+
+# sum(is.na(kt_not_icd_df$`2_hup_mrn`))
+kt_icd_df <- kt_mrn %>% filter(PMBB_ID %in% kt_icd)
+kt_icd_df <- left_join(
+    kt_icd_df,
+    icd_df,
+    by = c("PMBB_ID" = "person_id")
+)
+
+# save results!
 write.table(kt_not_icd, here("tgct", "data", "tgct_kt_not_icd.txt"),
             col.names = FALSE, row.names = FALSE, quote = FALSE)
 write.csv(kt_not_icd_df, here("tgct", "data", "tgct_kt_not_icd_df.csv"), row.names = FALSE, quote = FALSE)
 
-dim(kt_not_icd_df)
-length(kt_not_icd)
+write.table(kt_icd, here("tgct", "data", "tgct_kt_icd.txt"),
+            col.names = FALSE, row.names = FALSE, quote = FALSE)
+write.csv(kt_icd_df, here("tgct", "data", "tgct_kt_icd_df.csv"), row.names = FALSE, quote = FALSE)
+
+
 
