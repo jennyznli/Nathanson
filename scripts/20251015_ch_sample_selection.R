@@ -3,11 +3,9 @@
 # ========================
 
 library(here)
-setwd("/Users/jennyzli/Documents/Nathanson")
 setwd( "/Users/jennyzli/Documents/Nathanson")
-source(here("R", "load_packages.R"))
-source(here("R", "sample_selection.R"))
-source(here("R", "control_selection.R"))
+source(here("R", "config.R"))
+
 library(VennDiagram)
 
 # ========================
@@ -17,7 +15,6 @@ var <- read.csv(here("ch", "data", "all_genes_filtered_variants.csv"))
 x <- read.csv(here("ch", "data", "all_genes_with_filter_info.csv"))
 progeny <- read_excel(here("ch", "ss", "brca_carriers_ch_freq_w_seen_in_crep_20251020.xlsx"), sheet = "Data_from_master_table")
 progeny <- progeny %>% filter(DNA == "D")
-progeny_tumor <- read_excel(here("ch", "ss", "brca_carriers_ch_freq_w_seen_in_crep_20251020.xlsx"), sheet = "Tumor")
 progeny$SampNum <- as.numeric(progeny$SampNum)
 
 up <- read.csv(here("simplexo", "data", "simplexo_up_map.csv"))
@@ -41,6 +38,7 @@ length(unique(progeny$globalid))
 # 2816
 
 table(progeny$Seen_In_CREP)
+
 # get rid of the no, unkown, NA
 # [1] "Yes"                       "No"
 # [3] NA                          "Unknown"
@@ -55,17 +53,86 @@ progeny_pmbb <- progeny_merged %>%
     filter(!is.na(PMBB_ID))
 dim(progeny_pmbb)
 # 1278 are in the PMBB
+table(progeny_pmbb$BRCA1_Presence_of_Mutation)
+table(progeny_pmbb$BRCA2_Presence_of_Mutation)
 
-brca1_progeny_pmbb <- progeny_pmbb %>% filter(BRCA1_Presence_of_Mutation %in% c("Yes", "Obligate Carrier", "Yes-unconfirmed"))
-dim(brca1_progeny_pmbb) #681
-brca2_progeny_pmbb <- progeny_pmbb %>% filter(BRCA2_Presence_of_Mutation %in% c("Yes", "Obligate Carrier", "Yes-unconfirmed"))
-dim(brca2_progeny_pmbb) #606
+### CHECK OUT OTHER SHEETS ##
+progeny_tumor <- read_excel(here("ch", "ss", "brca_carriers_ch_freq_w_seen_in_crep_20251020.xlsx"), sheet = "Tumor") %>% filter(globalid %in% progeny_pmbb$globalid)
+progeny_treat <- read_excel(here("ch", "ss", "brca_carriers_ch_freq_w_seen_in_crep_20251020.xlsx"), sheet = "Treatment") %>% filter(globalid %in% progeny_pmbb$globalid)
+progeny_rec <- read_excel(here("ch", "ss", "brca_carriers_ch_freq_w_seen_in_crep_20251020.xlsx"), sheet = "Recurrence") %>% filter(globalid %in% progeny_pmbb$globalid)
+progeny_path <- read_excel(here("ch", "ss", "brca_carriers_ch_freq_w_seen_in_crep_20251020.xlsx"), sheet = "Pathology") %>% filter(globalid %in% progeny_pmbb$globalid)
+
+length(unique(progeny_treat$globalid))
+length(unique(progeny_rec$globalid))
+length(unique(progeny_path$globalid))
+length(unique(progeny_tumor$globalid))
+length(unique(progeny_pmbb$globalid))
+
+table(progeny_pmbb$SmokingEver)
+# NA   Never      No Unknown     Yes
+# 52     775      62      22     367
+# 52 + 22 = 74 unknowns not terrible
+
+# SEE IF THOSE THAT DON'T HAVE TUMOR INFO ARE DISPROPORTIONALLY NOT INC REP??
+no <- progeny_pmbb %>% filter(!(globalid %in% progeny_tumor$globalid)) # 554
+yes <- progeny_pmbb %>% filter((globalid %in% progeny_tumor$globalid)) # 724
+
+no_prop  <- prop.table(table(no$Seen_In_CREP))  %>% as.data.frame()
+yes_prop <- prop.table(table(yes$Seen_In_CREP)) %>% as.data.frame()
+no_prop
+# Var1        Freq
+# 1              HUP CREP 0.055956679
+# 2                    NA 0.016245487
+# 3                    No 0.324909747
+# 4 Pennsylvania Hospital 0.001805054
+# 5               Unknown 0.023465704
+# 6                   Yes 0.577617329
+yes_prop
+# Var1        Freq
+# 1   Chester County Hospital 0.001381215
+# 2                  HUP CREP 0.031767956
+# 3                        NA 0.030386740
+# 4                        No 0.348066298
+# 5 Penn Medicine Cherry Hill 0.001381215
+# 6     Pennsylvania Hospital 0.002762431
+# 7                   Unknown 0.026243094
+# 8                       Yes 0.558011050
+
+# so i don't htink that not being in CREP mens that you don't ahve tumor information?
+
+#### GET BRCA1/2 CARRIERS ####
+brca1_progeny_pmbb <- progeny_pmbb %>% filter(BRCA1_Presence_of_Mutation %in% c("Yes", "Obligate Carrier", "VUS Positive"))
+dim(brca1_progeny_pmbb) #682
+brca2_progeny_pmbb <- progeny_pmbb %>% filter(BRCA2_Presence_of_Mutation %in% c("Yes", "Obligate Carrier", "VUS Positive"))
+dim(brca2_progeny_pmbb) #607
 
 length(intersect(brca1_progeny_pmbb$globalid, brca2_progeny_pmbb$globalid))
-# 9 with both and in PMBB
+# 11 with both and in PMBB
 
-##### SEEN IN CREP #####
+# progeny_pmbb_tumor <- progeny_tumor %>% filter(globalid %in% progeny_pmbb$globalid)
+# # these are the tumors of the ones w/ dna in pmbb
+#
+# length(unique(progeny_pmbb$globalid))
+# progeny_pmbb_tumor_ids <- unique(progeny_pmbb_tumor$globalid)
+# length(progeny_pmbb_tumor_ids)
+# # 724 / 1278 samples in PMBB have tumor information...
+#
+# # wait so there are no NA in the progeny_tumor...
+#
+
+
 progeny_crep <- progeny %>% filter(!(Seen_In_CREP %in% c("No", "Unknown", NA)))
+progeny_nocrep <- progeny %>% filter((Seen_In_CREP %in% c("No", "Unknown", NA)))
+length(unique(progeny_crep$globalid))
+length(progeny_crep$globalid %in% tumor_ids)
+# 1648/1648 have cancer info or tumors...
+length(progeny_nocrep$globalid %in% tumor_ids)
+# 1168
+length(unique(progeny_nocrep$globalid))
+# 1168
+# how
+
+table(progeny_pmbb$Seen_In_CREP)
 dim(progeny_crep)
 # 1648
 progeny_crep_merged <- merge_duplicates(progeny_crep, "SampNum")
