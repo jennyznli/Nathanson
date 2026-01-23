@@ -9,20 +9,6 @@ source(here("R", "load_packages.R"))
 source(here("R", "sample_selection.R"))
 source(here("R", "control_selection.R"))
 
-
-# ========================
-# FUNCTIONS
-# ========================
-# USAGE: progeny_er_merged <- merge_duplicates(progeny_er, "SampNum")
-merge_duplicates <- function(df, group_col) {
-    df %>%
-        group_by(across(all_of(group_col))) %>%
-        summarise(
-            across(-any_of(group_col), ~ paste(unique(as.character(.x)), collapse = ";")),
-            .groups = "drop"
-        )
-}
-
 # ========================
 # BREAST CANCER ICD SELECTION
 # ========================
