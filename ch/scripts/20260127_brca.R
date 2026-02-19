@@ -131,7 +131,7 @@ table(f3_b12_und$Mutation_Gene1)
 # BRCA1 BRCA2
 # 65     6
 
-### POSSIBLE -> RESOLVED  ###
+### POSSIBLE / PUTATIVE -> RESOLVED  ###
 f3_b12_pos_mm <- read_excel(file.path("ch", "ss", "brca12_palb2_progenymatch_070125_w_family_source.xlsx"), sheet = "Mutation Match") %>%
     select("Sample.ID", "WSL ID", "Mutation_GeneX", "HGVScX", "HGVSpX") %>%
     filter(Mutation_GeneX %in% c("BRCA1", "BRCA2"))
@@ -170,7 +170,7 @@ dim(f3_b12_res)
 
 table(f3_b12_res$Gene)
 # BRCA1 BRCA2
-# 60    75
+# 61    75
 
 ### COMBINE ALL FREEZE 3
 # first merge the ones with annotations
@@ -179,7 +179,7 @@ f3_b12_lik_fnd_pos <- rbind(f3_b12_lik, f3_b12_fnd, f3_b12_res) %>%
 dim(f3_b12_lik_fnd_pos) # 1290
 table(f3_b12_lik_fnd_pos$Gene)
 # BRCA1 BRCA2
-# 654   636
+# 655   635
 
 ### QC STATS
 range(f3_b12_lik_fnd_pos$Sample.Depth) # 14 117
@@ -189,7 +189,7 @@ length(unique(f3_b12_lik_fnd_pos$Sample.ID)) # 1283
 (unique(f3_b12_lik_fnd_pos$Variant.Consequence))
 table(f3_b12_lik_fnd_pos$Variant.LoF_level)
 # 1    2
-# 1273   16
+# 1274   16
 
 write.csv(f3_b12_lik_fnd_pos, file.path("ch", "data", "crep_brca12_lik_fnd_pos_df.csv"))
 
@@ -264,6 +264,12 @@ length(all_b1_lof12_ids)
 # 890
 length(all_b2_lof12_ids)
 # 1020
+
+length(union(all_b1_lof12_ids, all_b2_lof12_ids))
+# 1899
+
+length(intersect(all_b1_lof12_ids, all_b2_lof12_ids))
+# 11
 
 # ========================
 # COMBINE WITH EVERYTHING
