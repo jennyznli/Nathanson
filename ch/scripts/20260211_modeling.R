@@ -15,13 +15,14 @@ source(here("R", "config.R"))
 b1_case <- read.csv(file.path("ch", "data", "pmbb_brca1_case.csv"))$x
 b2_case <- read.csv(file.path("ch", "data", "pmbb_brca2_case.csv"))$x
 
+m.out4 <- readRDS(file.path("ch", "data", "ch_psm_matched4.rds"))
+weights <- m.out4$weights
+m.data <- match_data(m.out4)
+
 # ========================
 # REGRESSION MODELS
 # ========================
-# need to add chip as binary
-m.out4 <- readRDS(file.path("ch", "data", "pmbb_brca2_case.csv"))
-weights <- m.out4$weights
-m.data <- match_data(m.out4)
+
 
 fit_glm <- glm(
     CHIP_Binary ~ BRCA12_Case + distance + Batch + Smoke_History + Sequenced_gender +

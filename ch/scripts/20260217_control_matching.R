@@ -212,6 +212,45 @@ cov2 <- cov1 %>%
         )
     )
 
+write.csv(cov2, here("ch", "data", "pmbb_brca12_cov_df.csv"))
+
+# ========================
+# CHECK NUMBER OF BRCA2 CARRIERS
+# ========================
+q <- cov2 %>% filter(BRCA2_Case == 1, Sequenced_gender == "Female")
+dim(q)
+# 707
+
+table(q$Cancer)
+# 0   1
+# 241 466
+
+# range
+range(q$Sample_age)
+# 19.9 90.0
+
+# Get Q1 and Q3 values
+quantiles <- quantile(q$Sample_age, probs = c(0.25, 0.75))
+
+# Print the quantiles and IQR
+cat("Q1:", quantiles[1], "\n")
+cat("Q3:", quantiles[2], "\n")
+cat("IQR:", IQR(q$Sample_age), "\n")
+
+ggplot(q, aes(x = Sample_age)) +
+    geom_boxplot(fill = "skyblue", color = "black", alpha = 0.7) +
+    labs(title = "Sample Age Box Plot of Female BRCA2 Cases", x = "Age", y = "Count") +
+    theme_minimal()
+ggsave(here("ch", "figures", "age_boxplot_female_brca2.png"), width = 6, height = 3, dpi = 300)
+
+# sample age
+ggplot(q, aes(x = Sample_age)) +
+    geom_histogram(binwidth = 5, fill = "skyblue", color = "black", alpha = 0.7) +
+    labs(title = "Sample Age Histogram of Female BRCA2 Cases", x = "Age", y = "Count") +
+    theme_minimal()
+
+ggsave(here("ch", "figures", "age_histogram_female_brca2.png"), width = 8, height = 6, dpi = 300)
+
 # ========================
 # CHECK STRATA DISTRIBUTION
 # ========================
@@ -455,6 +494,9 @@ m.out4 <- matchit(
     replace = FALSE
 )
 summary(m.out4, un = FALSE)
+
+saveRDS(m.out4, file.path("ch", "data", "ch_psm_matched4.rds"))
+
 # Summary of Balance for Matched Data:
 #     Means Treated Means Control Std. Mean Diff. Var. Ratio eCDF Mean eCDF Max Std. Pair Dist.
 # distance                      0.1277        0.1269          0.0082     1.0169    0.0007   0.0149          0.0164
@@ -478,6 +520,44 @@ summary(m.out4, un = FALSE)
 # Matched (ESS)  1957.97     677
 # Matched        2327.       677
 # Unmatched     25798.        20
+# Discarded         0.         0
+
+m.out43 <- matchit(
+    match_formula,
+    data = unaff,
+    method = "nearest",
+    distance = "glm",
+    ratio = 4,
+    caliper = c(0.4, # use 0.2 STD of logit(PS)
+                Sample_age = 5), # +- 5 years for sample age
+    std.caliper = c(TRUE, FALSE), # goes with caliper field
+    exact = ~ Sequenced_gender + Batch + Smoke_History,
+    replace = FALSE
+)
+summary(m.out43, un = FALSE)
+# Summary of Balance for Matched Data:
+#     Means Treated Means Control Std. Mean Diff. Var. Ratio eCDF Mean eCDF Max Std. Pair Dist.
+# distance                      0.1295        0.1281          0.0158     1.0302    0.0009   0.0213          0.0218
+# Sample_age                   42.9786       42.4944          0.0363     0.9476    0.0085   0.0440          0.1892
+# Sequenced_genderFemale        0.7645        0.7645          0.0000          .    0.0000   0.0000          0.0000
+# Sequenced_genderMale          0.2355        0.2355         -0.0000          .    0.0000   0.0000          0.0000
+# Smoke_History0                0.7137        0.7137          0.0000          .    0.0000   0.0000          0.0000
+# Smoke_History1                0.2863        0.2863         -0.0000          .    0.0000   0.0000          0.0000
+# Batch1                        0.2209        0.2209         -0.0000          .    0.0000   0.0000          0.0000
+# Batch2                        0.7791        0.7791          0.0000          .    0.0000   0.0000          0.0000
+# PC1                           0.0106        0.0109         -0.0220     0.9116    0.0250   0.0730          0.2921
+# PC2                           0.0443        0.0441          0.0104     0.8043    0.0376   0.0958          0.3448
+# PC3                          -0.0174       -0.0173         -0.0118     0.6174    0.0260   0.0617          0.7839
+# PC4                          -0.0095       -0.0092         -0.0237     1.4170    0.0186   0.0455          0.5038
+# PC5                           0.0061        0.0062         -0.0107     1.3571    0.0152   0.0350          0.5220
+# PC6                          -0.0004       -0.0003         -0.0154     0.8430    0.0071   0.0259          1.1080
+#
+# Sample Sizes:
+#     Control Treated
+# All           28125.       697
+# Matched (ESS)  2019.96     688
+# Matched        2379.       688
+# Unmatched     25746.         9
 # Discarded         0.         0
 
 # Distribution of matches per carrier
@@ -589,6 +669,8 @@ matched_data <- match_data(m.out4)
 head(matched_data)
 dim(matched_data)
 # 3004
+# 3067
+# 3104
 
 write.csv(matched_data, file.path("ch", "data", "ch_psm_matched4_data.csv"), row.names = FALSE)
 
@@ -611,6 +693,42 @@ all_ids <- sort(c(control_ids, case_ids))
 write.csv(case_ids, file.path("ch", "data", "ch_psm_matched4_case_ids.csv"), row.names = FALSE)
 write.csv(control_ids, file.path("ch", "data", "ch_psm_matched4_control_ids.csv"), row.names = FALSE)
 write.csv(all_ids, file.path("ch", "data", "ch_psm_matched4_case_control_ids.csv"), row.names = FALSE)
+
+# split it into f2 and f33
+case_control_f2_ids <- matched_data %>%
+    filter(Batch == 1) %>%
+    pull(person_id) %>%
+    sort()
+case_control_f3_ids <- matched_data %>%
+    filter(Batch == 2) %>%
+    pull(person_id) %>%
+    sort()
+
+length(case_control_f2_ids)
+# 760
+length(case_control_f3_ids)
+# 2244
+write.csv(case_control_f2_ids, file.path("ch", "data", "ch_psm_matched_f2_case_control_ids.csv"), row.names = FALSE)
+write.csv(case_control_f3_ids, file.path("ch", "data", "ch_psm_matched_f3_case_control_ids.csv"), row.names = FALSE)
+
+# split it into f2 and f3 df
+case_control_f2_df <- matched_data %>%
+    filter(Batch == 1) %>%
+    dplyr::select(person_id, BRCA12_Case)
+case_control_f3_df <- matched_data %>%
+    filter(Batch == 2) %>%
+    dplyr::select(person_id, BRCA12_Case)
+dim(case_control_f2_df)
+dim(case_control_f3_df)
+table(case_control_f2_df$BRCA12_Case)
+# 0   1
+# 608 152
+table(case_control_f3_df$BRCA12_Case)
+# 0    1
+# 1719  525
+
+write.csv(case_control_f2_df, file.path("ch", "data", "ch_psm_matched_f2_case_control_df.csv"), row.names = FALSE)
+write.csv(case_control_f3_df, file.path("ch", "data", "ch_psm_matched_f3_case_control_df.csv"), row.names = FALSE)
 
 # ========================
 # CHECK AGE

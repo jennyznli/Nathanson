@@ -1,0 +1,1 @@
+        log_cat(f"VAF range: {filtered['Sample.AltFrac'].min():.3f} - {filtered['Sample.AltFrac'].max():.3f}\n")
