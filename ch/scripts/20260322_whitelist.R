@@ -6,7 +6,11 @@ setwd("/Users/jennyzli/Documents/Nathanson")
 source(here("R", "config.R"))
 library(data.table, quietly = T)
 
+# ========================
+# READ IN DATA
+# ========================
 all_ch <- read.csv(file.path("ch", "data", "ch_seq_vars.csv"), row.names = 1)
+dim(all_ch)
 
 gList<-fread(file.path("ch", "data", "whitelist_filter_20230531", "Full_CHIP_gene_list_20260324.txt"))
 whitelist.mis<-fread(file.path("ch", "data", "whitelist_filter_20230531", "CHIP_missense_vars_cv_20260324.txt"))
@@ -19,14 +23,11 @@ whitelist.LoF<-fread(file.path("ch", "data", "whitelist_filter_20230531", "CHIP_
 all_ch <- all_ch %>% mutate(across(where(is.character), ~ URLdecode(.x)))
 
 all_ch <- all_ch %>% left_join(gList[, c("Gene", "Accession")], by = "Gene")
-
 all_ch <- all_ch %>%
     dplyr::mutate(
         MANE_Select_Str   = gsub("\\.\\d+$", "", MANE_SELECT),
-        MANE_Plus_Str     = gsub("\\.\\d+$", "", MANE_PLUS_CLINICAL),
         Accession_Str     = gsub("\\.\\d+$", "", Accession),
-        correct_transcript     = (MANE_Select_Str == Accession_Str) |
-                                 (MANE_Plus_Str   == Accession_Str)
+        correct_transcript     = (MANE_Select_Str == Accession_Str)
     )
 
 table(all_ch$correct_transcript)
