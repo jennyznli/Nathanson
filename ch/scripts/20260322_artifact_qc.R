@@ -260,7 +260,7 @@ binomial_germline_test <- function(alt_count, total_depth, p_germline = 0.5) {
                     p = p_germline, alternative = "two.sided")$p.value
     data.frame(
         p_binom            = p,
-        flag_germline_binom = p >= 0.01   # fails to reject germline = suspicious
+        flag_germline_binom = p >= 0.05   # fails to reject germline = suspicious
     )
 }
 
@@ -290,32 +290,42 @@ germline_summary <- germline_test_vars %>%
 cat(sprintf("Variants tested for germline: %d\n",    nrow(germline_summary)))
 # 48
 cat(sprintf("Variants flagged germline:    %d\n",    sum(germline_summary$flag_germline, na.rm = TRUE)))
-# 6
+# 5
 
-# join back onto all_ch3
 all_ch4 <- all_ch3 %>%
-    left_join(germline_summary %>% select(variant_id, n_fail_binom, prop_fail_binom, flag_germline),
-              by = "variant_id") %>%
+    # per-variant summary flag
+    left_join(
+        germline_summary %>% select(variant_id, n_fail_binom, prop_fail_binom, flag_germline),
+        by = "variant_id"
+    ) %>%
+    # per-individual flag
+    left_join(
+        germline_test_vars %>% select(variant_id, Sample.ID, p_binom, flag_germline_binom),
+        by = c("variant_id", "Sample.ID")
+    ) %>%
     mutate(
-        flag_germline = replace_na(flag_germline, FALSE),
-        # combined final artifact/germline flag
+        flag_germline       = replace_na(flag_germline,       FALSE),
+        flag_germline_binom = replace_na(flag_germline_binom, FALSE),
+
+        # primary removal flag driven by per-variant assessment
         flag_remove = flag_artifact | flag_germline | high_gnomad
     )
 
-cat(sprintf("Variants flagged artifact:          %d\n", sum(all_ch4$flag_artifact,  na.rm = TRUE)))
-cat(sprintf("Variants flagged germline (binom):  %d\n", sum(all_ch4$flag_germline,  na.rm = TRUE)))
-cat(sprintf("Variants flagged high gnomAD AF:    %d\n", sum(all_ch4$high_gnomad,    na.rm = TRUE)))
-cat(sprintf("Variants flagged for removal (any): %d\n", sum(all_ch4$flag_remove,    na.rm = TRUE)))
-cat(sprintf("Unique individuals affected:        %d\n", n_distinct(all_ch4$Sample.ID[all_ch4$flag_remove])))
+cat(sprintf("Variants flagged germline (variant-level): %d\n",
+            sum(all_ch4$flag_germline, na.rm = TRUE)))
+# 5
+cat(sprintf("Calls flagged germline (individual-level): %d\n",
+            sum(all_ch4$flag_germline_binom, na.rm = TRUE)))
+# 18
 
 write_xlsx(all_ch4, file.path("ch", "data", "ch_seq_wl_art_germ_vars.xlsx"))
 
 # ========================
 # COMPLEX INDELS
 # ========================
-all_ch4 <- all_ch4 %>% mutate(.row_idx = row_number())
+all_ch5 <- all_ch4 %>% mutate(.row_idx = row_number())
 
-cluster_idx <- all_ch4 %>%
+cluster_idx <- all_ch5 %>%
     filter(whitelist) %>%
     group_by(Sample.ID, Gene, Chr) %>%
     filter(n() > 1) %>%
@@ -325,28 +335,133 @@ cluster_idx <- all_ch4 %>%
     ungroup() %>%
     pull(.row_idx)
 
-all_ch4$cluster[all_ch4$.row_idx %in% cluster_idx] <- TRUE
-# all_ch$manualreview[all_ch4$.row_idx %in% cluster_idx] <- TRUE
-all_ch5 <- all_ch4 %>% select(-.row_idx)
-write_xlsx(all_ch4, file.path("ch", "data", "ch_seq_wl_art_germ_cluster_vars.xlsx"))
+all_ch5$cluster <- ifelse(all_ch5$.row_idx %in% cluster_idx, 1, 0) %>% select(-.row_idx)
+
+write_xlsx(all_ch5, file.path("ch", "data", "ch_seq_wl_art_germ_cluster_vars.xlsx"))
 
 # ========================
-# MIN AD - VARIOUS THRESHOLDS
+# minAD THRESHOLD SENSITIVITY ANALYSIS
 # ========================
-all_ch_min4 <- all_ch5 %>% filter(Sample.AltDepth >= 4)
-all_ch_min5 <- all_ch5 %>% filter(Sample.AltDepth >= 5)
+# Test how different minimum alt depth thresholds affect age association
+# Following Vlasschaert 2023 Fig 1A approach
 
-# test age association
-# overall
-# vs diff strata
+MIN_AD_THRESHOLDS <- 3:7
+
+# okay, so actually create flags for minAD 3:7 similar to the others
+# then create a function such that if i specify what flags i would like to include,
+# it applies those along with a name for the age association
+# so it owuld be like
+# name: c1, flags: c("cluster", "flag_germline_binom", "minad3", ... )
+# name2: c, flags: ..
+# in some config object
+# and the output is a df each row being the OR / p vals / confidence intervals for each filtering criteria
+# and is makes a plot with all the OR plotted
+
+## function input are various filtering thresholds like minAD 3 - 7
+# but also the combination of various flags like flag_germline_binom
+# or add flag_germline
+# or cluster as well
+# flag_freeze_enriched or flag_age_associated or flag_artifact
+# also add the covariates in this age testing or add option to specify the formula
+
+test_minad_age <- function(min_ad, all_ch, cov) {
+    # filter to variants passing this minAD threshold
+    ch_filtered <- all_ch %>%
+        filter(Sample.AltDepth >= min_ad)   # adjust col name to match yours
+
+    # get CHIP carriers at this threshold (any variant passing)
+    carriers <- ch_filtered %>%
+        distinct(Sample.ID) %>%
+        mutate(carrier = 1)
+
+    df <- cov %>%
+        left_join(carriers, by = c("person_id" = "Sample.ID")) %>%
+        mutate(
+            carrier = ifelse(is.na(carrier), 0, carrier),
+            carrier = as.integer(carrier)
+        )
+
+    cat(sprintf("minAD >= %d: %d carriers / %d total\n",
+                min_ad, sum(df$carrier), nrow(df)))
+
+    tryCatch({
+        m <- withCallingHandlers(
+            glm(carrier ~ Sample_age + as.factor(Batch),
+                data = df, family = binomial()),
+            warning = function(w) {
+                if (grepl("fitted probabilities numerically 0 or 1", conditionMessage(w)))
+                    invokeRestart("muffleWarning")
+            }
+        )
+        s  <- coef(summary(m))
+        ci <- confint.default(m)
+        data.frame(
+            min_ad      = min_ad,
+            n_carriers  = sum(df$carrier),
+            n_total     = nrow(df),
+            OR          = exp(coef(m)["Sample_age"]),
+            CI_lo       = exp(ci["Sample_age", 1]),
+            CI_hi       = exp(ci["Sample_age", 2]),
+            p_age       = s["Sample_age", "Pr(>|z|)"],
+            median_VAF  = median(ch_filtered$Sample.AltFrac, na.rm = TRUE)
+        )
+    }, error = function(e) {
+        warning(sprintf("Model failed for minAD %d: %s", min_ad, conditionMessage(e)))
+        data.frame(min_ad = min_ad, n_carriers = NA_integer_, n_total = NA_integer_,
+                   OR = NA_real_, CI_lo = NA_real_, CI_hi = NA_real_,
+                   p_age = NA_real_, median_VAF = NA_real_)
+    })
+}
+
+minad_results <- bind_rows(lapply(MIN_AD_THRESHOLDS, test_minad_age,
+                                  all_ch = all_ch5, cov = cov)) %>%
+    mutate(min_ad = factor(min_ad))
+
+print(minad_results %>% select(min_ad, n_carriers, OR, CI_lo, CI_hi, p_age, median_VAF))
 
 # ========================
-# TRY DIFF FILTERS + EVALUATE
+# PLOT - forest plot style like Vlasschaert Fig 1A
 # ========================
+p_minad <- ggplot(minad_results, aes(x = min_ad, y = OR)) +
+    geom_hline(yintercept = 1, linetype = "dashed", color = "grey60", linewidth = 0.4) +
+    geom_errorbar(aes(ymin = CI_lo, ymax = CI_hi),
+                  width = 0.15, linewidth = 0.6, color = "grey40") +
+    geom_point(size = 4, color = "#D85A30") +
+    scale_y_continuous(
+        name   = "Odds ratio (per year of age)",
+        breaks = scales::pretty_breaks(n = 6)
+    ) +
+    scale_x_discrete(name = "Minimum alt depth (minAD)") +
+    labs(
+        title    = "Age association by minAD threshold",
+        subtitle = sprintf("n = %d total individuals", nrow(cov))
+    ) +
+    theme_minimal(base_size = 11) +
+    theme(
+        plot.title    = element_text(face = "bold", hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5, size = 9, color = "grey40"),
+        panel.grid.minor  = element_blank(),
+        panel.grid.major.x = element_blank()
+    )
 
+# add median VAF as annotation below x axis
+p_minad <- p_minad +
+    annotate("text",
+             x    = seq_along(MIN_AD_THRESHOLDS),
+             y    = min(minad_results$CI_lo, na.rm = TRUE) - 0.002,
+             label = sprintf("%.1f%%", minad_results$median_VAF * 100),
+             size  = 3, color = "grey40") +
+    annotate("text", x = 0.4,
+             y    = min(minad_results$CI_lo, na.rm = TRUE) - 0.002,
+             label = "median\nVAF", size = 3, color = "grey40", hjust = 1)
 
+ggsave(file.path("ch", "figures", "qc_minad_age_sensitivity.pdf"),
+       p_minad, width = 6, height = 5)
 
+write_xlsx(minad_results %>% mutate(min_ad = as.integer(as.character(min_ad))),
+           file.path("ch", "data", "ch_minad_sensitivity.xlsx"))
 
+### try diff minAD thresholds...??
 
 # ========================
 # REMOVE ARTIFACTS AND HIGH VAF - MANUAL
@@ -525,15 +640,3 @@ plot_gene_exceptions <- function(df, title = "Gene-specific exceptions", filenam
 # ggsave(file.path("ch", "figures", "artifact_age_association.pdf"),
 #        plot = p_artifact, width = 8,
 #        height = max(5, nrow(results_plot) * 0.3), dpi = 300)
-
-# ========================
-# EXAMINE ASXL1
-# ========================
-x <- read.csv(file.path("ch", "data", "ch_all_vars.csv"), row.names = 1)
-y <- read_excel(file.path("ch", "data", "ch_wl_final.xlsx"))
-z <- read_excel(file.path("ch", "data", "ch_wl_art.xlsx"))
-
-View(x %>% filter(Gene == "ASXL1"))
-View(y %>% filter(Gene == "ASXL1"))
-View(z %>% filter(Gene == "ASXL1"))
-
