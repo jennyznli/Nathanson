@@ -5,7 +5,6 @@ library(here)
 setwd("/Users/jennyzli/Documents/Nathanson")
 source(here("R", "config.R"))
 
-
 library(data.table, quietly = T)
 library(MatchIt)
 library(MASS)

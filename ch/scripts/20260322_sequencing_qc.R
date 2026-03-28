@@ -4,9 +4,6 @@
 library(here)
 setwd("/Users/jennyzli/Documents/Nathanson")
 source(here("R", "config.R"))
-library(data.table, quietly = T)
-library(gridExtra)
-library(grid)
 
 gList <- fread(file.path("ch", "data", "whitelist_filter_20230531", "Full_CHIP_gene_list_08262022.txt"))
 # gList <- fread(file.path("ch", "data", "whitelist_filter_20230531", "NEJM_2017_genes_01262020.txt"))$Gene
@@ -101,7 +98,6 @@ process_ch <- function(data, dataset_label, AF_LOWER, AF_UPPER, DP, AD) {
     summary_file   <- file.path("ch", "log", paste0(datetime_stamp, "_ch_qc_", dataset_label, "_summary.csv"))
     dir.create(file.path("ch", "log"), showWarnings = FALSE, recursive = TRUE)
 
-    # --- Upfront protein coding filter (not a flag, just remove) ---
     n_before <- nrow(data)
     data <- data %>%
         filter(
@@ -127,13 +123,11 @@ process_ch <- function(data, dataset_label, AF_LOWER, AF_UPPER, DP, AD) {
     n_after_pc <- nrow(data)
     cat("Removed", n_before - n_after_pc, "non-protein-coding / missing variants\n")
 
-    # --- Filter flags in new order: orientation -> alt depth -> total depth -> VAF ---
     data <- data %>%
         dplyr::mutate(
             pass_orientation = FALSE,
             pass_alt_depth   = FALSE,
             pass_depth       = FALSE,
-            pass_vaf         = FALSE,
             qc_pass          = FALSE
         )
 
@@ -146,22 +140,16 @@ process_ch <- function(data, dataset_label, AF_LOWER, AF_UPPER, DP, AD) {
     data$pass_depth <- data$pass_alt_depth &
         (data$Sample.Depth >= DP)
 
-    data$pass_vaf <- data$pass_depth &
-        (data$Sample.AltFrac >= AF_LOWER) &
-        (data$Sample.AltFrac <= AF_UPPER)
-
-    data$qc_pass <- data$pass_vaf
+    data$qc_pass <- data$pass_depth
 
     summary_df <- data.frame(
         Step = c("After protein coding filter", "Pass orientation filter",
-                 "Pass alt depth filter", "Pass total depth filter",
-                 "Pass VAF filter"),
+                 "Pass alt depth filter", "Pass total depth filter"),
         Variants_Remaining = c(
             n_after_pc,
             sum(data$pass_orientation),
             sum(data$pass_alt_depth),
-            sum(data$pass_depth),
-            sum(data$pass_vaf)
+            sum(data$pass_depth)
         )
     )
     summary_df$Percent_of_Original <- round(100 * summary_df$Variants_Remaining / n_before, 1)
@@ -178,26 +166,23 @@ process_ch <- function(data, dataset_label, AF_LOWER, AF_UPPER, DP, AD) {
     return(data)
 }
 
-vars <- process_ch(vars, "ch", 0.02, 0.45, 20, 3)
+vars <- process_ch(vars, "ch", DP = 20, AD = 3)
 
 all_ch <- vars %>% filter(qc_pass)
 cat("QC-pass variants:", nrow(all_ch), "\n")
 # 18231
 
-write.csv(all_ch %>% select(-TLOD, -pass_protein_coding, -pass_vaf, -pass_depth, -pass_orientation, -qc_pass),
+write.csv(all_ch %>% select(-Sample.TLOD, -pass_alt_depth, -pass_depth, -pass_orientation, -qc_pass),
           file.path("ch", "data", "ch_seq_vars.csv"))
 
-# ========================
-# DIAGNOSTIC PLOTS
-# ========================
+# diagnostic plot
 create_diagnostic_pdf(
     vars      = vars,
     steps     = c(
-        "Initial"             = NA,
-        "After Orientation"   = "pass_orientation",
-        "After Alt Depth"     = "pass_alt_depth",
-        "After Total Depth"   = "pass_depth",
-        "Final (After VAF)"   = "pass_vaf"
+        "Initial"           = NA,
+        "After Orientation" = "pass_orientation",
+        "After Alt Depth"   = "pass_alt_depth",
+        "Final (Depth)"     = "pass_depth"
     ),
     gene_name   = "CH",
     output_file = file.path("ch", "figures", "ch_seq_filtering.pdf")

@@ -1,132 +1,360 @@
 # ========================
 # Age association for artifacts
+# binomial testing for germline variants
 # ========================
 library(here)
 setwd("/Users/jennyzli/Documents/Nathanson")
 source(here("R", "config.R"))
 library(data.table, quietly = T)
+library(ggVennDiagram)
 
 # ========================
 # READ IN DATA
 # ========================
-all_ch <- read_excel(file.path("ch", "data", "ch_wl_final.xlsx"))
+all_ch <- read_excel(file.path("ch", "data", "ch_seq_wl_vars.xlsx"))
 dim(all_ch)
-# 315
+# 774
 
-cov <- read.csv(file.path("ch", "data", "pmbb_brca12_cov_df.csv"))
+cov <- read.csv(file.path("ch", "data", "pmbb_brca12_cov_df.csv"), row.names = 1)
 all_ids <- read.csv(file.path("ch", "data", "ch_psm_matched4_case_control_ids.csv"))$x
 cov <- cov %>% filter(person_id %in% all_ids)
 dim(cov)
 # 3004
 
 # ========================
-# ASSIGN CATEGORY
-# ========================
-all_ch <- all_ch %>%
-    dplyr::mutate(
-        variant_category = dplyr::case_when(
-            manualreview == TRUE                                ~ "manual_review",
-            wl.exception == TRUE                               ~ "exception",
-            wl.mis  == TRUE & !wl.exception & !manualreview   ~ "missense",
-            wl.lof  == TRUE & !wl.exception & !manualreview   ~ "lof",
-            wl.splice == TRUE & !wl.exception & !manualreview ~ "splice"
-            # TRUE                                               ~ "non_whitelist"
-        )
-    )
-print(table(all_ch$variant_category))
-# exception           lof manual_review      missense non_whitelist        splice
-# 40           407           175            57         22116            95
-
-plot_category_breakdown(all_ch, title = "CHIP variant whitelist breakdown",
-                        filename = "ch_wl_categories.pdf")
-plot_gene_exceptions(all_ch, filename = "ch_wl_gene_exceptions.pdf")
-plot_genes(all_ch, filename = "ch_wl_all_genes.pdf", width = 10)
-plot_genes(all_ch, top_n = 10, title = "Top 10 CHIP genes",
-           filename = "ch_wl_genes_top10.pdf", width = 7)
-
-# ========================
-# BUILD VARIANT_ID
-# ========================
-trim_splice_hgvsc <- function(hgvsc) {
-    if (is.na(hgvsc) || hgvsc == "" || hgvsc == ".") return(NA_character_)
-    hgvsc_clean <- sub("^[A-Z]{2}_[0-9]+(?:\\.[0-9]+)?:", "", hgvsc)
-    sub("(c\\.\\d+)[+\\-].*", "\\1", hgvsc_clean)
-}
-
-clean_hgvsc <- function(hgvsc) {
-    if (is.na(hgvsc) || hgvsc == "" || hgvsc == ".") return(NA_character_)
-    sub("^[A-Z]{2}_[0-9]+(?:\\.[0-9]+)?:", "", hgvsc)
-}
-
-all_ch <- all_ch %>%
-    dplyr::mutate(
-        HGVSp_clean = dplyr::case_when(
-            is.na(HGVSp) | HGVSp == "" | HGVSp == "." ~ NA_character_,
-            TRUE ~ sub("^[A-Z]{2}_[0-9]+(?:\\.[0-9]+)?:", "", HGVSp)
-        ),
-        exon_label = dplyr::case_when(
-            !is.na(ExonNumber) ~ paste0("exon", ExonNumber),
-            TRUE               ~ "exonUnk"
-        ),
-        variant_id = dplyr::case_when(
-            variant_category == "non_whitelist" ~ NA_character_,
-            # if it's a splice, just HGVSc and exon
-            variant_category == "splice" ~ paste(
-                Gene, MANE_Select_Str, exon_label,
-                sapply(HGVSc, trim_splice_hgvsc), sep = ":"
-            ),
-            # if its anything else, put HGVSp as well
-            TRUE ~ paste(
-                Gene, MANE_Select_Str, exon_label,
-                sapply(HGVSc, clean_hgvsc),
-                ifelse(!is.na(HGVSp_clean), HGVSp_clean, ""),
-                sep = ":"
-            )
-        ),
-        variant_id = sub(":$", "", variant_id)
-    ) %>%
-    dplyr::select(-exon_label, -HGVSp_clean)
-
-length(unique((all_ch$variant_id)))
-# 213
-
-length(unique((all_ch$Sample.ID)))
-# 273
-
-# ========================
-# ARTIFACT FILTERING
+# IDENTIFY HIGH FREQ VARIANTS
 # ========================
 FREQ_THRESHOLD <- 3
 
-# count carriers per variant_id
 variant_counts <- all_ch %>%
-    filter(!is.na(variant_id)) %>%
     group_by(variant_id) %>%
     summarise(
-        n_carriers = n_distinct(Sample.ID),
-        Gene       = first(Gene),
-        Chr        = first(Chr),
-        Start      = first(Start),
-        .groups    = "drop"
+        n_carriers          = n_distinct(Sample.ID),
+        batch_1             = n_distinct(Sample.ID[Batch == 1]),
+        batch_2             = n_distinct(Sample.ID[Batch == 2]),
+        Gene                = first(Gene),
+        Chr                 = first(Chr),
+        Start               = first(Start),
+        variant_category    = first(variant_category),
+        Variant.Consequence = first(Variant.Consequence),
+        .groups             = "drop"
     ) %>%
-    arrange(desc(n_carriers))
-write_xlsx(variant_counts, file.path("ch", "data", "ch_art_vars_counts.xlsx"))
+    arrange(desc(n_carriers)) %>%
+    mutate(potential_artifact = as.integer(n_carriers >= FREQ_THRESHOLD))
+write_xlsx(variant_counts, file.path("ch", "data", "ch_var_counts.xlsx"))
 
-# after manual review, remove just this large artifacts...
-remove <- c("PDS5B:NM_015032:exonUnk:c.2407")
-all_ch_clean <- all_ch %>% filter(variant_id != "PDS5B:NM_015032:exonUnk:c.2407")
+high_freq <- variant_counts %>% filter(potential_artifact == 1)
 
-# just remove high VAF
+cat(sprintf("High frequency variants to test: %d\n", nrow(high_freq)))
+# 25
+
+# ========================
+# FREEZE ENRICHMENT FLAG (Fisher's exact test)
+# ========================
+batch_totals <- all_ch %>%
+    group_by(Batch) %>%
+    summarise(n_total = n_distinct(Sample.ID), .groups = "drop")
+
+n_batch_1 <- batch_totals$n_total[batch_totals$Batch == 1]
+n_batch_2 <- batch_totals$n_total[batch_totals$Batch == 2]
+
+high_freq2 <- high_freq %>%
+    mutate(
+        p_freeze         = mapply(function(b1, b2) {
+            fisher.test(matrix(
+                c(b1, n_batch_1 - b1,
+                  b2, n_batch_2 - b2),
+                nrow = 2
+            ))$p.value
+        }, batch_1, batch_2),
+        p_freeze_adj         = p.adjust(p_freeze, method = "BH"),
+        flag_freeze_enriched = p_freeze_adj < 0.05
+    )
+
+cat(sprintf("High frequency variants to test: %d\n", nrow(high_freq2)))
+cat(sprintf("  of which freeze-enriched:      %d\n", sum(high_freq2$flag_freeze_enriched, na.rm = TRUE)))
+# 3
+
+# ========================
+# OVERLAP VENN DIAGRAMS
+# ========================
+var_f2 <- sort(variant_counts %>% filter(batch_1 != 0) %>% pull(variant_id))
+var_f3 <- sort(variant_counts %>% filter(batch_2 != 0) %>% pull(variant_id))
+
+p_venn <- ggVennDiagram(
+    list("Freeze 2" = var_f2, "Freeze 3" = var_f3),
+    label       = "count",
+    label_alpha = 0
+) +
+    scale_fill_gradient(low = "white", high = "#1D9E75") +
+    scale_color_manual(values = c("grey40", "grey40")) +
+    labs(title = "Variant overlap between freezes") +
+    theme(
+        plot.title  = element_text(face = "bold", hjust = 0.5, size = 13),
+        legend.position = "none"
+    )
+
+ggsave(file.path("ch", "figures", "qc_variant_overlap_venn.pdf"),
+       p_venn, width = 6, height = 4)
+
+### OVERLAP BTWN FREEZES - GENES ###
+gene_f2 <- sort(unique(all_ch %>% filter(Batch == 1) %>% pull(Gene)))
+gene_f3 <- sort(unique(all_ch %>% filter(Batch == 2) %>% pull(Gene)))
+
+p_venn_gene <- ggVennDiagram(
+    list("Freeze 2" = gene_f2, "Freeze 3" = gene_f3),
+    label       = "count",
+    label_alpha = 0
+) +
+    scale_fill_gradient(low = "white", high = "#378ADD") +
+    scale_color_manual(values = c("grey40", "grey40")) +
+    labs(title = "Gene overlap between freezes") +
+    theme(
+        plot.title      = element_text(face = "bold", hjust = 0.5, size = 13),
+        legend.position = "none"
+    )
+
+ggsave(file.path("ch", "figures", "qc_gene_overlap_venn.pdf"),
+       p_venn_gene, width = 6, height = 4)
+
+# ========================
+# AGE ASSOCIATION FLAG
+# ========================
+artifact_test_age <- function(vkey, cov, extra_covs = NULL) {
+    carriers <- all_ch %>%
+        filter(variant_id == vkey) %>%
+        distinct(Sample.ID) %>%
+        mutate(carrier = 1)
+
+    df <- cov %>%
+        left_join(carriers, by = c("person_id" = "Sample.ID")) %>%
+        mutate(carrier = ifelse(is.na(carrier), 0, carrier))
+
+    # build formula dynamically
+    base    <- "carrier ~ Sample_age + as.factor(Batch)"
+    formula <- if (!is.null(extra_covs)) {
+        as.formula(paste(base, "+", extra_covs))
+    } else {
+        as.formula(base)
+    }
+
+    tryCatch({
+        m <- withCallingHandlers(
+            glm(formula, data = df, family = binomial()),
+            warning = function(w) {
+                if (grepl("fitted probabilities numerically 0 or 1", conditionMessage(w)))
+                    invokeRestart("muffleWarning")
+            }
+        )
+        separation <- any(fitted(m) %in% c(0, 1))
+        s  <- coef(summary(m))
+        ci <- confint.default(m)
+        data.frame(
+            OR         = exp(coef(m)["Sample_age"]),
+            CI_lo      = exp(ci["Sample_age", 1]),
+            CI_hi      = exp(ci["Sample_age", 2]),
+            p_age      = s["Sample_age", "Pr(>|z|)"],
+            separation = separation
+        )
+    }, error = function(e) {
+        warning(sprintf("Model failed for %s: %s", vkey, conditionMessage(e)))
+        data.frame(OR = NA_real_, CI_lo = NA_real_, CI_hi = NA_real_,
+                   p_age = NA_real_, separation = NA)
+    })
+}
+
+# base model
+high_freq_base <- high_freq2 %>%
+    rowwise() %>%
+    mutate(res = list(artifact_test_age(variant_id, cov))) %>%
+    unnest(res) %>% ungroup() %>%
+    mutate(
+        p_age_adj           = p.adjust(p_age, method = "BH"),
+        flag_age_associated = !is.na(p_age) & !separation & p_age < 0.10
+    )
+
+# with extra covariates
+extra_covs <- "Smoke_History + Sequenced_gender + PC1 + PC2 + PC3 + PC4 + PC5 + PC6"
+
+high_freq_full <- high_freq2 %>%
+    rowwise() %>%
+    mutate(res = list(artifact_test_age(variant_id, cov, extra_covs = extra_covs))) %>%
+    unnest(res) %>% ungroup() %>%
+    mutate(
+        p_age_adj           = p.adjust(p_age, method = "BH"),
+        flag_age_associated = !is.na(p_age) & !separation & p_age < 0.10
+    )
+
+write_xlsx(high_freq_full, file.path("ch", "data", "ch_high_freq_counts.xlsx"))
+
+# ========================
+# JOIN FLAGS BACK ONTO all_ch
+# ========================
+all_ch2 <- all_ch %>%
+    left_join(
+        high_freq_full %>% select(variant_id, potential_artifact, p_freeze, p_freeze_adj, flag_freeze_enriched,
+                             p_age, p_age_adj, OR, CI_lo, CI_hi,
+                             flag_age_associated, separation),
+        by = "variant_id"
+    ) %>%
+    mutate(
+        potential_artifact   = replace_na(potential_artifact,   0L),
+        flag_age_associated  = replace_na(flag_age_associated,  FALSE),
+        flag_freeze_enriched = replace_na(flag_freeze_enriched, FALSE),
+
+        flag_artifact = case_when(
+            potential_artifact & flag_freeze_enriched          ~ TRUE,
+            potential_artifact & !is.na(p_age) & !flag_age_associated ~ TRUE,
+            TRUE                          ~ FALSE
+        )
+    )
+
+cat(sprintf("Variants flagged as freeze-enriched: %d\n", sum(all_ch2$flag_freeze_enriched)))
+cat(sprintf("Variants flagged no age association: %d\n",
+            sum(all_ch2$potential_artifact == 1 & !all_ch2$flag_age_associated, na.rm = TRUE)))
+cat(sprintf("Variants flagged artifact (either):  %d\n", sum(all_ch2$flag_artifact, na.rm = TRUE)))
+cat(sprintf("Unique individuals affected:         %d\n", n_distinct(all_ch2$Sample.ID[all_ch2$flag_artifact])))
+# > cat(sprintf("Variants flagged as freeze-enriched: %d\n", sum(all_ch2$flag_freeze_enriched)))
+# Variants flagged as freeze-enriched: 167
+# > cat(sprintf("Variants flagged no age association: %d\n", sum(!all_ch2$flag_age_associated, na.rm = TRUE)))
+# Variants flagged no age association: 206
+# > cat(sprintf("Variants flagged artifact (either):  %d\n", sum(all_ch2$flag_artifact, na.rm = TRUE)))
+# Variants flagged artifact (either):  253
+# > cat(sprintf("Unique individuals affected:         %d\n", n_distinct(all_ch2$Sample.ID[all_ch2$flag_artifact])))
+# Unique individuals affected:         230
+
+write_xlsx(all_ch2, file.path("ch", "data", "ch_seq_wl_art_vars.xlsx"))
+
+# ========================
+# GERMLINE TESTING
+# ========================
+all_ch3 <- all_ch2 %>% mutate(
+    high_gnomad = ifelse(gnomAD.MAX_AF > 0.001, TRUE, FALSE)
+)
+sum(all_ch3$high_gnomad)
+# 81
+
+# ========================
+# GERMLINE TESTING (binomial test)
+# ========================
+all_ch3 <- all_ch3 %>% mutate(
+    VAF_Strata = case_when(
+        Sample.AltFrac >= 0.02 & Sample.AltFrac < 0.05 ~ "2-5",
+        Sample.AltFrac >= 0.05 & Sample.AltFrac < 0.10 ~ "5-10",
+        Sample.AltFrac >= 0.10 ~ "10+",
+        TRUE ~ NA_character_
+    )
+)
+
+# Tests whether observed VAF is consistent with germline het (expected = 0.5)
+# Flags variants where we cannot reject germline origin at P < 0.01
+# tet <- variant_counts %>% filter(Gene %in% c("TET2", "CBL"))
+# examine_germ <- rbind(tet, high_freq)
+
+binomial_germline_test <- function(alt_count, total_depth, p_germline = 0.5) {
+    if (is.na(alt_count) || is.na(total_depth) || total_depth == 0) {
+        return(data.frame(p_binom = NA_real_, flag_germline_binom = NA))
+    }
+    # two-sided: is VAF significantly different from 0.5?
+    p <- binom.test(x = alt_count, n = total_depth,
+                    p = p_germline, alternative = "two.sided")$p.value
+    data.frame(
+        p_binom            = p,
+        flag_germline_binom = p >= 0.01   # fails to reject germline = suspicious
+    )
+}
+
+# apply to TET2/CBL missense + high_freq variants
+germline_test_vars <- all_ch3 %>%
+    filter(
+        (Gene %in% c("TET2", "CBL") & variant_category == "missense") |
+            potential_artifact == 1
+    ) %>%
+    distinct(variant_id, Sample.ID, Sample.AltDepth, Sample.Depth) %>%   # adjust col names to match yours
+    rowwise() %>%
+    mutate(res = list(binomial_germline_test(Sample.AltDepth, Sample.Depth))) %>%
+    unnest(res) %>%
+    ungroup()
+
+# summarize per variant: flag if MAJORITY of carriers fail binomial test
+germline_summary <- germline_test_vars %>%
+    group_by(variant_id) %>%
+    summarise(
+        n_tested          = sum(!is.na(p_binom)),
+        n_fail_binom      = sum(flag_germline_binom, na.rm = TRUE),
+        prop_fail_binom   = n_fail_binom / n_tested,
+        flag_germline     = prop_fail_binom > 0.5,   # majority of carriers look germline
+        .groups           = "drop"
+    )
+
+cat(sprintf("Variants tested for germline: %d\n",    nrow(germline_summary)))
+# 48
+cat(sprintf("Variants flagged germline:    %d\n",    sum(germline_summary$flag_germline, na.rm = TRUE)))
+# 6
+
+# join back onto all_ch3
+all_ch4 <- all_ch3 %>%
+    left_join(germline_summary %>% select(variant_id, n_fail_binom, prop_fail_binom, flag_germline),
+              by = "variant_id") %>%
+    mutate(
+        flag_germline = replace_na(flag_germline, FALSE),
+        # combined final artifact/germline flag
+        flag_remove = flag_artifact | flag_germline | high_gnomad
+    )
+
+cat(sprintf("Variants flagged artifact:          %d\n", sum(all_ch4$flag_artifact,  na.rm = TRUE)))
+cat(sprintf("Variants flagged germline (binom):  %d\n", sum(all_ch4$flag_germline,  na.rm = TRUE)))
+cat(sprintf("Variants flagged high gnomAD AF:    %d\n", sum(all_ch4$high_gnomad,    na.rm = TRUE)))
+cat(sprintf("Variants flagged for removal (any): %d\n", sum(all_ch4$flag_remove,    na.rm = TRUE)))
+cat(sprintf("Unique individuals affected:        %d\n", n_distinct(all_ch4$Sample.ID[all_ch4$flag_remove])))
+
+write_xlsx(all_ch4, file.path("ch", "data", "ch_seq_wl_art_germ_vars.xlsx"))
+
+# ========================
+# COMPLEX INDELS
+# ========================
+all_ch4 <- all_ch4 %>% mutate(.row_idx = row_number())
+
+cluster_idx <- all_ch4 %>%
+    filter(whitelist) %>%
+    group_by(Sample.ID, Gene, Chr) %>%
+    filter(n() > 1) %>%
+    arrange(Sample.ID, Gene, Chr, Start) %>%
+    mutate(near_prev = c(FALSE, diff(Start) <= 50)) %>%
+    filter(near_prev | lead(near_prev, default = FALSE)) %>%
+    ungroup() %>%
+    pull(.row_idx)
+
+all_ch4$cluster[all_ch4$.row_idx %in% cluster_idx] <- TRUE
+# all_ch$manualreview[all_ch4$.row_idx %in% cluster_idx] <- TRUE
+all_ch5 <- all_ch4 %>% select(-.row_idx)
+write_xlsx(all_ch4, file.path("ch", "data", "ch_seq_wl_art_germ_cluster_vars.xlsx"))
+
+# ========================
+# MIN AD - VARIOUS THRESHOLDS
+# ========================
+all_ch_min4 <- all_ch5 %>% filter(Sample.AltDepth >= 4)
+all_ch_min5 <- all_ch5 %>% filter(Sample.AltDepth >= 5)
+
+# test age association
+# overall
+# vs diff strata
+
+# ========================
+# TRY DIFF FILTERS + EVALUATE
+# ========================
+
+
+
+
 
 # ========================
 # REMOVE ARTIFACTS AND HIGH VAF - MANUAL
 # ========================
 cat("Variants before artifact removal:", nrow(all_ch), "\n")
-cat("Variants after artifact removal: ", nrow(all_ch_clean), "\n")
-# 315
-# 268
+cat("Variants after artifact removal: ", nrow(all_ch3), "\n")
 
-write_xlsx(all_ch_clean, file.path("ch", "data", "ch_wl_art.xlsx"))
+write_xlsx(all_ch_clean, file.path("ch", "data", "ch_wl_art_germ.xlsx"))
 
 plot_category_breakdown(all_ch_clean, title = "CHIP variant categories (artifact-filtered)",
                         filename = "ch_wl_art_categories.pdf")
@@ -256,138 +484,6 @@ plot_gene_exceptions <- function(df, title = "Gene-specific exceptions", filenam
 #     select(Sample.ID, Age = all_of("Sample_age"))
 
 
-### NOT NECESSARY..
-# artifact_test_age <- function(vkey, all_samples_cov) {
-#     carriers <- all_ch %>%
-#         filter(variant_id == vkey) %>%
-#         distinct(Sample.ID) %>%
-#         mutate(carrier = 1)
-#
-#     df <- all_samples_cov %>%
-#         left_join(carriers, by = "Sample.ID") %>%
-#         mutate(carrier = ifelse(is.na(carrier), 0, carrier))
-#
-#     tryCatch({
-#         m  <- glm(carrier ~ Age, data = df, family = binomial())
-#         s  <- coef(summary(m))
-#         ci <- confint.default(m)
-#         data.frame(
-#             OR    = exp(coef(m)["Age"]),
-#             CI_lo = exp(ci["Age", 1]),
-#             CI_hi = exp(ci["Age", 2]),
-#             p_age = s["Age", "Pr(>|z|)"]
-#         )
-#     }, error = function(e) {
-#         data.frame(OR = NA_real_, CI_lo = NA_real_, CI_hi = NA_real_, p_age = NA_real_)
-#     })
-# }
-#
-# results <- high_freq_variants %>%
-#     rowwise() %>%
-#     mutate(res = list(artifact_test_age(variant_id, all_samples_cov))) %>%
-#     unnest(res) %>%
-#     ungroup() %>%
-#     mutate(
-#         status = case_when(
-#             is.na(p_age) ~ "artifact",
-#             p_age < 0.10 ~ "retained",
-#             TRUE         ~ "artifact"
-#         ),
-#         OR_fmt = sprintf("%.2f (%.2f\u2013%.2f)", OR, CI_lo, CI_hi)
-#     )
-#
-# results %>% arrange(desc(n_carriers)) %>%
-#     select(variant_id, Gene, n_carriers, OR_fmt, p_age, status)
-
-# # ========================
-# # RS7705526 ASSOCIATION TEST
-# # ========================
-# rs <- read_tsv(file.path("ch", "data", "rs7705526_output.raw")) %>%
-#     select(Sample.ID = IID, rs7705526 = rs7705526_C) %>%
-#     filter(!is.na(rs7705526))
-#
-# # merge with age
-# all_samples_cov_rs <- cov %>%
-#     filter(Batch == 1) %>%
-#     rename(Sample.ID = person_id) %>%
-#     select(Sample.ID, Age = all_of("Sample_age")) %>%
-#     left_join(rs, by = "Sample.ID") %>%
-#     filter(!is.na(rs7705526))
-#
-# cat("Batch 1 samples with rs7705526:", nrow(all_samples_cov_rs), "\n")
-# cat("Samples with rs7705526:", sum(!is.na(all_samples_cov_rs$rs7705526)), "\n")
-#
-# # association test — same structure as age test
-# artifact_test_rs <- function(vkey, all_samples_cov_rs) {
-#     carriers <- all_ch_clean %>%
-#         filter(variant_id == vkey) %>%
-#         distinct(Sample.ID) %>%
-#         mutate(carrier = 1)
-#
-#     df <- all_samples_cov_rs %>%
-#         left_join(carriers, by = "Sample.ID") %>%
-#         mutate(carrier = ifelse(is.na(carrier), 0, carrier)) %>%
-#         filter(!is.na(rs7705526))
-#
-#     n_carriers <- sum(df$carrier)
-#
-#     # skip if too few carriers to fit reliably
-#     if (n_carriers < 3) {
-#         return(data.frame(OR_rs = NA_real_, CI_lo_rs = NA_real_,
-#                           CI_hi_rs = NA_real_, p_rs = NA_real_))
-#     }
-#
-#     tryCatch({
-#         m  <- suppressWarnings(glm(carrier ~ rs7705526, data = df,
-#                                    family = binomial(),
-#                                    control = glm.control(maxit = 100)))  # more iterations
-#
-#         # check convergence explicitly
-#         if (!m$converged) {
-#             return(data.frame(OR_rs = NA_real_, CI_lo_rs = NA_real_,
-#                               CI_hi_rs = NA_real_, p_rs = NA_real_))
-#         }
-#
-#         s  <- coef(summary(m))
-#         ci <- confint.default(m)
-#         data.frame(
-#             OR_rs    = exp(coef(m)["rs7705526"]),
-#             CI_lo_rs = exp(ci["rs7705526", 1]),
-#             CI_hi_rs = exp(ci["rs7705526", 2]),
-#             p_rs     = s["rs7705526", "Pr(>|z|)"]
-#         )
-#     }, error = function(e) {
-#         data.frame(OR_rs = NA_real_, CI_lo_rs = NA_real_,
-#                    CI_hi_rs = NA_real_, p_rs = NA_real_)
-#     })
-# }
-#
-# # run on same high_freq_variants
-# results_rs <- high_freq_variants %>%
-#     rowwise() %>%
-#     mutate(res = list(artifact_test_rs(variant_id, all_samples_cov_rs))) %>%
-#     unnest(res) %>%
-#     ungroup()
-#
-# # combine with age results and apply joint retention rule:
-# # retain if EITHER age OR rs association p < 0.10
-# results_combined <- results %>%
-#     left_join(results_rs %>% select(variant_id, OR_rs, CI_lo_rs, CI_hi_rs, p_rs),
-#               by = "variant_id") %>%
-#     mutate(
-#         OR_rs_fmt = sprintf("%.2f (%.2f\u2013%.2f)", OR_rs, CI_lo_rs, CI_hi_rs),
-#         status = case_when(
-#             is.na(p_age) & is.na(p_rs)          ~ "artifact",
-#             !is.na(p_age) & p_age < 0.10        ~ "retained",
-#             !is.na(p_rs)  & p_rs  < 0.10        ~ "retained",
-#             TRUE                                 ~ "artifact"
-#         )
-#     )
-#
-# results_combined %>%
-#     arrange(desc(n_carriers)) %>%
-#     select(variant_id, Gene, n_carriers, OR_fmt, p_age, OR_rs_fmt, p_rs, status) %>%
-#     print(n = 30)
 
 # # ========================
 # # FOREST PLOT
