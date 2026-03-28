@@ -339,129 +339,292 @@ all_ch5$cluster <- ifelse(all_ch5$.row_idx %in% cluster_idx, 1, 0) %>% select(-.
 
 write_xlsx(all_ch5, file.path("ch", "data", "ch_seq_wl_art_germ_cluster_vars.xlsx"))
 
-# ========================
-# minAD THRESHOLD SENSITIVITY ANALYSIS
-# ========================
-# Test how different minimum alt depth thresholds affect age association
-# Following Vlasschaert 2023 Fig 1A approach
-
 MIN_AD_THRESHOLDS <- 3:7
 
-# okay, so actually create flags for minAD 3:7 similar to the others
-# then create a function such that if i specify what flags i would like to include,
-# it applies those along with a name for the age association
-# so it owuld be like
-# name: c1, flags: c("cluster", "flag_germline_binom", "minad3", ... )
-# name2: c, flags: ..
-# in some config object
-# and the output is a df each row being the OR / p vals / confidence intervals for each filtering criteria
-# and is makes a plot with all the OR plotted
-
-## function input are various filtering thresholds like minAD 3 - 7
-# but also the combination of various flags like flag_germline_binom
-# or add flag_germline
-# or cluster as well
-# flag_freeze_enriched or flag_age_associated or flag_artifact
-# also add the covariates in this age testing or add option to specify the formula
-
-test_minad_age <- function(min_ad, all_ch, cov) {
-    # filter to variants passing this minAD threshold
-    ch_filtered <- all_ch %>%
-        filter(Sample.AltDepth >= min_ad)   # adjust col name to match yours
-
-    # get CHIP carriers at this threshold (any variant passing)
-    carriers <- ch_filtered %>%
-        distinct(Sample.ID) %>%
-        mutate(carrier = 1)
-
-    df <- cov %>%
-        left_join(carriers, by = c("person_id" = "Sample.ID")) %>%
-        mutate(
-            carrier = ifelse(is.na(carrier), 0, carrier),
-            carrier = as.integer(carrier)
-        )
-
-    cat(sprintf("minAD >= %d: %d carriers / %d total\n",
-                min_ad, sum(df$carrier), nrow(df)))
-
-    tryCatch({
-        m <- withCallingHandlers(
-            glm(carrier ~ Sample_age + as.factor(Batch),
-                data = df, family = binomial()),
-            warning = function(w) {
-                if (grepl("fitted probabilities numerically 0 or 1", conditionMessage(w)))
-                    invokeRestart("muffleWarning")
-            }
-        )
-        s  <- coef(summary(m))
-        ci <- confint.default(m)
-        data.frame(
-            min_ad      = min_ad,
-            n_carriers  = sum(df$carrier),
-            n_total     = nrow(df),
-            OR          = exp(coef(m)["Sample_age"]),
-            CI_lo       = exp(ci["Sample_age", 1]),
-            CI_hi       = exp(ci["Sample_age", 2]),
-            p_age       = s["Sample_age", "Pr(>|z|)"],
-            median_VAF  = median(ch_filtered$Sample.AltFrac, na.rm = TRUE)
-        )
-    }, error = function(e) {
-        warning(sprintf("Model failed for minAD %d: %s", min_ad, conditionMessage(e)))
-        data.frame(min_ad = min_ad, n_carriers = NA_integer_, n_total = NA_integer_,
-                   OR = NA_real_, CI_lo = NA_real_, CI_hi = NA_real_,
-                   p_age = NA_real_, median_VAF = NA_real_)
-    })
+# ========================
+# CREATE minAD FLAGS ON all_ch5
+# ========================
+for (thresh in MIN_AD_THRESHOLDS) {
+    col_name <- paste0("minad", thresh)
+    all_ch5[[col_name]] <- all_ch5$Sample.AltDepth < thresh
 }
 
-minad_results <- bind_rows(lapply(MIN_AD_THRESHOLDS, test_minad_age,
-                                  all_ch = all_ch5, cov = cov)) %>%
-    mutate(min_ad = factor(min_ad))
+# ========================
+# DEFINE FILTER CONFIGURATIONS
+# ========================
+extra_covs <- "Smoke_History + Sequenced_gender + PC1 + PC2 + PC3 + PC4 + PC5 + PC6"
 
-print(minad_results %>% select(min_ad, n_carriers, OR, CI_lo, CI_hi, p_age, median_VAF))
+filter_configs <- list(
+    # --- baseline: no filters ---
+    list(name = "no_filter",            flags = character(0)),
+
+    # --- single artifact/germline flags ---
+    list(name = "flag_artifact",        flags = c("flag_artifact")),
+    list(name = "flag_germline",        flags = c("flag_germline")),
+    list(name = "flag_germline_binom",  flags = c("flag_germline_binom")),
+    list(name = "flag_freeze_enriched", flags = c("flag_freeze_enriched")),
+    list(name = "cluster",              flags = c("cluster")),
+    list(name = "high_gnomad",          flags = c("high_gnomad")),
+
+    # --- combined QC flags (no minAD) ---
+    list(name = "full_qc_no_minad",
+         flags = c("flag_artifact", "flag_germline", "high_gnomad", "cluster")),
+
+    # --- minAD thresholds alone ---
+    list(name = "minad3",               flags = c("minad3")),
+    list(name = "minad4",               flags = c("minad4")),
+    list(name = "minad5",               flags = c("minad5")),
+    list(name = "minad6",               flags = c("minad6")),
+    list(name = "minad7",               flags = c("minad7")),
+
+    # --- minAD + full QC combinations ---
+    list(name = "minad3_full",
+         flags = c("minad3", "flag_artifact", "flag_germline", "high_gnomad", "cluster")),
+    list(name = "minad4_full",
+         flags = c("minad4", "flag_artifact", "flag_germline", "high_gnomad", "cluster")),
+    list(name = "minad5_full",
+         flags = c("minad5", "flag_artifact", "flag_germline", "high_gnomad", "cluster")),
+    list(name = "minad6_full",
+         flags = c("minad6", "flag_artifact", "flag_germline", "high_gnomad", "cluster")),
+    list(name = "minad7_full",
+         flags = c("minad7", "flag_artifact", "flag_germline", "high_gnomad", "cluster")),
+
+    # --- full QC + extra covariates ---
+    list(name = "full_covs",
+         flags = c("flag_artifact", "flag_germline", "high_gnomad", "cluster"),
+         formula_extra = extra_covs),
+    list(name = "minad3_full_covs",
+         flags = c("flag_artifact", "flag_germline", "high_gnomad", "cluster"),
+         formula_extra = extra_covs),
+    list(name = "minad4_full_covs",
+         flags = c("flag_artifact", "flag_germline", "high_gnomad", "cluster", "minad4"),
+         formula_extra = extra_covs),
+    list(name = "minad5_full_covs",
+         flags = c("flag_artifact", "flag_germline", "high_gnomad", "cluster", "minad5"),
+         formula_extra = extra_covs)
+)
 
 # ========================
-# PLOT - forest plot style like Vlasschaert Fig 1A
+# FLEXIBLE AGE ASSOCIATION TESTER (with optional stratification)
 # ========================
-p_minad <- ggplot(minad_results, aes(x = min_ad, y = OR)) +
-    geom_hline(yintercept = 1, linetype = "dashed", color = "grey60", linewidth = 0.4) +
-    geom_errorbar(aes(ymin = CI_lo, ymax = CI_hi),
-                  width = 0.15, linewidth = 0.6, color = "grey40") +
-    geom_point(size = 4, color = "#D85A30") +
-    scale_y_continuous(
-        name   = "Odds ratio (per year of age)",
-        breaks = scales::pretty_breaks(n = 6)
-    ) +
-    scale_x_discrete(name = "Minimum alt depth (minAD)") +
-    labs(
-        title    = "Age association by minAD threshold",
-        subtitle = sprintf("n = %d total individuals", nrow(cov))
-    ) +
-    theme_minimal(base_size = 11) +
-    theme(
-        plot.title    = element_text(face = "bold", hjust = 0.5),
-        plot.subtitle = element_text(hjust = 0.5, size = 9, color = "grey40"),
-        panel.grid.minor  = element_blank(),
-        panel.grid.major.x = element_blank()
-    )
+# config: named list where each element has:
+#   $name          : label for the row in results / plot
+#   $flags         : character vector of column names in all_ch5; rows where ANY flag == TRUE are excluded
+#   $formula_extra : (optional) string of extra RHS covariates
+#
+# stratify_by: (optional) column name in all_ch5 to stratify on (e.g. "VAF_Strata", "Batch")
+#              runs the model separately for each level; results get a `stratum` column
 
-# add median VAF as annotation below x axis
-p_minad <- p_minad +
-    annotate("text",
-             x    = seq_along(MIN_AD_THRESHOLDS),
-             y    = min(minad_results$CI_lo, na.rm = TRUE) - 0.002,
-             label = sprintf("%.1f%%", minad_results$median_VAF * 100),
-             size  = 3, color = "grey40") +
-    annotate("text", x = 0.4,
-             y    = min(minad_results$CI_lo, na.rm = TRUE) - 0.002,
-             label = "median\nVAF", size = 3, color = "grey40", hjust = 1)
+test_age_association <- function(config, all_ch, cov,
+                                 default_formula_extra = NULL,
+                                 stratify_by = NULL) {
 
-ggsave(file.path("ch", "figures", "qc_minad_age_sensitivity.pdf"),
-       p_minad, width = 6, height = 5)
+    # determine strata levels up front
+    if (!is.null(stratify_by)) {
+        strata_levels <- sort(unique(na.omit(all_ch[[stratify_by]])))
+        strata_list   <- setNames(as.list(strata_levels), strata_levels)
+    } else {
+        strata_list <- list("all" = NULL)   # single pass, no subsetting
+    }
 
-write_xlsx(minad_results %>% mutate(min_ad = as.integer(as.character(min_ad))),
-           file.path("ch", "data", "ch_minad_sensitivity.xlsx"))
+    results <- lapply(config, function(cfg) {
+        nm        <- cfg$name
+        flags     <- cfg$flags
+        fml_extra <- if (!is.null(cfg$formula_extra)) cfg$formula_extra else default_formula_extra
 
-### try diff minAD thresholds...??
+        lapply(names(strata_list), function(stratum) {
+            stratum_val <- strata_list[[stratum]]
+
+            # --- filter variants by QC flags ---
+            ch_filtered <- all_ch
+            if (!is.null(stratum_val)) {
+                ch_filtered <- ch_filtered %>%
+                    filter(.data[[stratify_by]] == stratum_val)
+            }
+            if (length(flags) > 0) {
+                remove_mask <- Reduce(`|`, lapply(flags, function(f) {
+                    col <- ch_filtered[[f]]
+                    if (is.logical(col)) col else as.logical(col)
+                }))
+                remove_mask[is.na(remove_mask)] <- FALSE
+                ch_filtered <- ch_filtered[!remove_mask, ]
+            }
+
+            # --- carrier status ---
+            carriers <- ch_filtered %>%
+                distinct(Sample.ID) %>%
+                mutate(carrier = 1L)
+
+            df <- cov %>%
+                left_join(carriers, by = c("person_id" = "Sample.ID")) %>%
+                mutate(carrier = as.integer(ifelse(is.na(carrier), 0L, carrier)))
+
+            n_carriers <- sum(df$carrier)
+            n_total    <- nrow(df)
+
+            cat(sprintf("[%s | stratum: %s] %d carriers / %d total | flags: %s\n",
+                        nm, stratum, n_carriers, n_total,
+                        if (length(flags) == 0) "none" else paste(flags, collapse = ", ")))
+
+            # --- build formula ---
+            # if stratifying by Batch, drop as.factor(Batch) from base to avoid collinearity
+            base_rhs <- if (!is.null(stratify_by) && stratify_by == "Batch") {
+                "Sample_age"
+            } else {
+                "Sample_age + as.factor(Batch)"
+            }
+            rhs     <- if (!is.null(fml_extra)) paste(base_rhs, "+", fml_extra) else base_rhs
+            formula <- as.formula(paste("carrier ~", rhs))
+
+            # --- fit model ---
+            tryCatch({
+                m <- withCallingHandlers(
+                    glm(formula, data = df, family = binomial()),
+                    warning = function(w) {
+                        if (grepl("fitted probabilities numerically 0 or 1", conditionMessage(w)))
+                            invokeRestart("muffleWarning")
+                    }
+                )
+                separation <- any(fitted(m) %in% c(0, 1))
+                s  <- coef(summary(m))
+                ci <- confint.default(m)
+
+                data.frame(
+                    name        = nm,
+                    stratum     = stratum,
+                    flags       = paste(flags, collapse = ", "),
+                    n_carriers  = n_carriers,
+                    n_total     = n_total,
+                    OR          = exp(coef(m)["Sample_age"]),
+                    CI_lo       = exp(ci["Sample_age", 1]),
+                    CI_hi       = exp(ci["Sample_age", 2]),
+                    p_age       = s["Sample_age", "Pr(>|z|)"],
+                    separation  = separation,
+                    stringsAsFactors = FALSE
+                )
+            }, error = function(e) {
+                warning(sprintf("Model failed for [%s | %s]: %s", nm, stratum, conditionMessage(e)))
+                data.frame(name = nm, stratum = stratum,
+                           flags = paste(flags, collapse = ", "),
+                           n_carriers = n_carriers, n_total = n_total,
+                           OR = NA_real_, CI_lo = NA_real_, CI_hi = NA_real_,
+                           p_age = NA_real_, separation = NA,
+                           stringsAsFactors = FALSE)
+            })
+        }) %>% bind_rows()
+    }) %>% bind_rows()
+
+    results
+}
+
+# ========================
+# RUN (unstratified, as before)
+# ========================
+age_assoc_results <- test_age_association(
+    config     = filter_configs,
+    all_ch     = all_ch5,
+    cov        = cov
+)
+
+# ========================
+# RUN (stratified examples)
+# ========================
+age_assoc_vaf <- test_age_association(
+    config      = filter_configs,
+    all_ch      = all_ch5,
+    cov         = cov,
+    stratify_by = "VAF_Strata"
+)
+
+age_assoc_batch <- test_age_association(
+    config      = filter_configs,
+    all_ch      = all_ch5,
+    cov         = cov,
+    stratify_by = "Batch"
+)
+
+write_xlsx(age_assoc_results, file.path("ch", "data", "ch_filter_age_sensitivity.xlsx"))
+write_xlsx(age_assoc_vaf,     file.path("ch", "data", "ch_filter_age_sensitivity_vaf_strata.xlsx"))
+write_xlsx(age_assoc_batch,   file.path("ch", "data", "ch_filter_age_sensitivity_batch.xlsx"))
+
+# ========================
+# PLOT FUNCTION (works for stratified and unstratified)
+# ========================
+plot_age_association <- function(results, title = "Age association under different QC filters",
+                                 n_total = NULL) {
+    stratified <- length(unique(results$stratum)) > 1
+
+    plot_df <- results %>%
+        filter(!is.na(OR)) %>%
+        mutate(
+            name   = factor(name, levels = rev(unique(name))),
+            sig    = !is.na(p_age) & p_age < 0.05,
+            stratum = factor(stratum)
+        )
+
+    subtitle <- if (!is.null(n_total)) sprintf("n = %d total individuals", n_total) else NULL
+
+    p <- ggplot(plot_df, aes(x = OR, y = name, color = if (stratified) stratum else sig)) +
+        geom_vline(xintercept = 1, linetype = "dashed", color = "grey60", linewidth = 0.4) +
+        geom_errorbar(aes(xmin = CI_lo, xmax = CI_hi, group = if (stratified) stratum else NULL),
+                      width = 0.25, linewidth = 0.6, orientation = "y",
+                      position = if (stratified) position_dodge(width = 0.6) else "identity") +
+        geom_point(size = 3,
+                   position = if (stratified) position_dodge(width = 0.6) else "identity") +
+        scale_x_continuous(
+            name   = "Odds ratio per year of age (95% CI)",
+            breaks = scales::pretty_breaks(n = 6)
+        ) +
+        labs(title = title, subtitle = subtitle, y = NULL) +
+        theme_minimal(base_size = 11) +
+        theme(
+            plot.title         = element_text(face = "bold", hjust = 0.5),
+            plot.subtitle      = element_text(hjust = 0.5, size = 9, color = "grey40"),
+            panel.grid.minor   = element_blank(),
+            panel.grid.major.y = element_blank(),
+            legend.position    = "bottom"
+        )
+
+    if (stratified) {
+        p <- p +
+            scale_color_brewer(palette = "Set2", name = unique(results$stratum[1]) |>
+                                   (\(.) if (is.null(attr(results, "stratify_by"))) "stratum"
+                                    else attr(results, "stratify_by"))()) +
+            guides(color = guide_legend(title = "stratum"))
+    } else {
+        p <- p +
+            scale_color_manual(
+                values = c("FALSE" = "grey50", "TRUE" = "#D85A30"),
+                labels = c("FALSE" = "p \u2265 0.05", "TRUE" = "p < 0.05"),
+                name   = NULL
+            )
+    }
+
+    p
+}
+
+# --- save plots ---
+p_base <- plot_age_association(age_assoc_results, n_total = nrow(cov))
+ggsave(file.path("ch", "figures", "qc_filter_age_sensitivity.pdf"),
+       p_base, width = 7,
+       height = 0.4 * n_distinct(age_assoc_results$name) + 2,
+       limitsize = FALSE)
+
+p_vaf <- plot_age_association(age_assoc_vaf,
+                              title   = "Age association by VAF stratum",
+                              n_total = nrow(cov))
+ggsave(file.path("ch", "figures", "qc_filter_age_sensitivity_vaf_strata.pdf"),
+       p_vaf, width = 5 * n_distinct(age_assoc_vaf$stratum),
+       height = 0.4 * n_distinct(age_assoc_vaf$name) + 2,
+       limitsize = FALSE)
+
+p_batch <- plot_age_association(age_assoc_batch,
+                                title   = "Age association by batch",
+                                n_total = nrow(cov))
+ggsave(file.path("ch", "figures", "qc_filter_age_sensitivity_batch.pdf"),
+       p_batch, width = 4 * n_distinct(age_assoc_batch$stratum),
+       height = 0.4 * n_distinct(age_assoc_batch$name) + 2,
+       limitsize = FALSE)
 
 # ========================
 # REMOVE ARTIFACTS AND HIGH VAF - MANUAL
