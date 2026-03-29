@@ -6,6 +6,7 @@ setwd("/Users/jennyzli/Documents/Nathanson")
 source(here("R", "config.R"))
 library(data.table, quietly = T)
 library(ggVennDiagram)
+library(UpSetR)
 
 # ========================
 # READ IN DATA
@@ -231,8 +232,8 @@ germline_var <- germline_summary %>% filter(flag_germline_var) %>% pull(variant_
 
 cat(sprintf("Variants tested for germline: %d\n", nrow(germline_summary)))
 # 41
-# cat(sprintf("Individuals flagged germline: %d\n",  sum(germline_ind_pairs$variant_id, na.rm = TRUE)))
-# # 18
+cat(sprintf("Individuals flagged germline: %d\n",  nrow(germline_ind_pairs)))
+# 18
 cat(sprintf("Variants flagged germline:    %d\n",  sum(germline_summary$flag_germline_var, na.rm = TRUE)))
 # 5
 
@@ -295,6 +296,106 @@ for (thresh in MIN_AD_THRESHOLDS) {
 write_xlsx(all_ch2, file.path("ch", "data", "ch_seq_wl_art_flags_vars.xlsx"))
 
 # ========================
+# FLAG SUMMARY TABLE
+# ========================
+flag_cols <- c(
+    "flag_freeze_enriched", "flag_not_age_associated",
+    "flag_germline_ind", "flag_germline_var",
+    "flag_cluster", "flag_gnomad",
+    paste0("minad", MIN_AD_THRESHOLDS)
+)
+
+flag_summary <- do.call(rbind, lapply(flag_cols, function(f) {
+    col      <- as.logical(all_ch2[[f]])
+    batch_1  <- all_ch2$Batch == 1
+    batch_2  <- all_ch2$Batch == 2
+    n_total  <- nrow(all_ch2)
+    n_f2     <- sum(batch_1)
+    n_f3     <- sum(batch_2)
+
+    data.frame(
+        Flag          = f,
+        N_Flagged     = sum(col, na.rm = TRUE),
+        Pct_Overall   = round(100 * mean(col, na.rm = TRUE), 2),
+        N_Freeze2     = sum(col & batch_1, na.rm = TRUE),
+        Pct_Freeze2   = round(100 * sum(col & batch_1, na.rm = TRUE) / n_f2, 2),
+        N_Freeze3     = sum(col & batch_2, na.rm = TRUE),
+        Pct_Freeze3   = round(100 * sum(col & batch_2, na.rm = TRUE) / n_f3, 2),
+        stringsAsFactors = FALSE
+    )
+}))
+
+# Add total row at bottom for context
+totals <- data.frame(
+    Flag        = "TOTAL (rows)",
+    N_Flagged   = nrow(all_ch2),
+    Pct_Overall = 100.00,
+    N_Freeze2   = sum(all_ch2$Batch == 1),
+    Pct_Freeze2 = 100.00,
+    N_Freeze3   = sum(all_ch2$Batch == 2),
+    Pct_Freeze3 = 100.00,
+    stringsAsFactors = FALSE
+)
+flag_summary <- rbind(flag_summary, totals)
+
+print(flag_summary, row.names = FALSE)
+# Flag N_Flagged Pct_Overall N_Freeze2 Pct_Freeze2 N_Freeze3 Pct_Freeze3
+# flag_freeze_enriched       149       19.25         0        0.00       149       22.01
+# flag_not_age_associated       188       24.29        10       10.31       178       26.29
+# flag_germline_ind        18        2.33         3        3.09        15        2.22
+# flag_germline_var         5        0.65         3        3.09         2        0.30
+# flag_cluster       131       16.93         9        9.28       122       18.02
+# flag_gnomad        81       10.47        28       28.87        53        7.83
+# minad3         0        0.00         0        0.00         0        0.00
+# minad4       321       41.47        38       39.18       283       41.80
+# minad5       460       59.43        58       59.79       402       59.38
+# minad6       521       67.31        68       70.10       453       66.91
+# minad7       572       73.90        72       74.23       500       73.86
+# minad8       617       79.72        73       75.26       544       80.35
+# TOTAL (rows)       774      100.00        97      100.00       677      100.00
+# TOTAL (rows)       774      100.00        97      100.00       677      100.00
+#
+
+write_xlsx(flag_summary, file.path("ch", "data", "ch_flag_summary.xlsx"))
+
+# ========================
+# UPSET
+# ========================
+overlap_flags <- c(
+    "flag_freeze_enriched", "flag_not_age_associated",
+    "flag_germline_ind", "flag_germline_var",
+    "flag_cluster", "flag_gnomad"
+)
+
+flag_mat <- all_ch2 %>%
+    select(all_of(overlap_flags)) %>%
+    mutate(across(everything(), as.integer))
+
+### UPSET PLOT
+pdf(file.path("ch", "figures", "qc_flag_overlap_upset.pdf"), width = 10, height = 5)
+upset(
+    as.data.frame(flag_mat),
+    sets           = overlap_flags,
+    order.by       = "freq",
+    sets.bar.color = "#378ADD",
+    main.bar.color = "#1D9E75",
+    text.scale     = 1.2,
+    mb.ratio       = c(0.6, 0.4)
+)
+dev.off()
+
+all_ch2 <- all_ch2 %>%
+    mutate(n_flags = rowSums(across(all_of(overlap_flags), as.integer), na.rm = TRUE))
+
+cat("\nRows by number of flags triggered:\n")
+print(table(all_ch2$n_flags))
+# 0   1   2   3
+# 359 266 141   8
+
+write_xlsx(all_ch2 %>% filter(n_flags == 1), file.path("ch", "data", "ch_flag1_examine.xlsx"))
+write_xlsx(all_ch2 %>% filter(n_flags >= 2), file.path("ch", "data", "ch_flag2_examine.xlsx"))
+
+# ========================
 # DEFINE FILTER CONFIGURATIONS
 # ========================
 full_qc <- c("flag_freeze_enriched", "flag_not_age_associated",
@@ -318,6 +419,7 @@ minad_configs <- list(
     list(name = "minad5",      flags = c("minad5")),
     list(name = "minad6",      flags = c("minad6")),
     list(name = "minad7",      flags = c("minad7")),
+    list(name = "minad8",      flags = c("minad8")),
     list(name = "minad3_full", flags = c("minad3", full_qc)),
     list(name = "minad4_full", flags = c("minad4", full_qc)),
     list(name = "minad5_full", flags = c("minad5", full_qc)),
@@ -541,6 +643,9 @@ save_assoc_plot(minad_freeze_res,  file.path("ch", "figures", "qc_minad_age_sens
 save_assoc_plot(cov_freeze_res,    file.path("ch", "figures", "qc_cov_age_sensitivity_batch.pdf"),
                 "Age association — covariate models by batch", nrow(cov))
 
+# ========================
+# COMPARE VAF 10< vs. ALL VAF
+# ========================
 vaf_compare_res <- bind_rows(
     test_age_association(cov_configs, all_ch2, cov) %>% mutate(vaf_group = "All VAF"),
     test_age_association(cov_configs, all_ch2 %>% filter(Sample.AltFrac >= 0.10), cov) %>%
@@ -595,4 +700,51 @@ ggsave(file.path("ch", "figures", "qc_filter_age_cov_compare.pdf"),
        limitsize = FALSE)
 
 
+# ========================
+# FINAL FILTER
+# ========================
+full_qc <- c("flag_freeze_enriched", "flag_not_age_associated",
+             "flag_germline_ind", "flag_germline_var", "flag_cluster", "flag_gnomad")
+# minad5
+
+all_ch3 <- all_ch2 %>% filter(n_flags == 0, minad5)
+dim(all_ch3)
+# ========================
+# TOP GENES BY FREEZE (POST-QC)
+# ========================
+top_genes <- all_ch3 %>%
+    count(Gene) %>%
+    slice_max(n, n = 20) %>%
+    pull(Gene)
+
+gene_counts <- all_ch3 %>%
+    filter(Gene %in% top_genes) %>%
+    mutate(
+        Freeze = factor(Batch, levels = c(1, 2), labels = c("Freeze 2", "Freeze 3")),
+        Gene   = factor(Gene, levels = top_genes)  # ordered by overall count
+    ) %>%
+    count(Gene, Freeze)
+
+p_genes <- ggplot(gene_counts, aes(x = Gene, y = n, fill = Freeze)) +
+    geom_col(position = "dodge", width = 0.7) +
+    scale_fill_manual(values = c("Freeze 2" = "#378ADD", "Freeze 3" = "#1D9E75")) +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
+    labs(
+        title    = "Top genes after QC filtering",
+        subtitle = sprintf("minAD ≥ 5 + full QC | n = %d variants", nrow(all_ch3)),
+        x        = NULL, y = "Variant count", fill = NULL
+    ) +
+    theme_minimal(base_size = 11) +
+    theme(
+        plot.title       = element_text(face = "bold", hjust = 0.5),
+        plot.subtitle    = element_text(hjust = 0.5, size = 9, color = "grey40"),
+        axis.text.x      = element_text(angle = 40, hjust = 1),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor   = element_blank(),
+        legend.position    = "top"
+    )
+
+ggsave(file.path("ch", "figures", "ch_top_genes_by_freeze.pdf"),
+       p_genes, width = 9, height = 5)
+write_xlsx(all_ch3, file.path("ch", "data", "ch3.xlsx"))
 

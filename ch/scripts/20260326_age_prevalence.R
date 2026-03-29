@@ -9,9 +9,10 @@ source(here("R", "config.R"))
 # READ IN DATA
 # ========================
 all_ids <- read.csv(file.path("ch", "data", "ch_psm_matched4_case_control_ids.csv"))$x
+# write_xlsx(all_ch3, file.path("ch", "data", "ch3.xlsx"))
 
 ### CHIP variants
-vars <- read_excel(file.path("ch", "data", "ch_wl_art_checked.xlsx")) %>% filter(Keep == 1)
+vars <- read_excel(file.path("ch", "data", "ch3.xlsx"))
 dim(vars)
 # 256
 length(unique(vars$Sample.ID))
@@ -33,8 +34,8 @@ dim(cov_all)
 dim(cov_s1)
 # 2605
 
-write_xlsx(cov_s1, file.path("ch", "data", "pmbb_brca12_s1_cov_chip_df.xlsx"))
-write_xlsx(cov_all, file.path("ch", "data", "pmbb_brca12_cov_chip_df.xlsx"))
+# write_xlsx(cov_s1, file.path("ch", "data", "pmbb_brca12_s1_cov_chip_df.xlsx"))
+# write_xlsx(cov_all, file.path("ch", "data", "pmbb_brca12_cov_chip_df.xlsx"))
 
 # ========================
 # QUICK STATS
