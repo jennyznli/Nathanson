@@ -12,7 +12,9 @@ all_ids <- read.csv(file.path("ch", "data", "ch_psm_matched4_case_control_ids.cs
 # write_xlsx(all_ch3, file.path("ch", "data", "ch3.xlsx"))
 
 ### CHIP variants
+# vars <- read_excel(file.path("ch", "data", "ch3.xlsx"))
 vars <- read_excel(file.path("ch", "data", "ch3.xlsx"))
+
 dim(vars)
 # 256
 length(unique(vars$Sample.ID))
@@ -297,8 +299,6 @@ for (tag in c("all", "s1")) {
                p, width = 7, height = 5)
     }
 }
-
-
 
 # ========================
 # HISTOGRAM OF AGE

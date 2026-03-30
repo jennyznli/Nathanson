@@ -9,23 +9,9 @@ library(ggVennDiagram)
 library(UpSetR)
 
 # ========================
-# READ IN DATA
-# ========================
-all_ch <- read_excel(file.path("ch", "data", "ch_seq_wl_vars.xlsx"))
-dim(all_ch)
-# 774
-
-cov <- read.csv(file.path("ch", "data", "pmbb_brca12_cov_df.csv"), row.names = 1)
-all_ids <- read.csv(file.path("ch", "data", "ch_psm_matched4_case_control_ids.csv"))$x
-cov <- cov %>% filter(person_id %in% all_ids)
-table(cov$Batch)
-dim(cov)
-# 3004
-
-# ========================
 # SET GLOBALS
 # ========================
-GNOMAD_THRESHOLD  <- 0.001
+GNOMAD_THRESHOLD  <- 0.005
 FREQ_THRESHOLD    <- 4
 CLUSTER_THRESHOLD <- 50
 MIN_AD_THRESHOLDS <- 3:8
@@ -38,6 +24,32 @@ n_f2 <- 760
 n_f3 <- 2244
 
 extra_covs <- "Smoke_History + Sequenced_gender + PC1 + PC2 + PC3 + PC4 + PC5 + PC6"
+
+# ========================
+# READ IN DATA
+# ========================
+all_ch <- read_excel(file.path("ch", "data", "ch_seq_wl_vars.xlsx"))
+all_ch$gnomAD.MAX_AF <- as.numeric(all_ch$gnomAD.MAX_AF)
+all_ch <- all_ch %>% mutate(
+        VAF_Strata = case_when(
+            Sample.AltFrac >= 0.10              ~ "10+",
+            Sample.AltFrac >= 0.02              ~ "2-10",
+            TRUE                                ~ NA_character_
+        )
+    )
+
+cov <- read.csv(file.path("ch", "data", "pmbb_brca12_cov_df.csv"), row.names = 1)
+all_ids <- read.csv(file.path("ch", "data", "ch_psm_matched4_case_control_ids.csv"))$x
+cov <- cov %>% filter(person_id %in% all_ids)
+table(cov$Batch)
+# 1    2
+# 760 2244
+dim(cov)
+# 3004
+
+all_ch <- all_ch %>% left_join(cov %>% select(person_id, Sample_age), by = c("Sample.ID" = "person_id"))
+dim(all_ch)
+# 774 84
 
 # ========================
 # 1. FLAG - HIGH FREQ VARIANTS
@@ -62,7 +74,7 @@ dim(variant_counts)
 # 481
 write_xlsx(variant_counts, file.path("ch", "data", "ch_wl_var_counts.xlsx"))
 
-high_freq      <- variant_counts %>% filter(flag_high_freq == 1)
+high_freq <- variant_counts %>% filter(flag_high_freq == 1)
 high_freq_vars <- unique(high_freq$variant_id)
 cat(sprintf("High frequency variants to test: %d\n", nrow(high_freq)))
 # 18
@@ -79,52 +91,37 @@ high_freq2 <- high_freq %>%
                 nrow = 2
             ))$p.value
         }, batch_1, batch_2),
-        p_freeze_adj         = p.adjust(p_freeze, method = "BH"),
+        p_freeze_adj = p.adjust(p_freeze, method = "BH"),
         flag_freeze_enriched = p_freeze_adj < FREEZE_SIG
     )
 
-freeze_enriched_vars <- high_freq2 %>% filter(flag_freeze_enriched) %>% pull(variant_id)
-cat(sprintf("Freeze-enriched variants: %d\n", length(freeze_enriched_vars)))
-# 2
+freeze_enriched <- high_freq2 %>% filter(flag_freeze_enriched)
+freeze_enriched_var <- freeze_enriched %>% pull(variant_id)
+freeze_removed_var <- all_ch %>% filter(variant_id %in% freeze_enriched_var)
 
-# ========================
-# OVERLAP VENN DIAGRAMS
-# ========================
-var_f2 <- sort(variant_counts %>% filter(batch_1 != 0) %>% pull(variant_id))
-var_f3 <- sort(variant_counts %>% filter(batch_2 != 0) %>% pull(variant_id))
-
-p_venn <- ggVennDiagram(
-    list("Freeze 2" = var_f2, "Freeze 3" = var_f3),
-    label = "count", label_alpha = 0
-) +
-    scale_fill_gradient(low = "white", high = "#1D9E75") +
-    scale_color_manual(values = c("grey40", "grey40")) +
-    labs(title = "Variant overlap between freezes") +
-    theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 13),
-          legend.position = "none")
-
-ggsave(file.path("ch", "figures", "qc_variant_overlap_venn.pdf"), p_venn, width = 6, height = 4)
-
-gene_f2 <- sort(unique(all_ch %>% filter(Batch == 1) %>% pull(Gene)))
-gene_f3 <- sort(unique(all_ch %>% filter(Batch == 2) %>% pull(Gene)))
-
-p_venn_gene <- ggVennDiagram(
-    list("Freeze 2" = gene_f2, "Freeze 3" = gene_f3),
-    label = "count", label_alpha = 0
-) +
-    scale_fill_gradient(low = "white", high = "#378ADD") +
-    scale_color_manual(values = c("grey40", "grey40")) +
-    labs(title = "Gene overlap between freezes") +
-    theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 13),
-          legend.position = "none")
-
-ggsave(file.path("ch", "figures", "qc_gene_overlap_venn.pdf"), p_venn_gene, width = 6, height = 4)
+write_xlsx(
+    list(summary = freeze_enriched, removed = freeze_removed_var),
+    file.path("ch", "data", "ch_freeze_enriched_removed.xlsx")
+)
 
 # ========================
 # 3. FLAG - AGE ASSOCIATION
 # ========================
-artifact_test_age <- function(vkey, cov, extra_covs = NULL) {
-    carriers <- all_ch %>%
+run_age_tests <- function(data, variants) {
+    variants %>%
+        rowwise() %>%
+        mutate(res = list(artifact_test_age(variant_id, data, extra_covs = extra_covs))) %>%
+        unnest(res) %>%
+        ungroup() %>%
+        mutate(
+            p_age_adj = p.adjust(p_age, method = "BH"),
+            flag_age_associated = !is.na(p_age) & !separation & p_age < AGE_SIG
+        )
+}
+
+# test age association per variant category
+artifact_test_age <- function(vkey, vars, extra_covs = NULL) {
+    carriers <- vars %>%
         filter(variant_id == vkey) %>%
         distinct(Sample.ID) %>%
         mutate(carrier = 1)
@@ -148,7 +145,7 @@ artifact_test_age <- function(vkey, cov, extra_covs = NULL) {
                     invokeRestart("muffleWarning")
             }
         )
-        separation <- any(fitted(m) %in% c(0, 1))
+        separation <- any(fitted(m) %in% c(0, 1)) | !m$converged
         s  <- coef(summary(m))
         ci <- confint.default(m)
         data.frame(
@@ -165,82 +162,316 @@ artifact_test_age <- function(vkey, cov, extra_covs = NULL) {
     })
 }
 
-high_freq_base <- high_freq2 %>%
+age_association <- high_freq2 %>%
     rowwise() %>%
-    mutate(res = list(artifact_test_age(variant_id, cov))) %>%
+    mutate(res = list(artifact_test_age(variant_id, all_ch, extra_covs = extra_covs))) %>%
     unnest(res) %>% ungroup() %>%
     mutate(
-        p_age_adj           = p.adjust(p_age, method = "BH"),
+        p_age_adj = p.adjust(p_age, method = "BH"),
         flag_age_associated = !is.na(p_age) & !separation & p_age < AGE_SIG
     )
 
-high_freq_full <- high_freq2 %>%
-    rowwise() %>%
-    mutate(res = list(artifact_test_age(variant_id, cov, extra_covs = extra_covs))) %>%
-    unnest(res) %>% ungroup() %>%
-    mutate(
-        p_age_adj           = p.adjust(p_age, method = "BH"),
-        flag_age_associated = !is.na(p_age) & !separation & p_age < AGE_SIG
-    )
+not_age_associated <- age_association %>% filter(!flag_age_associated)
+not_age_associated_var <- not_age_associated %>% pull(variant_id)
+age_removed_var <- all_ch %>% filter(variant_id %in% not_age_associated_var)
 
-not_age_associated_var <- high_freq_full %>% filter(!flag_age_associated) %>% pull(variant_id)
-write_xlsx(high_freq_full, file.path("ch", "data", "ch_high_freq_counts.xlsx"))
+write_xlsx(
+    list(summary = not_age_associated, removed = age_removed_var),
+    file.path("ch", "data", "ch_age_association_removed.xlsx")
+)
+
+### TEST IF OVERALL ASSOCIATION IMPROVES ###
+all_ch2 <- all_ch %>%
+    left_join(
+        age_removed_var %>% select(Sample.ID, variant_id) %>% mutate(flag_not_age_associated_var = TRUE),
+        by = c("Sample.ID", "variant_id")
+    ) %>%
+    mutate(flag_not_age_associated_var = ifelse(is.na(flag_not_age_associated_var), FALSE, flag_not_age_associated_var))
+
+age_config <- list(
+    list(name = "before_age_association", flags = c()),
+    list(name = "after_age_association",  flags = c("flag_not_age_associated_var"))
+)
+
+age_res <- test_age_association(age_config, all_ch2, cov)
+age_res
+# name stratum                       flags n_carriers n_total       OR    CI_lo    CI_hi        p_age separation
+# Sample_age...1 before_age_association     all                                    556    3004 1.013259 1.006386 1.020179 1.487781e-04      FALSE
+# Sample_age...2  after_age_association     all flag_not_age_associated_var        413    3004 1.018569 1.010947 1.026250 1.582579e-06      FALSE
 
 # ========================
 # 4. FLAG - GERMLINE TESTING
 # ========================
 binomial_germline_test <- function(alt_count, total_depth, p_germline = 0.5) {
     if (is.na(alt_count) || is.na(total_depth) || total_depth == 0) {
-        return(data.frame(p_binom = NA_real_, flag_germline_ind = NA))
+        return(list(p_binom = NA_real_, flag_germline_ind = NA))
     }
     p <- binom.test(x = alt_count, n = total_depth,
                     p = p_germline, alternative = "two.sided")$p.value
-    data.frame(
-        p_binom           = p,
-        flag_germline_ind = p >= GERMLINE_SIG
-    )
+    list(p_binom = p, flag_germline_ind = p >= GERMLINE_SIG)
 }
 
+# flag variants to test
 germline_test_vars <- all_ch %>%
     filter(
-        (Gene %in% c("TET2", "CBL") & variant_category == "missense") |
-            variant_id %in% high_freq2$variant_id
+        Gene %in% c("TET2", "CBL") |
+            variant_id %in% high_freq2$variant_id |
+            Sample.AltFrac > 0.30
     ) %>%
-    distinct(variant_id, Sample.ID, Sample.AltDepth, Sample.Depth) %>%
-    rowwise() %>%
-    mutate(res = list(binomial_germline_test(Sample.AltDepth, Sample.Depth))) %>%
-    unnest(res) %>%
-    ungroup()
+    distinct(variant_id, Sample.ID, Sample_age, Sample.AltDepth, Sample.Depth, Sample.AltFrac,
+             gnomAD.MAX_AF, ProteinChange_1L, variant_category, Gene) %>%
+    mutate(
+        pmap_dfr(
+            list(Sample.AltDepth, Sample.Depth),
+            ~ binomial_germline_test(..1, ..2)
+        )
+    )
 
+# variant category proportions failing binomial test
 germline_summary <- germline_test_vars %>%
     group_by(variant_id) %>%
     summarise(
-        n_tested        = sum(!is.na(p_binom)),
-        n_fail_binom    = sum(flag_germline_ind, na.rm = TRUE),
-        prop_fail_binom = n_fail_binom / n_tested,
-        flag_germline_var = prop_fail_binom > 0.5,
-        .groups         = "drop"
+        n_tested          = sum(!is.na(p_binom)),
+        n_fail_binom      = sum(flag_germline_ind, na.rm = TRUE),
+        prop_fail_binom   = n_fail_binom / n_tested,
+        flag_germline_var = prop_fail_binom > 0.50,
+        .groups           = "drop"
+    )
+fail_majority_germline <- germline_summary %>% filter(flag_germline_var)
+
+# from all vars tested, remove those individuals' variants failing binomial
+# as well as entire variant categories whose majority failed
+germline_fail_vars <- germline_test_vars %>%
+    filter(variant_id %in% fail_majority_germline$variant_id) %>%
+    filter(flag_germline_ind)
+
+germline_removed_vars <- all_ch %>% semi_join(germline_fail_vars, by = c("Sample.ID", "variant_id"))
+
+cat(sprintf("Variants tested for germline: %d\n", nrow(germline_summary)))   # 93
+cat(sprintf("Individuals flagged germline: %d\n", length(unique(germline_fail_vars$Sample.ID)))) # 25
+cat(sprintf("Variants flagged germline: %d\n", nrow(germline_removed_vars))) # 25
+
+write_xlsx(
+    list(summary = fail_majority_germline, removed = germline_removed_vars),
+    file.path("ch", "data", "ch_germline_removed.xlsx")
+)
+
+### PLOT ###
+# colored by TET2 missense
+tet2_vars <- germline_test_vars %>% filter(Gene == "TET2")
+p <- ggplot(tet2_vars,
+                 aes(x = Sample_age, y = Sample.AltFrac,
+                     color = ProteinChange_1L,
+                     size  = !flag_germline_ind)) +
+    geom_point(alpha = 0.85) +
+    scale_color_manual(
+        values = setNames(
+            colorRampPalette(c("#4B0082", "#C0392B", "#E67E22", "#F1C40F"))(n_distinct(tet2_vars$ProteinChange_1L)),
+            sort(unique(tet2_vars$ProteinChange_1L))
+        ),
+        name = "Protein change"
+    ) +
+    scale_size_manual(
+        values = c("TRUE" = 2, "FALSE" = 4),
+        labels = c("TRUE" = "p \u2265 0.05", "FALSE" = "p < 0.05"),
+        name   = "Binomial test"
+    ) +
+    scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+    labs(x = "Baseline age", y = "Variant allele fraction (VAF %)") +
+    theme_minimal(base_size = 11) +
+    theme(
+        panel.grid.minor = element_blank(),
+        legend.position  = "right",
+        legend.title     = element_text(face = "bold", size = 9),
+        legend.text      = element_text(size = 9)
+    ) +
+    guides(
+        color = guide_legend(order = 2, override.aes = list(size = 3)),
+        size  = guide_legend(order = 1)
     )
 
-write_xlsx(germline_test_vars, file.path("ch", "data", "ch_germline_ind_df.xlsx"))
-write_xlsx(germline_summary, file.path("ch", "data", "ch_germline_vars_df.xlsx"))
+ggsave(file.path("ch", "figures", "germline_vaf_age_tet2_missense.pdf"),
+       p, width = 9, height = 6)
 
-germline_ind_pairs <- germline_test_vars %>%
-    filter(flag_germline_ind) %>%
-    select(Sample.ID, variant_id)
-germline_var <- germline_summary %>% filter(flag_germline_var) %>% pull(variant_id)
+# colored by type
+p <- ggplot(germline_test_vars,
+                 aes(x = Sample_age, y = Sample.AltFrac,
+                     color = variant_category,
+                     size  = !flag_germline_ind)) +
+    geom_point(alpha = 0.85) +
+    scale_size_manual(
+        values = c("TRUE" = 2, "FALSE" = 4),
+        labels = c("TRUE" = "p \u2265 0.05", "FALSE" = "p < 0.05"),
+        name   = "Binomial test"
+    ) +
+    scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+    labs(x = "Baseline age", y = "Variant allele fraction (VAF %)") +
+    theme_minimal(base_size = 11) +
+    theme(
+        panel.grid.minor = element_blank(),
+        legend.position  = "right",
+        legend.title     = element_text(face = "bold", size = 9),
+        legend.text      = element_text(size = 9)
+    ) +
+    guides(
+        color = guide_legend(order = 2, override.aes = list(size = 3)),
+        size  = guide_legend(order = 1)
+    )
 
-cat(sprintf("Variants tested for germline: %d\n", nrow(germline_summary)))
-# 41
-cat(sprintf("Individuals flagged germline: %d\n",  nrow(germline_ind_pairs)))
-# 18
-cat(sprintf("Variants flagged germline:    %d\n",  sum(germline_summary$flag_germline_var, na.rm = TRUE)))
-# 5
+ggsave(file.path("ch", "figures", "germline_vaf_age_category.pdf"), p, width = 9, height = 6)
+
+# colored by gene
+p <- ggplot(germline_test_vars,
+            aes(x = Sample_age, y = Sample.AltFrac,
+                color = Gene,
+                size  = !flag_germline_ind)) +
+    geom_point(alpha = 0.85) +
+    scale_size_manual(
+        values = c("TRUE" = 2, "FALSE" = 4),
+        labels = c("TRUE" = "p \u2265 0.05", "FALSE" = "p < 0.05"),
+        name   = "Binomial test"
+    ) +
+    scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+    labs(x = "Baseline age", y = "Variant allele fraction (VAF %)") +
+    theme_minimal(base_size = 11) +
+    theme(
+        panel.grid.minor = element_blank(),
+        legend.position  = "right",
+        legend.title     = element_text(face = "bold", size = 9),
+        legend.text      = element_text(size = 9)
+    ) +
+    guides(
+        color = guide_legend(order = 2, override.aes = list(size = 3)),
+        size  = guide_legend(order = 1)
+    )
+
+ggsave(file.path("ch", "figures", "germline_vaf_age_gene.pdf"), p, width = 9, height = 6)
+
+# colored by MAX AF
+germline_test_vars$gnomAD.MAX_AF[germline_test_vars$gnomAD.MAX_AF == 0] <- NA
+p <- ggplot(germline_test_vars,
+            aes(x = Sample_age, y = Sample.AltFrac,
+                color = gnomAD.MAX_AF,
+                size  = !flag_germline_ind)) +
+    geom_point(alpha = 0.85) +
+    scale_color_gradient(low = "blue", high = "red", trans = "log10") +
+    scale_size_manual(
+        values = c("TRUE" = 2, "FALSE" = 4),
+        labels = c("TRUE" = "p \u2265 0.05", "FALSE" = "p < 0.05"),
+        name   = "Binomial test"
+    ) +
+    scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+    labs(x = "Baseline age", y = "Variant allele fraction (VAF %)") +
+    theme_minimal(base_size = 11) +
+    theme(
+        panel.grid.minor = element_blank(),
+        legend.position  = "right",
+        legend.title     = element_text(face = "bold", size = 9),
+        legend.text      = element_text(size = 9)
+    ) +
+    guides(
+        color = guide_colorbar(order = 2),
+        size  = guide_legend(order = 1)
+    )
+
+ggsave(file.path("ch", "figures", "germline_vaf_age_gnomad.pdf"), p, width = 9, height = 6)
+
+### TEST OVERALL AGE ASSOCIATION BEFORE/AFTER REMOVING
+all_ch3 <- all_ch2 %>%
+    left_join(
+        germline_fail_vars %>% select(Sample.ID, variant_id) %>% mutate(flag_germline_var = TRUE),
+        by = c("Sample.ID", "variant_id")
+    ) %>%
+    mutate(flag_germline_var = ifelse(is.na(flag_germline_var), FALSE, flag_germline_var))
+
+germline_config <- list(
+    list(name = "before_germline", flags = c()),
+    list(name = "after_germline",  flags = c("flag_germline_var", "flag_not_age_associated_var"))
+)
+
+germline_res <- test_age_association(germline_config, all_ch3, cov)
+germline_res
+# name stratum                                          flags n_carriers n_total       OR    CI_lo    CI_hi        p_age separation
+# Sample_age...1 before_germline     all                                                       556    3004 1.013259 1.006386 1.020179 1.487781e-04      FALSE
+# Sample_age...2  after_germline     all flag_germline_var, flag_not_age_associated_var        393    3004 1.020680 1.012879 1.028540 1.700100e-07      FALSE
+
+# ### TEST INDIVIDUAL VARIANTS - AGE ASSOCIATION BEFORE/AFTER REMOVING
+# # variants to test = those that went through germline testing
+# germline_test_variant_ids <- germline_test_vars %>% distinct(variant_id)
+#
+# # before
+# germline_before_age <- germline_test_variant_ids %>%
+#     rowwise() %>%
+#     mutate(res = list(artifact_test_age(variant_id, all_ch2, extra_covs = extra_covs))) %>%
+#     unnest(res) %>% ungroup() %>%
+#     mutate(
+#         p_age_adj           = p.adjust(p_age, method = "BH"),
+#         flag_age_associated = !is.na(p_age) & !separation & p_age < AGE_SIG,
+#         stage               = "before"
+#     )
+#
+# # after
+# germline_after_age <- germline_test_variant_ids %>%
+#     rowwise() %>%
+#     mutate(res = list(artifact_test_age(variant_id, all_ch2 %>% filter(!flag_germline_var), extra_covs = extra_covs))) %>%
+#     unnest(res) %>% ungroup() %>%
+#     mutate(
+#         p_age_adj           = p.adjust(p_age, method = "BH"),
+#         flag_age_associated = !is.na(p_age) & !separation & p_age < AGE_SIG,
+#         stage               = "after"
+#     )
+#
+# # combine and compare
+# germline_age_comparison <- bind_rows(germline_before_age, germline_after_age) %>%
+#     left_join(germline_summary %>% select(variant_id, flag_germline_var, prop_fail_binom),
+#               by = "variant_id")
+#
+# # summary
+# germline_age_comparison %>%
+#     group_by(stage) %>%
+#     summarise(
+#         n_variants       = n(),
+#         n_age_associated = sum(flag_age_associated, na.rm = TRUE),
+#         prop_associated  = n_age_associated / n_variants,
+#         .groups          = "drop"
+#     )
+#
+# # specifically: which variants changed status before -> after?
+# germline_age_comparison %>%
+#     select(variant_id, stage, flag_age_associated, p_age, p_age_adj) %>%
+#     pivot_wider(names_from = stage,
+#                 values_from = c(flag_age_associated, p_age, p_age_adj)) %>%
+#     filter(flag_age_associated_before != flag_age_associated_after)
+#
+# # how many failed to converge?
+# germline_before_age %>%
+#     filter(separation) %>%
+#     nrow()
+#
+# germline_after_age %>%
+#     filter(separation) %>%
+#     nrow()
+#
+# # what's the carrier count for converging vs non-converging?
+# germline_before_age %>%
+#     left_join(variant_counts %>% select(variant_id, n_carriers), by = "variant_id") %>%
+#     group_by(separation) %>%
+#     summarise(
+#         n          = n(),
+#         median_carriers = median(n_carriers),
+#         max_carriers    = max(n_carriers),
+#         .groups = "drop"
+#     )
+#
+# # separation     n median_carriers max_carriers
+# # <lgl>      <int>           <dbl>        <int>
+# #     1 FALSE         46               2          102
+# # 2 TRUE          47               1            1
 
 # ========================
 # 5. FLAG - CLUSTERS
 # ========================
-all_ch_clustered <- all_ch %>%
+all_ch_clustered <- all_ch3 %>%
     mutate(.row_idx = row_number()) %>%
     group_by(Sample.ID, Gene, Chr) %>%
     arrange(Sample.ID, Gene, Chr, Start) %>%
@@ -361,6 +592,8 @@ write_xlsx(flag_summary, file.path("ch", "data", "ch_flag_summary.xlsx"))
 # ========================
 # UPSET
 # ========================
+all_ch <- read_excel(file.path("ch", "data", "ch_wl_art_flag_vars.xlsx"))
+
 overlap_flags <- c(
     "flag_freeze_enriched", "flag_not_age_associated",
     "flag_germline_ind", "flag_germline_var",
@@ -395,356 +628,42 @@ print(table(all_ch2$n_flags))
 write_xlsx(all_ch2 %>% filter(n_flags == 1), file.path("ch", "data", "ch_flag1_examine.xlsx"))
 write_xlsx(all_ch2 %>% filter(n_flags >= 2), file.path("ch", "data", "ch_flag2_examine.xlsx"))
 
-# ========================
-# DEFINE FILTER CONFIGURATIONS
-# ========================
-full_qc <- c("flag_freeze_enriched", "flag_not_age_associated",
-             "flag_germline_ind", "flag_germline_var", "flag_cluster", "flag_gnomad")
+write_xlsx(all_ch3, file.path("ch", "data", "ch_wl_art_flag_vars.xlsx"))
 
-filter_configs <- list(
-    list(name = "no_filter",               flags = character(0)),
-    list(name = "covs",                    flags = character(0), formula_extra = extra_covs),
-    list(name = "flag_freeze_enriched",    flags = c("flag_freeze_enriched")),
-    list(name = "flag_not_age_associated", flags = c("flag_not_age_associated")),
-    list(name = "flag_germline_ind",       flags = c("flag_germline_ind")),
-    list(name = "flag_germline_var",       flags = c("flag_germline_var")),
-    list(name = "flag_cluster",            flags = c("flag_cluster")),
-    list(name = "flag_gnomad",             flags = c("flag_gnomad")),
-    list(name = "full_qc_no_minad",        flags = full_qc)
-)
 
-minad_configs <- list(
-    list(name = "minad3",      flags = c("minad3")),
-    list(name = "minad4",      flags = c("minad4")),
-    list(name = "minad5",      flags = c("minad5")),
-    list(name = "minad6",      flags = c("minad6")),
-    list(name = "minad7",      flags = c("minad7")),
-    list(name = "minad8",      flags = c("minad8")),
-    list(name = "minad3_full", flags = c("minad3", full_qc)),
-    list(name = "minad4_full", flags = c("minad4", full_qc)),
-    list(name = "minad5_full", flags = c("minad5", full_qc)),
-    list(name = "minad6_full", flags = c("minad6", full_qc)),
-    list(name = "minad7_full", flags = c("minad7", full_qc)),
-    list(name = "minad8_full", flags = c("minad8", full_qc))
-)
-
-cov_configs <- list(
-    list(name = "full_covs",       flags = full_qc,                formula_extra = extra_covs),
-    list(name = "minad3_full_covs",  flags = c("minad3",  full_qc), formula_extra = extra_covs),
-    list(name = "minad4_full_covs",  flags = c("minad4",  full_qc), formula_extra = extra_covs),
-    list(name = "minad5_full_covs",  flags = c("minad5",  full_qc), formula_extra = extra_covs),
-    list(name = "minad6_full_covs",  flags = c("minad6",  full_qc), formula_extra = extra_covs),
-    list(name = "minad7_full_covs",  flags = c("minad7",  full_qc), formula_extra = extra_covs),
-    list(name = "minad8_full_covs",  flags = c("minad8",  full_qc), formula_extra = extra_covs)
-)
-
-# ========================
-# AGE ASSOCIATION TESTER
-# ========================
-test_age_association <- function(config, all_ch, cov,
-                                 default_formula_extra = NULL,
-                                 stratify_by = NULL) {
-    if (!is.null(stratify_by)) {
-        strata_levels <- sort(unique(na.omit(all_ch[[stratify_by]])))
-        strata_list   <- setNames(as.list(strata_levels), strata_levels)
-    } else {
-        strata_list <- list("all" = NULL)
-    }
-
-    results <- lapply(config, function(cfg) {
-        nm        <- cfg$name
-        flags     <- cfg$flags
-        fml_extra <- if (!is.null(cfg$formula_extra)) cfg$formula_extra else default_formula_extra
-
-        lapply(names(strata_list), function(stratum) {
-            stratum_val <- strata_list[[stratum]]
-
-            ch_filtered <- all_ch
-            if (!is.null(stratum_val)) {
-                ch_filtered <- ch_filtered %>% filter(.data[[stratify_by]] == stratum_val)
-            }
-            if (length(flags) > 0) {
-                remove_mask <- Reduce(`|`, lapply(flags, function(f) {
-                    col <- ch_filtered[[f]]
-                    if (is.logical(col)) col else as.logical(col)
-                }))
-                remove_mask[is.na(remove_mask)] <- FALSE
-                ch_filtered <- ch_filtered[!remove_mask, ]
-            }
-
-            carriers <- ch_filtered %>%
-                distinct(Sample.ID) %>%
-                mutate(carrier = 1L)
-
-            df <- cov %>%
-                left_join(carriers, by = c("person_id" = "Sample.ID")) %>%
-                mutate(carrier = as.integer(ifelse(is.na(carrier), 0L, carrier)))
-
-            n_carriers <- sum(df$carrier)
-            n_total    <- nrow(df)
-
-            cat(sprintf("[%s | stratum: %s] %d carriers / %d total\n",
-                        nm, stratum, n_carriers, n_total))
-
-            base_rhs <- if (!is.null(stratify_by) && stratify_by == "Batch") {
-                "Sample_age"
-            } else {
-                "Sample_age + as.factor(Batch)"
-            }
-            rhs     <- if (!is.null(fml_extra)) paste(base_rhs, "+", fml_extra) else base_rhs
-            formula <- as.formula(paste("carrier ~", rhs))
-
-            tryCatch({
-                m <- withCallingHandlers(
-                    glm(formula, data = df, family = binomial()),
-                    warning = function(w) {
-                        if (grepl("fitted probabilities numerically 0 or 1", conditionMessage(w)))
-                            invokeRestart("muffleWarning")
-                    }
-                )
-                separation <- any(fitted(m) %in% c(0, 1))
-                s  <- coef(summary(m))
-                ci <- confint.default(m)
-                data.frame(
-                    name       = nm, stratum = stratum,
-                    flags      = paste(flags, collapse = ", "),
-                    n_carriers = n_carriers, n_total = n_total,
-                    OR         = exp(coef(m)["Sample_age"]),
-                    CI_lo      = exp(ci["Sample_age", 1]),
-                    CI_hi      = exp(ci["Sample_age", 2]),
-                    p_age      = s["Sample_age", "Pr(>|z|)"],
-                    separation = separation,
-                    stringsAsFactors = FALSE
-                )
-            }, error = function(e) {
-                warning(sprintf("Model failed for [%s | %s]: %s", nm, stratum, conditionMessage(e)))
-                data.frame(name = nm, stratum = stratum,
-                           flags = paste(flags, collapse = ", "),
-                           n_carriers = n_carriers, n_total = n_total,
-                           OR = NA_real_, CI_lo = NA_real_, CI_hi = NA_real_,
-                           p_age = NA_real_, separation = NA,
-                           stringsAsFactors = FALSE)
-            })
-        }) %>% bind_rows()
-    }) %>% bind_rows()
-
-    results
-}
-
-# ========================
-# PLOT FUNCTION
-# ========================
-plot_age_association <- function(results, title = "Age association under different QC filters",
-                                 n_total = NULL) {
-    stratified <- length(unique(results$stratum)) > 1
-
-    plot_df <- results %>%
-        filter(!is.na(OR)) %>%
-        mutate(
-            name    = factor(name, levels = rev(unique(name))),
-            sig     = !is.na(p_age) & p_age < 0.05,
-            stratum = factor(stratum)
-        )
-
-    subtitle <- if (!is.null(n_total)) sprintf("n = %d total individuals", n_total) else NULL
-
-    p <- ggplot(plot_df, aes(x = OR, y = name, color = if (stratified) stratum else sig)) +
-        geom_vline(xintercept = 1, linetype = "dashed", color = "grey60", linewidth = 0.4) +
-        geom_errorbar(aes(xmin = CI_lo, xmax = CI_hi, group = if (stratified) stratum else NULL),
-                      width = 0.25, linewidth = 0.6, orientation = "y",
-                      position = if (stratified) position_dodge(width = 0.6) else "identity") +
-        geom_point(size = 3,
-                   position = if (stratified) position_dodge(width = 0.6) else "identity") +
-        scale_x_continuous(name = "Odds ratio per year of age (95% CI)",
-                           breaks = scales::pretty_breaks(n = 6)) +
-        labs(title = title, subtitle = subtitle, y = NULL) +
-        theme_minimal(base_size = 11) +
-        theme(
-            plot.title         = element_text(face = "bold", hjust = 0.5),
-            plot.subtitle      = element_text(hjust = 0.5, size = 9, color = "grey40"),
-            panel.grid.minor   = element_blank(),
-            panel.grid.major.y = element_blank(),
-            legend.position    = "bottom"
-        )
-
-    if (stratified) {
-        p <- p +
-            scale_color_brewer(palette = "Set2") +
-            guides(color = guide_legend(title = "stratum"))
-    } else {
-        p <- p +
-            scale_color_manual(
-                values = c("FALSE" = "grey50", "TRUE" = "#D85A30"),
-                labels = c("FALSE" = "p \u2265 0.05", "TRUE" = "p < 0.05"),
-                name   = NULL
-            )
-    }
-    p
-}
-
-# ========================
-# RUN
-# ========================
-filter_res       <- test_age_association(filter_configs, all_ch2, cov)
-minad_res        <- test_age_association(minad_configs,  all_ch2, cov)
-cov_res          <- test_age_association(cov_configs,    all_ch2, cov)
-
-filter_vaf_res   <- test_age_association(filter_configs, all_ch2, cov, stratify_by = "VAF_Strata")
-minad_vaf_res    <- test_age_association(minad_configs,  all_ch2, cov, stratify_by = "VAF_Strata")
-cov_vaf_res      <- test_age_association(cov_configs,    all_ch2, cov, stratify_by = "VAF_Strata")
-
-filter_freeze_res <- test_age_association(filter_configs, all_ch2, cov, stratify_by = "Batch")
-minad_freeze_res  <- test_age_association(minad_configs,  all_ch2, cov, stratify_by = "Batch")
-cov_freeze_res    <- test_age_association(cov_configs,    all_ch2, cov, stratify_by = "Batch")
-
-# ========================
-# SAVE RESULTS
-# ========================
-write_xlsx(filter_res,        file.path("ch", "data", "ch_filter_age_sensitivity.xlsx"))
-write_xlsx(minad_res,         file.path("ch", "data", "ch_minad_age_sensitivity.xlsx"))
-write_xlsx(cov_res,           file.path("ch", "data", "ch_cov_age_sensitivity.xlsx"))
-write_xlsx(filter_vaf_res,    file.path("ch", "data", "ch_filter_age_sensitivity_vaf.xlsx"))
-write_xlsx(minad_vaf_res,     file.path("ch", "data", "ch_minad_age_sensitivity_vaf.xlsx"))
-write_xlsx(cov_vaf_res,       file.path("ch", "data", "ch_cov_age_sensitivity_vaf.xlsx"))
-write_xlsx(filter_freeze_res, file.path("ch", "data", "ch_filter_age_sensitivity_batch.xlsx"))
-write_xlsx(minad_freeze_res,  file.path("ch", "data", "ch_minad_age_sensitivity_batch.xlsx"))
-write_xlsx(cov_freeze_res,    file.path("ch", "data", "ch_cov_age_sensitivity_batch.xlsx"))
-
-# ========================
-# PLOTS
-# ========================
-save_assoc_plot <- function(results, filename, title, n_total) {
-    p <- plot_age_association(results, title = title, n_total = n_total)
-    n_names   <- n_distinct(results$name)
-    n_strata  <- n_distinct(results$stratum)
-    width  <- if (n_strata > 1) 5 + 1.5 * n_strata else 7
-    height <- 0.4 * n_names + 2
-    ggsave(filename, p, width = width, height = height, limitsize = FALSE)
-}
-
-save_assoc_plot(filter_res,        file.path("ch", "figures", "qc_filter_age_sensitivity.pdf"),
-                "Age association — QC filters", nrow(cov))
-save_assoc_plot(minad_res,         file.path("ch", "figures", "qc_minad_age_sensitivity.pdf"),
-                "Age association — minAD thresholds", nrow(cov))
-save_assoc_plot(cov_res,           file.path("ch", "figures", "qc_cov_age_sensitivity.pdf"),
-                "Age association — covariate models", nrow(cov))
-
-save_assoc_plot(filter_vaf_res,    file.path("ch", "figures", "qc_filter_age_sensitivity_vaf.pdf"),
-                "Age association — QC filters by VAF stratum", nrow(cov))
-save_assoc_plot(minad_vaf_res,     file.path("ch", "figures", "qc_minad_age_sensitivity_vaf.pdf"),
-                "Age association — minAD by VAF stratum", nrow(cov))
-save_assoc_plot(cov_vaf_res,       file.path("ch", "figures", "qc_cov_age_sensitivity_vaf.pdf"),
-                "Age association — covariate models by VAF stratum", nrow(cov))
-
-save_assoc_plot(filter_freeze_res, file.path("ch", "figures", "qc_filter_age_sensitivity_batch.pdf"),
-                "Age association — QC filters by batch", nrow(cov))
-save_assoc_plot(minad_freeze_res,  file.path("ch", "figures", "qc_minad_age_sensitivity_batch.pdf"),
-                "Age association — minAD by batch", nrow(cov))
-save_assoc_plot(cov_freeze_res,    file.path("ch", "figures", "qc_cov_age_sensitivity_batch.pdf"),
-                "Age association — covariate models by batch", nrow(cov))
-
-# ========================
-# COMPARE VAF 10< vs. ALL VAF
-# ========================
-vaf_compare_res <- bind_rows(
-    test_age_association(cov_configs, all_ch2, cov) %>% mutate(vaf_group = "All VAF"),
-    test_age_association(cov_configs, all_ch2 %>% filter(Sample.AltFrac >= 0.10), cov) %>%
-        mutate(vaf_group = "VAF ≥ 10%")
-)
-
-plot_df <- vaf_compare_res %>%
-    filter(!is.na(OR)) %>%
-    mutate(
-        name      = factor(name, levels = rev(unique(name))),
-        sig       = !is.na(p_age) & p_age < 0.05,
-        vaf_group = factor(vaf_group, levels = c("All VAF", "VAF ≥ 10%"))
-    )
-
-p_vaf_compare <- ggplot(plot_df, aes(x = OR, y = name, color = vaf_group)) +
-    geom_vline(xintercept = 1, linetype = "dashed", color = "grey60", linewidth = 0.4) +
-    geom_errorbar(aes(xmin = CI_lo, xmax = CI_hi, group = vaf_group),
-                  width = 0.25, linewidth = 0.6, orientation = "y",
-                  position = position_dodge(width = 0.6)) +
-    geom_point(aes(shape = sig), size = 3, position = position_dodge(width = 0.6)) +
-    scale_color_manual(
-        values = c("All VAF" = "#378ADD", "VAF ≥ 10%" = "#D85A30"),
-        name   = NULL
-    ) +
-    scale_shape_manual(
-        values = c("FALSE" = 16, "TRUE" = 8),
-        labels = c("FALSE" = "p \u2265 0.05", "TRUE" = "p < 0.05"),
-        name   = NULL
-    ) +
-    scale_x_continuous(
-        name   = "Odds ratio per year of age (95% CI)",
-        breaks = scales::pretty_breaks(n = 6)
-    ) +
-    labs(
-        title    = "Age association by VAF threshold",
-        subtitle = sprintf("n = %d total individuals", nrow(cov)),
-        y        = NULL
-    ) +
-    theme_minimal(base_size = 11) +
-    theme(
-        plot.title         = element_text(face = "bold", hjust = 0.5),
-        plot.subtitle      = element_text(hjust = 0.5, size = 9, color = "grey40"),
-        panel.grid.minor   = element_blank(),
-        panel.grid.major.y = element_blank(),
-        legend.position    = "bottom"
-    )
-
-ggsave(file.path("ch", "figures", "qc_filter_age_cov_compare.pdf"),
-       p_vaf_compare,
-       width  = 7,
-       height = 0.4 * n_distinct(plot_df$name) + 2,
-       limitsize = FALSE)
 
 
 # ========================
-# FINAL FILTER
+# OVERLAP VENN DIAGRAMS
 # ========================
-full_qc <- c("flag_freeze_enriched", "flag_not_age_associated",
-             "flag_germline_ind", "flag_germline_var", "flag_cluster", "flag_gnomad")
-# minad5
+var_f2 <- sort(variant_counts %>% filter(batch_1 != 0) %>% pull(variant_id))
+var_f3 <- sort(variant_counts %>% filter(batch_2 != 0) %>% pull(variant_id))
 
-all_ch3 <- all_ch2 %>% filter(n_flags == 0, minad5)
-dim(all_ch3)
-# ========================
-# TOP GENES BY FREEZE (POST-QC)
-# ========================
-top_genes <- all_ch3 %>%
-    count(Gene) %>%
-    slice_max(n, n = 20) %>%
-    pull(Gene)
+p_venn <- ggVennDiagram(
+    list("Freeze 2" = var_f2, "Freeze 3" = var_f3),
+    label = "count", label_alpha = 0
+) +
+    scale_fill_gradient(low = "white", high = "#1D9E75") +
+    scale_color_manual(values = c("grey40", "grey40")) +
+    labs(title = "Variant overlap between freezes") +
+    theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 13),
+          legend.position = "none")
 
-gene_counts <- all_ch3 %>%
-    filter(Gene %in% top_genes) %>%
-    mutate(
-        Freeze = factor(Batch, levels = c(1, 2), labels = c("Freeze 2", "Freeze 3")),
-        Gene   = factor(Gene, levels = top_genes)  # ordered by overall count
-    ) %>%
-    count(Gene, Freeze)
+ggsave(file.path("ch", "figures", "qc_variant_overlap_venn.pdf"), p_venn, width = 6, height = 4)
 
-p_genes <- ggplot(gene_counts, aes(x = Gene, y = n, fill = Freeze)) +
-    geom_col(position = "dodge", width = 0.7) +
-    scale_fill_manual(values = c("Freeze 2" = "#378ADD", "Freeze 3" = "#1D9E75")) +
-    scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
-    labs(
-        title    = "Top genes after QC filtering",
-        subtitle = sprintf("minAD ≥ 5 + full QC | n = %d variants", nrow(all_ch3)),
-        x        = NULL, y = "Variant count", fill = NULL
-    ) +
-    theme_minimal(base_size = 11) +
-    theme(
-        plot.title       = element_text(face = "bold", hjust = 0.5),
-        plot.subtitle    = element_text(hjust = 0.5, size = 9, color = "grey40"),
-        axis.text.x      = element_text(angle = 40, hjust = 1),
-        panel.grid.major.x = element_blank(),
-        panel.grid.minor   = element_blank(),
-        legend.position    = "top"
-    )
+gene_f2 <- sort(unique(all_ch %>% filter(Batch == 1) %>% pull(Gene)))
+gene_f3 <- sort(unique(all_ch %>% filter(Batch == 2) %>% pull(Gene)))
 
-ggsave(file.path("ch", "figures", "ch_top_genes_by_freeze.pdf"),
-       p_genes, width = 9, height = 5)
-write_xlsx(all_ch3, file.path("ch", "data", "ch3.xlsx"))
+p_venn_gene <- ggVennDiagram(
+    list("Freeze 2" = gene_f2, "Freeze 3" = gene_f3),
+    label = "count", label_alpha = 0
+) +
+    scale_fill_gradient(low = "white", high = "#378ADD") +
+    scale_color_manual(values = c("grey40", "grey40")) +
+    labs(title = "Gene overlap between freezes") +
+    theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 13),
+          legend.position = "none")
+
+ggsave(file.path("ch", "figures", "qc_gene_overlap_venn.pdf"), p_venn_gene, width = 6, height = 4)
+
 
