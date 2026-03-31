@@ -202,6 +202,15 @@ for (tag in c("all", "s1")) {
                      paste0("chip_prevalence_by_decade_by_batch_", tag, ".pdf")),
            p, width = 7, height = 5)
 }
+
+
+
+
+
+
+
+
+
 # ========================
 # COVERAGE DISTRIBUTIONS (Total Depth)
 # ========================

@@ -13,7 +13,7 @@ library(UpSetR)
 # ========================
 all_ch <- read_excel(file.path("ch", "data", "ch_seq_wl_flags_vars.xlsx"))
 dim(all_ch)
-# 481
+# 999
 
 cov <- read.csv(file.path("ch", "data", "pmbb_brca12_cov_df.csv"), row.names = 1)
 all_ids <- read.csv(file.path("ch", "data", "ch_psm_matched4_case_control_ids.csv"))$x

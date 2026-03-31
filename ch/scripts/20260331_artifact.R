@@ -7,6 +7,7 @@ source(here("R", "config.R"))
 library(data.table, quietly = T)
 library(ggVennDiagram)
 library(UpSetR)
+library(ggrepel)
 
 # ========================
 # SET GLOBALS
@@ -72,17 +73,17 @@ variant_counts <- all_ch %>%
     mutate(flag_high_freq = (n_carriers >= FREQ_THRESHOLD))
 
 dim(variant_counts)
-# 481 unique variants
+# 607 unique variants
 
 high_freq <- variant_counts %>% filter(flag_high_freq)
 high_freq_var <- unique(high_freq$variant_id)
 
 length(high_freq_var)
-# 18
+# 25
 
 high_freq_vars <- all_ch %>% filter(variant_id %in% high_freq_var) %>% arrange(variant_id)
 dim(high_freq_vars)
-# 252
+# 329
 
 # ========================
 # 2. FREEZE ENRICHMENT
@@ -180,11 +181,11 @@ age_association <- high_freq2 %>%
 not_age_associated <- age_association %>% filter(!flag_age_associated)
 not_age_associated_var <- not_age_associated %>% pull(variant_id)
 length(not_age_associated_var)
-# 14
+# 21
 
 age_removed_var <- all_ch %>% filter(variant_id %in% not_age_associated_var) %>% arrange(variant_id)
 dim(age_removed_var)
-# 188
+# 265
 
 # ========================
 # 4. GERMLINE TESTING
@@ -226,7 +227,7 @@ germline_summary <- germline_test_vars %>%
     )
 fail_majority_germline <- germline_summary %>% filter(flag_germline_var)
 dim(fail_majority_germline)
-# 23 - most of these are singletons...
+# 51 - most of these are singletons...
 
 # from all vars tested, remove those individuals' variants failing binomial
 # as well as entire variant categories whose majority failed
@@ -236,12 +237,10 @@ germline_fail_vars <- germline_test_vars %>%
 
 germline_removed_vars <- all_ch %>% inner_join(germline_fail_vars, by = c("Sample.ID", "variant_id"))
 dim(germline_removed_vars)
-# 25
+# 84
 
 ### PLOT ###
 # colored by TET2 missense
-library(ggrepel)
-
 tet2_vars <- germline_test_vars %>% filter(Gene == "TET2")
 
 p <- ggplot(tet2_vars,
@@ -417,7 +416,7 @@ cluster_summary <- cluster_all %>%
     ) %>%
     arrange(Sample.ID, Chr, Start_min)
 dim(cluster_summary)
-# 88 unique clusters
+# 99 unique clusters
 
 # get one representative variant per cluster
 cluster_rep <- cluster_all %>%
@@ -447,7 +446,6 @@ all_ch2 <- all_ch %>%
 all_ch2 <- all_ch2 %>% mutate(n_flags = rowSums(across(c("flag_freeze_enriched",
                                       "flag_not_age_associated", "flag_germline_ind",
                                       "flag_cluster"), as.integer), na.rm = TRUE))
-
 
 flags <- c("flag_high_freq", "flag_freeze_enriched", "flag_not_age_associated",
            "flag_germline_ind", "flag_cluster", "flag_full")
@@ -483,17 +481,30 @@ flag_summary <- tibble(
 flag_summary
 # flag                    n_rows_flagged n_individuals_flagged n_variants_flagged
 # <chr>                            <int>                 <int>              <int>
-#     1 flag_high_freq                     252                   221                 18
+#     1 flag_high_freq                     329                   287                 25
 # 2 flag_freeze_enriched               149                   148                  2
-# 3 flag_not_age_associated            188                   173                 14
-# 4 flag_germline_ind                   25                    25                 23
-# 5 flag_cluster                       131                    74                100
-# 6 flag_full                          375                   292                135
+# 3 flag_not_age_associated            265                   241                 21
+# 4 flag_germline_ind                   84                    82                 51
+# 5 flag_cluster                       147                    80                114
+# 6 flag_full                          500                   387                180
 
 cat("\nRows by number of flags triggered:\n")
 print(table(all_ch2$n_flags))
 # 0   1   2
-# 399 257 118
+# 499 355 145
+
+# final clean dataset
+all_ch_clean <- all_ch2 %>% filter(!flag_full)
+cat(sprintf("Rows before filtering: %d\n", nrow(all_ch2)))
+# 999
+cat(sprintf("Rows after filtering:  %d\n", nrow(all_ch_clean)))
+# 499
+cat(sprintf("Rows removed:          %d\n", nrow(all_ch2) - nrow(all_ch_clean)))
+# 500
+
+write_xlsx(all_ch2, file.path("ch", "data", "ch_seq_wl_flags_vars.xlsx"))
+write_xlsx(all_ch_clean, file.path("ch", "data", "ch_seq_wl_art_vars.xlsx"))
+write_xlsx(flag_summary, file.path("ch", "data", "ch_flags_summary.xlsx"))
 
 # ========================
 # CHIP VARIANT COUNT PER INDIVIDUAL
@@ -526,19 +537,6 @@ p_chip <- ggplot(chip_counts, aes(x = n_chip, y = n)) +
 
 ggsave(file.path("ch", "figures", "ch_variants_per_individual.pdf"),
        p_chip, width = 6, height = 5)
-
-# final clean dataset
-all_ch_clean <- all_ch2 %>% filter(!flag_full)
-cat(sprintf("Rows before filtering: %d\n", nrow(all_ch2)))
-# 774
-cat(sprintf("Rows after filtering:  %d\n", nrow(all_ch_clean)))
-# 399
-cat(sprintf("Rows removed:          %d\n", nrow(all_ch2) - nrow(all_ch_clean)))
-# 375
-
-write_xlsx(all_ch2, file.path("ch", "data", "ch_seq_wl_flags_vars.xlsx"))
-write_xlsx(all_ch_clean, file.path("ch", "data", "ch_seq_wl_art_vars.xlsx"))
-write_xlsx(flag_summary, file.path("ch", "data", "ch_flags_summary.xlsx"))
 
 # ========================
 # FLAGS UPSET PLOT
@@ -614,6 +612,16 @@ all_variants_master <- variant_counts %>%
                                     prop_fail_binom, flag_germline_var),
         by = "variant_id"
     ) %>%
+    left_join(
+        all_ch %>%
+            group_by(variant_id) %>%
+            summarise(
+                across(c(whitelist, wl.mis, wl.lof, wl.splice, wl.exception), first),
+                wl_manualreview = any(manualreview, na.rm = TRUE),
+                .groups = "drop"
+            ),
+        by = "variant_id"
+    ) %>%
     mutate(
         flag_cluster            = variant_id %in% cluster_not_rep_var,
         flag_high_freq          = flag_high_freq == 1,
@@ -622,14 +630,15 @@ all_variants_master <- variant_counts %>%
         flag_germline_var       = ifelse(is.na(flag_germline_var), FALSE, flag_germline_var),
         n_flags                 = flag_high_freq + flag_freeze_enriched +
             flag_not_age_associated + flag_germline_var + flag_cluster,
-        manual_review           = as.integer(n_flags > 0)
+        final_manual_review     = as.integer(n_flags > 0 | wl_manualreview)
     ) %>%
-    arrange(desc(manual_review), desc(n_flags), desc(n_carriers))
+    arrange(desc(final_manual_review), desc(n_flags), desc(n_carriers))
 
 write_xlsx(
     list(
         "flag_overview"           = flag_overview,
         "all_variants"            = all_variants_master,
+        "whitelist_manual"        = all_ch %>% filter(manualreview),
         "high_freq_summary"       = age_association %>%
             arrange(desc(n_carriers)),
         "high_freq_vars"          = high_freq_vars,
@@ -643,16 +652,16 @@ write_xlsx(
         "cluster_not_rep_vars"    = cluster_all %>%
             filter(variant_id %in% cluster_not_rep_var)
     ),
-    file.path("ch", "data", "ch_artifact_filter_review.xlsx")
+    file.path("ch", "data", "ch_wl_artifact_review.xlsx")
 )
 
 cat("Master review sheet written.\n")
 cat(sprintf("Total variants:     %d\n", nrow(all_variants_master)))
 # 481
 cat(sprintf("Flagged for review: %d\n", sum(all_variants_master$manual_review)))
-# 137
+# 182
 cat(sprintf("Clean variants:     %d\n", sum(all_variants_master$manual_review == 0)))
-# 344
+# 425
 
 # ========================
 # OVERLAP VENN DIAGRAMS
@@ -702,4 +711,91 @@ p_venn_gene <- ggVennDiagram(
           legend.position = "none")
 
 ggsave(file.path("ch", "figures", "qc_gene_overlap_venn.pdf"), p_venn_gene, width = 6, height = 4)
+
+# ========================
+# QC PLOTTING FUNCTION
+# ========================
+plot_batch_gene_freq <- function(df, label = "",
+                                 sample_col = "Sample.ID",
+                                 gene_col   = "Gene",
+                                 batch_col  = "Batch",
+                                 batch_labels = c("Freeze 2", "Freeze 3"),
+                                 out_dir    = file.path("ch", "figures")) {
+
+    # --- overlap summary ---
+    f2_vars <- df %>% filter(.data[[batch_col]] == 1) %>% pull(variant_id) %>% unique()
+    f3_vars <- df %>% filter(.data[[batch_col]] == 2) %>% pull(variant_id) %>% unique()
+    cat(sprintf("[%s] Variants only in F2: %d\n",  label, sum(!f2_vars %in% f3_vars)))
+    cat(sprintf("[%s] Variants only in F3: %d\n",  label, sum(!f3_vars %in% f2_vars)))
+    cat(sprintf("[%s] Variants in both:   %d\n\n", label, sum(f2_vars %in% f3_vars)))
+
+    # --- batch sizes ---
+    batch_sizes <- df %>%
+        group_by(.data[[batch_col]]) %>%
+        summarise(n_total = n_distinct(.data[[sample_col]]), .groups = "drop")
+
+    n_total_overall <- n_distinct(df[[sample_col]])
+    subtitle_str <- sprintf("%s n = %d  |  %s n = %d  |  Overall n = %d",
+                            batch_labels[1], batch_sizes$n_total[batch_sizes[[batch_col]] == 1],
+                            batch_labels[2], batch_sizes$n_total[batch_sizes[[batch_col]] == 2],
+                            n_total_overall)
+
+    # --- batch carrier freq ---
+    gene_freq <- df %>%
+        group_by(.data[[gene_col]], .data[[batch_col]]) %>%
+        summarise(n_carriers = n_distinct(.data[[sample_col]]), .groups = "drop") %>%
+        left_join(batch_sizes, by = batch_col) %>%
+        mutate(freq  = n_carriers / n_total,
+               Batch = factor(.data[[batch_col]], labels = batch_labels))
+
+    # --- overall carrier freq ---
+    gene_freq_overall <- df %>%
+        group_by(.data[[gene_col]]) %>%
+        summarise(n_carriers = n_distinct(.data[[sample_col]]),
+                  n_total    = n_total_overall,
+                  freq       = n_carriers / n_total_overall,
+                  Batch      = "Overall",
+                  .groups    = "drop")
+
+    # gene order by overall freq
+    gene_order <- gene_freq_overall %>%
+        arrange(desc(freq)) %>%
+        pull(.data[[gene_col]])
+
+    gene_freq <- bind_rows(gene_freq, gene_freq_overall) %>%
+        mutate(Gene  = factor(.data[[gene_col]], levels = gene_order),
+               Batch = factor(Batch, levels = c(batch_labels, "Overall")))
+
+    batch_colors <- c(RColorBrewer::brewer.pal(3, "Set2")[1:2], "grey30") %>%
+        setNames(c(batch_labels, "Overall"))
+
+    # --- dot plot (horizontal) ---
+    p_dot <- ggplot(gene_freq, aes(x = Gene, y = freq, color = Batch)) +
+        geom_line(aes(group = Gene), color = "grey80", linewidth = 0.4) +
+        geom_point(size = 2.5, alpha = 0.9) +
+        scale_color_manual(values = batch_colors, name = NULL) +
+        scale_y_continuous(labels = scales::percent_format(accuracy = 0.1),
+                           breaks = scales::pretty_breaks(n = 6),
+                           expand = expansion(mult = c(0.02, 0.1))) +
+        labs(title    = sprintf("Carrier frequency per gene by batch%s",
+                                if (label != "") sprintf(" - %s", label) else ""),
+             subtitle = subtitle_str,
+             x = NULL, y = "Carrier frequency") +
+        theme_minimal(base_size = 11) +
+        theme(plot.title       = element_text(face = "bold", hjust = 0.5),
+              plot.subtitle    = element_text(hjust = 0.5, size = 9, color = "grey40"),
+              axis.text.x      = element_text(angle = 45, hjust = 1, size = 8),
+              legend.position  = "bottom",
+              panel.grid.minor = element_blank(),
+              panel.grid.major.x = element_blank())
+
+    slug <- if (label != "") paste0("_", gsub("\\s+", "_", tolower(label))) else ""
+    ggsave(file.path(out_dir, sprintf("qc_carrier_freq_dot%s.pdf", slug)),
+           p_dot, width = 14, height = 6)
+
+    invisible(list(dot = p_dot, freq_table = gene_freq))
+}
+
+plot_batch_gene_freq(all_ch_clean, label = "post artifact")
+
 
