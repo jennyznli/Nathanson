@@ -9,16 +9,11 @@ source(here("R", "config.R"))
 # READ IN DATA
 # ========================
 all_ids <- read.csv(file.path("ch", "data", "ch_psm_matched4_case_control_ids.csv"))$x
-# write_xlsx(all_ch3, file.path("ch", "data", "ch3.xlsx"))
 
 ### CHIP variants
-# vars <- read_excel(file.path("ch", "data", "ch3.xlsx"))
-vars <- read_excel(file.path("ch", "data", "ch3.xlsx"))
-
+vars <- read_excel(file.path("ch", "data", "ch_seq_wl_art_minad4_vars.xlsx"))
 dim(vars)
-# 256
 length(unique(vars$Sample.ID))
-# 220
 
 ### covariates
 cov_all <- read.csv(file.path("ch", "data", "pmbb_brca12_cov_df.csv"), row.names = 1) %>% filter(person_id %in% all_ids)
@@ -29,15 +24,11 @@ cov_all <- cov_all %>%
         CHIP_Count  = sapply(person_id, function(id) sum(vars$Sample.ID == id))
     )
 
-
 cov_s1 <- cov_all %>% filter(Strata == 1)
 dim(cov_all)
 # 3004
 dim(cov_s1)
 # 2605
-
-# write_xlsx(cov_s1, file.path("ch", "data", "pmbb_brca12_s1_cov_chip_df.xlsx"))
-# write_xlsx(cov_all, file.path("ch", "data", "pmbb_brca12_cov_chip_df.xlsx"))
 
 # ========================
 # QUICK STATS
@@ -166,24 +157,25 @@ plot_prev_stratified <- function(df, strat_var, title_str, max_age = Inf) {
 # (loop over cov_all and cov_s1)
 # ========================
 for (tag in c("all", "s1")) {
-    cov <- get(paste0("cov_", tag))
+    cov      <- get(paste0("cov_", tag))
+    tag_lab  <- if (tag == "all") "All" else "Strata 1"
 
     # Overall
-    p <- plot_prev_by_decade(cov, "CHIP prevalence by decade")
+    p <- plot_prev_by_decade(cov, sprintf("CHIP prevalence by decade (%s)", tag_lab))
     ggsave(file.path("ch", "figures",
                      paste0("chip_prevalence_by_decade_", tag, ".pdf")),
            p, width = 7, height = 5)
 
     # Non-carriers only
     p <- plot_prev_by_decade(cov %>% filter(BRCA12_Case == 0),
-                             "CHIP prevalence by decade (non-carriers)")
+                             sprintf("CHIP prevalence by decade — non-carriers (%s)", tag_lab))
     ggsave(file.path("ch", "figures",
                      paste0("chip_prevalence_by_decade_no_brca12_", tag, ".pdf")),
            p, width = 7, height = 5)
 
-    # BRCA1/2 carriers only (age capped at 70)
+    # BRCA1/2 carriers only
     p <- plot_prev_by_decade(cov %>% filter(BRCA12_Case == 1),
-                             "CHIP prevalence by decade (BRCA1/2 carriers)",
+                             sprintf("CHIP prevalence by decade — BRCA1/2 carriers (%s)", tag_lab),
                              max_age = 70)
     ggsave(file.path("ch", "figures",
                      paste0("chip_prevalence_by_decade_brca12_", tag, ".pdf")),
@@ -191,26 +183,25 @@ for (tag in c("all", "s1")) {
 
     # Stratified by Sequenced_gender
     p <- plot_prev_stratified(cov, "Sequenced_gender",
-                              "CHIP prevalence by decade (by sex)")
+                              sprintf("CHIP prevalence by decade — by sex (%s)", tag_lab))
     ggsave(file.path("ch", "figures",
                      paste0("chip_prevalence_by_decade_by_sex_", tag, ".pdf")),
            p, width = 7, height = 5)
 
     # Stratified by BRCA12_Case
     p <- plot_prev_stratified(cov, "BRCA12_Case",
-                              "CHIP prevalence by decade (carriers vs controls)")
+                              sprintf("CHIP prevalence by decade — carriers vs controls (%s)", tag_lab))
     ggsave(file.path("ch", "figures",
                      paste0("chip_prevalence_by_decade_by_case_", tag, ".pdf")),
            p, width = 7, height = 5)
 
     # Stratified by Batch
     p <- plot_prev_stratified(cov, "Batch",
-                              "CHIP prevalence by decade (by batch)")
+                              sprintf("CHIP prevalence by decade — by batch (%s)", tag_lab))
     ggsave(file.path("ch", "figures",
                      paste0("chip_prevalence_by_decade_by_batch_", tag, ".pdf")),
            p, width = 7, height = 5)
 }
-
 # ========================
 # COVERAGE DISTRIBUTIONS (Total Depth)
 # ========================

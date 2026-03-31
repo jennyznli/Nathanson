@@ -11,9 +11,9 @@ library(UpSetR)
 # ========================
 # READ IN DATA
 # ========================
-all_ch <- read_excel(file.path("ch", "data", "ch_wl_art_flag_vars.xlsx"))
+all_ch <- read_excel(file.path("ch", "data", "ch_seq_wl_flags_vars.xlsx"))
 dim(all_ch)
-# 774
+# 481
 
 cov <- read.csv(file.path("ch", "data", "pmbb_brca12_cov_df.csv"), row.names = 1)
 all_ids <- read.csv(file.path("ch", "data", "ch_psm_matched4_case_control_ids.csv"))$x
@@ -23,10 +23,20 @@ dim(cov)
 # 3004
 
 # ========================
+# MINAD THRESHOLDS
+# ========================
+for (thresh in MIN_AD_THRESHOLDS) {
+    all_ch[[paste0("minad", thresh)]] <- all_ch$Sample.AltDepth < thresh
+}
+
+write_xlsx(all_ch, file.path("ch", "data", "ch_seq_wl_flags_minad_vars.xlsx"))
+
+# ========================
 # DEFINE FILTER CONFIGURATIONS
 # ========================
 full_qc <- c("flag_freeze_enriched", "flag_not_age_associated",
-             "flag_germline_ind", "flag_germline_var", "flag_cluster", "flag_gnomad")
+             "flag_germline_ind", "flag_cluster")
+extra_covs <- "Smoke_History + Sequenced_gender + PC1 + PC2 + PC3 + PC4 + PC5 + PC6"
 
 filter_configs <- list(
     list(name = "no_filter",               flags = character(0)),
@@ -34,10 +44,11 @@ filter_configs <- list(
     list(name = "flag_freeze_enriched",    flags = c("flag_freeze_enriched")),
     list(name = "flag_not_age_associated", flags = c("flag_not_age_associated")),
     list(name = "flag_germline_ind",       flags = c("flag_germline_ind")),
-    list(name = "flag_germline_var",       flags = c("flag_germline_var")),
     list(name = "flag_cluster",            flags = c("flag_cluster")),
-    list(name = "flag_gnomad",             flags = c("flag_gnomad")),
-    list(name = "full_qc_no_minad",        flags = full_qc)
+    list(name = "flag_freeze_age", flags = c("flag_freeze_enriched", "flag_not_age_associated")),
+    list(name = "flag_freeze_age_germ", flags = c("flag_freeze_enriched", "flag_not_age_associated", "flag_germline_ind")),
+    list(name = "flag_freeze_age_germ_cluster", flags = c("flag_freeze_enriched", "flag_not_age_associated",
+                                                          "flag_germline_ind", "flag_cluster"))
 )
 
 minad_configs <- list(
@@ -52,10 +63,7 @@ minad_configs <- list(
     list(name = "minad5_full", flags = c("minad5", full_qc)),
     list(name = "minad6_full", flags = c("minad6", full_qc)),
     list(name = "minad7_full", flags = c("minad7", full_qc)),
-    list(name = "minad8_full", flags = c("minad8", full_qc))
-)
-
-cov_configs <- list(
+    list(name = "minad8_full", flags = c("minad8", full_qc)),
     list(name = "full_covs",       flags = full_qc,                formula_extra = extra_covs),
     list(name = "minad3_full_covs",  flags = c("minad3",  full_qc), formula_extra = extra_covs),
     list(name = "minad4_full_covs",  flags = c("minad4",  full_qc), formula_extra = extra_covs),
@@ -129,7 +137,7 @@ test_age_association <- function(config, all_ch, cov,
                             invokeRestart("muffleWarning")
                     }
                 )
-                separation <- any(fitted(m) %in% c(0, 1))
+                separation <- any(fitted(m) %in% c(0, 1))  | !m$converged
                 s  <- coef(summary(m))
                 ci <- confint.default(m)
                 data.frame(
@@ -212,30 +220,26 @@ plot_age_association <- function(results, title = "Age association under differe
 # ========================
 # RUN
 # ========================
-filter_res       <- test_age_association(filter_configs, all_ch2, cov)
-minad_res        <- test_age_association(minad_configs,  all_ch2, cov)
-cov_res          <- test_age_association(cov_configs,    all_ch2, cov)
+filter_res <- test_age_association(filter_configs, all_ch, cov)
+minad_res <- test_age_association(minad_configs,  all_ch, cov)
 
-filter_vaf_res   <- test_age_association(filter_configs, all_ch2, cov, stratify_by = "VAF_Strata")
-minad_vaf_res    <- test_age_association(minad_configs,  all_ch2, cov, stratify_by = "VAF_Strata")
-cov_vaf_res      <- test_age_association(cov_configs,    all_ch2, cov, stratify_by = "VAF_Strata")
+filter_vaf_res <- test_age_association(filter_configs, all_ch, cov, stratify_by = "VAF_Strata")
+minad_vaf_res <- test_age_association(minad_configs,  all_ch, cov, stratify_by = "VAF_Strata")
 
-filter_freeze_res <- test_age_association(filter_configs, all_ch2, cov, stratify_by = "Batch")
-minad_freeze_res  <- test_age_association(minad_configs,  all_ch2, cov, stratify_by = "Batch")
-cov_freeze_res    <- test_age_association(cov_configs,    all_ch2, cov, stratify_by = "Batch")
+filter_freeze_res <- test_age_association(filter_configs, all_ch, cov, stratify_by = "Batch")
+minad_freeze_res  <- test_age_association(minad_configs,  all_ch, cov, stratify_by = "Batch")
 
 # ========================
 # SAVE RESULTS
 # ========================
 write_xlsx(filter_res,        file.path("ch", "data", "ch_filter_age_sensitivity.xlsx"))
 write_xlsx(minad_res,         file.path("ch", "data", "ch_minad_age_sensitivity.xlsx"))
-write_xlsx(cov_res,           file.path("ch", "data", "ch_cov_age_sensitivity.xlsx"))
-write_xlsx(filter_vaf_res,    file.path("ch", "data", "ch_filter_age_sensitivity_vaf.xlsx"))
-write_xlsx(minad_vaf_res,     file.path("ch", "data", "ch_minad_age_sensitivity_vaf.xlsx"))
-write_xlsx(cov_vaf_res,       file.path("ch", "data", "ch_cov_age_sensitivity_vaf.xlsx"))
-write_xlsx(filter_freeze_res, file.path("ch", "data", "ch_filter_age_sensitivity_batch.xlsx"))
-write_xlsx(minad_freeze_res,  file.path("ch", "data", "ch_minad_age_sensitivity_batch.xlsx"))
-write_xlsx(cov_freeze_res,    file.path("ch", "data", "ch_cov_age_sensitivity_batch.xlsx"))
+
+write_xlsx(filter_vaf_res,     file.path("ch", "data", "ch_filter_age_sensitivity_vaf.xlsx"))
+write_xlsx(minad_vaf_res,       file.path("ch", "data", "ch_minad_age_sensitivity_vaf.xlsx"))
+
+write_xlsx(filter_freeze_res,  file.path("ch", "data", "ch_filter_age_sensitivity_batch.xlsx"))
+write_xlsx(minad_freeze_res,    file.path("ch", "data", "ch_minad_age_sensitivity_batch.xlsx"))
 
 # ========================
 # PLOTS
@@ -250,32 +254,26 @@ save_assoc_plot <- function(results, filename, title, n_total) {
 }
 
 save_assoc_plot(filter_res,        file.path("ch", "figures", "qc_filter_age_sensitivity.pdf"),
-                "Age association — QC filters", nrow(cov))
+                "Age association — filters", nrow(cov))
 save_assoc_plot(minad_res,         file.path("ch", "figures", "qc_minad_age_sensitivity.pdf"),
                 "Age association — minAD thresholds", nrow(cov))
-save_assoc_plot(cov_res,           file.path("ch", "figures", "qc_cov_age_sensitivity.pdf"),
-                "Age association — covariate models", nrow(cov))
 
 save_assoc_plot(filter_vaf_res,    file.path("ch", "figures", "qc_filter_age_sensitivity_vaf.pdf"),
-                "Age association — QC filters by VAF stratum", nrow(cov))
+                "Age association — filters by VAF stratum", nrow(cov))
 save_assoc_plot(minad_vaf_res,     file.path("ch", "figures", "qc_minad_age_sensitivity_vaf.pdf"),
                 "Age association — minAD by VAF stratum", nrow(cov))
-save_assoc_plot(cov_vaf_res,       file.path("ch", "figures", "qc_cov_age_sensitivity_vaf.pdf"),
-                "Age association — covariate models by VAF stratum", nrow(cov))
 
 save_assoc_plot(filter_freeze_res, file.path("ch", "figures", "qc_filter_age_sensitivity_batch.pdf"),
-                "Age association — QC filters by batch", nrow(cov))
+                "Age association — filters by batch", nrow(cov))
 save_assoc_plot(minad_freeze_res,  file.path("ch", "figures", "qc_minad_age_sensitivity_batch.pdf"),
                 "Age association — minAD by batch", nrow(cov))
-save_assoc_plot(cov_freeze_res,    file.path("ch", "figures", "qc_cov_age_sensitivity_batch.pdf"),
-                "Age association — covariate models by batch", nrow(cov))
 
 # ========================
 # COMPARE VAF 10< vs. ALL VAF
 # ========================
 vaf_compare_res <- bind_rows(
-    test_age_association(cov_configs, all_ch2, cov) %>% mutate(vaf_group = "All VAF"),
-    test_age_association(cov_configs, all_ch2 %>% filter(Sample.AltFrac >= 0.10), cov) %>%
+    test_age_association(filter_configs, all_ch, cov) %>% mutate(vaf_group = "All VAF"),
+    test_age_association(filter_configs, all_ch %>% filter(Sample.AltFrac >= 0.10), cov) %>%
         mutate(vaf_group = "VAF ≥ 10%")
 )
 
@@ -330,22 +328,46 @@ ggsave(file.path("ch", "figures", "qc_filter_age_cov_compare.pdf"),
 # ========================
 # FINAL FILTER
 # ========================
-full_qc <- c("flag_freeze_enriched", "flag_not_age_associated",
-             "flag_germline_ind", "flag_germline_var", "flag_cluster", "flag_gnomad")
-# minad5
-
-all_ch3 <- all_ch2 %>% filter(n_flags == 0, minad6)
+all_ch3 <- all_ch %>%
+    filter(!flag_freeze_enriched, !flag_not_age_associated,
+           !flag_germline_ind, !flag_cluster)
 dim(all_ch3)
+# 399
+write_xlsx(all_ch3, file.path("ch", "data", "ch_seq_wl_art_minad3_vars.xlsx"))
+
+all_ch4 <- all_ch %>%
+    filter(!flag_freeze_enriched, !flag_not_age_associated,
+           !flag_germline_ind, !flag_cluster,
+           !minad4)
+dim(all_ch4)
+# 175
+write_xlsx(all_ch4, file.path("ch", "data", "ch_seq_wl_art_minad4_vars.xlsx"))
+
+all_ch5 <- all_ch %>%
+    filter(!flag_freeze_enriched, !flag_not_age_associated,
+           !flag_germline_ind, !flag_cluster,
+           !minad5)
+dim(all_ch5)
+# 98
+write_xlsx(all_ch5, file.path("ch", "data", "ch_seq_wl_art_minad5_vars.xlsx"))
+
+all_ch6 <- all_ch %>%
+    filter(!flag_freeze_enriched, !flag_not_age_associated,
+           !flag_germline_ind, !flag_cluster,
+           !minad6)
+dim(all_ch6)
+# 68
+write_xlsx(all_ch6, file.path("ch", "data", "ch_seq_wl_art_minad6_vars.xlsx"))
 
 # ========================
 # TOP GENES BY FREEZE (POST-QC)
 # ========================
-top_genes <- all_ch3 %>%
+top_genes <- all_ch_clean %>%
     count(Gene) %>%
     slice_max(n, n = 20) %>%
     pull(Gene)
 
-gene_counts <- all_ch3 %>%
+gene_counts <- all_ch_clean %>%
     filter(Gene %in% top_genes) %>%
     mutate(
         Freeze = factor(Batch, levels = c(1, 2), labels = c("Freeze 2", "Freeze 3")),
@@ -359,7 +381,7 @@ p_genes <- ggplot(gene_counts, aes(x = Gene, y = n, fill = Freeze)) +
     scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
     labs(
         title    = "Top genes after QC filtering",
-        subtitle = sprintf("minAD ≥ 5 + full QC | n = %d variants", nrow(all_ch3)),
+        subtitle = sprintf("minAD ≥ 4 + full QC | n = %d variants", nrow(all_ch_clean)),
         x        = NULL, y = "Variant count", fill = NULL
     ) +
     theme_minimal(base_size = 11) +
@@ -374,14 +396,123 @@ p_genes <- ggplot(gene_counts, aes(x = Gene, y = n, fill = Freeze)) +
 
 ggsave(file.path("ch", "figures", "ch_top_genes_by_freeze.pdf"),
        p_genes, width = 9, height = 5)
-write_xlsx(all_ch3, file.path("ch", "data", "ch3.xlsx"))
 
 # ========================
-# DIFF MINAD CUTOFFS
+# DIFF MINAD CUTOFFS for freeze
+# ========================
+# asymmetric: different cutoffs per batch
+# format: minad_f2_{x}_f3_{y} = TRUE if below threshold for that sample's batch
+for (t2 in MIN_AD_THRESHOLDS) {
+    for (t3 in MIN_AD_THRESHOLDS) {
+        col <- paste0("minad_f2_", t2, "_f3_", t3)
+        all_ch[[col]] <- ifelse(
+            all_ch$Batch == 1,
+            all_ch$Sample.AltDepth < t2,   # freeze 2
+            all_ch$Sample.AltDepth < t3    # freeze 3
+        )
+    }
+}
+
+write_xlsx(all_ch, file.path("ch", "data", "ch_seq_wl_flags_minad_vars.xlsx"))
+
+# asymmetric minad configs
+minad_asym_configs <- lapply(MIN_AD_THRESHOLDS, function(t2) {
+    lapply(MIN_AD_THRESHOLDS, function(t3) {
+        list(
+            name  = sprintf("minad_f2_%d_f3_%d", t2, t3),
+            flags = c(paste0("minad_f2_", t2, "_f3_", t3))
+        )
+    })
+}) %>% unlist(recursive = FALSE)
+
+# asymmetric + full qc
+minad_asym_full_configs <- lapply(MIN_AD_THRESHOLDS, function(t2) {
+    lapply(MIN_AD_THRESHOLDS, function(t3) {
+        list(
+            name  = sprintf("minad_f2_%d_f3_%d_full", t2, t3),
+            flags = c(paste0("minad_f2_", t2, "_f3_", t3), full_qc)
+        )
+    })
+}) %>% unlist(recursive = FALSE)
+
+# run
+minad_asym_res      <- test_age_association(minad_asym_configs,      all_ch, cov)
+minad_asym_full_res <- test_age_association(minad_asym_full_configs,  all_ch, cov)
+
+write_xlsx(minad_asym_res,      file.path("ch", "data", "ch_minad_asym_age_sensitivity.xlsx"))
+write_xlsx(minad_asym_full_res, file.path("ch", "data", "ch_minad_asym_full_age_sensitivity.xlsx"))
+
+# plot — heatmap works better than forest plot for a grid of combinations
+asym_heat_df <- minad_asym_full_res %>%
+    filter(stratum == "all") %>%
+    mutate(
+        t2 = as.integer(str_extract(name, "(?<=f2_)\\d")),
+        t3 = as.integer(str_extract(name, "(?<=f3_)\\d")),
+        sig = !is.na(p_age) & p_age < 0.05
+    )
+
+p_asym_heat <- ggplot(asym_heat_df, aes(x = factor(t2), y = factor(t3), fill = -log10(p_age))) +
+    geom_tile(color = "white") +
+    geom_text(aes(label = ifelse(sig, sprintf("%.3f*", p_age), sprintf("%.3f", p_age))),
+              size = 3) +
+    scale_fill_gradient(
+        low      = "white",
+        high     = "#D85A30",
+        na.value = "grey90",
+        name     = expression(-log[10](p))
+    ) +
+    geom_tile(data = filter(asym_heat_df, sig),   # outline significant cells
+              color = "#D85A30", fill = NA, linewidth = 1) +
+    labs(
+        title    = "Age association by asymmetric minAD cutoffs (+ full QC)",
+        subtitle = "* = p < 0.05 | fill = -log10(p_age)",
+        x        = "minAD threshold — Freeze 2",
+        y        = "minAD threshold — Freeze 3"
+    ) +
+    theme_minimal(base_size = 11) +
+    theme(
+        plot.title    = element_text(face = "bold", hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5, size = 9, color = "grey40"),
+        panel.grid    = element_blank()
+    )
+
+ggsave(file.path("ch", "figures", "qc_minad_asym_heatmap.pdf"),
+       p_asym_heat, width = 8, height = 6)
+
+
+# ========================
+# COMPARE SPECIFIC ASYMMETRIC VS SYMMETRIC MINAD
 # ========================
 
+# define comparison configs
+minad_compare_configs <- list(
+    list(name = "no_filter",                    flags = character(0)),
+    list(name = "minad4 (symmetric)",           flags = c("minad4")),
+    list(name = "minad6 (symmetric)",           flags = c("minad6")),
+    list(name = "minad f2=4, f3=6 (asymmetric)", flags = c("minad_f2_4_f3_6")),
+    list(name = "minad4 + full QC",             flags = c("minad4", full_qc)),
+    list(name = "minad6 + full QC",             flags = c("minad6", full_qc)),
+    list(name = "minad f2=4, f3=6 + full QC",  flags = c("minad_f2_4_f3_6", full_qc))
+)
 
+minad_compare_res <- test_age_association(minad_compare_configs, all_ch, cov)
 
+# optionally also stratified by VAF
+minad_compare_vaf_res <- test_age_association(minad_compare_configs, all_ch, cov,
+                                              stratify_by = "VAF_Strata")
+
+# plot
+save_assoc_plot(minad_compare_res,
+                file.path("ch", "figures", "qc_minad_asym_compare.pdf"),
+                "Age association — symmetric vs asymmetric minAD", nrow(cov))
+
+save_assoc_plot(minad_compare_vaf_res,
+                file.path("ch", "figures", "qc_minad_asym_compare_vaf.pdf"),
+                "Age association — symmetric vs asymmetric minAD by VAF", nrow(cov))
+
+# save results
+write_xlsx(minad_compare_res,
+           file.path("ch", "data", "ch_minad_asym_compare.xlsx"))
 
 
 

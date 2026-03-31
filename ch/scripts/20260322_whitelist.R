@@ -477,97 +477,97 @@ cat(sprintf("Final unique genes: %d\n", length(unique(all_ch$Gene))))
 # ========================
 # QC PLOTTING FUNCTION
 # ========================
-plot_batch_gene_freq <- function(df, label = "",
-                                 sample_col = "Sample.ID",
-                                 gene_col = "Gene",
-                                 batch_col = "Batch",
-                                 batch_labels = c("Freeze 2", "Freeze 3"),
-                                 out_dir = file.path("ch", "figures")) {
-
-    # --- overlap summary ---
-    f2_vars <- df %>% filter(.data[[batch_col]] == 1) %>% pull(variant_id) %>% unique()
-    f3_vars <- df %>% filter(.data[[batch_col]] == 2) %>% pull(variant_id) %>% unique()
-    cat(sprintf("[%s] Variants only in F2: %d\n",   label, sum(!f2_vars %in% f3_vars)))
-    cat(sprintf("[%s] Variants only in F3: %d\n",   label, sum(!f3_vars %in% f2_vars)))
-    cat(sprintf("[%s] Variants in both:   %d\n\n",  label, sum(f2_vars %in% f3_vars)))
-
-    # --- batch sizes ---
-    batch_sizes <- df %>%
-        group_by(.data[[batch_col]]) %>%
-        summarise(n_total = n_distinct(.data[[sample_col]]), .groups = "drop")
-
-    subtitle_str <- sprintf("%s n = %d  |  %s n = %d",
-                            batch_labels[1], batch_sizes$n_total[batch_sizes[[batch_col]] == 1],
-                            batch_labels[2], batch_sizes$n_total[batch_sizes[[batch_col]] == 2])
-
-    # --- carrier freq ---
-    gene_freq <- df %>%
-        group_by(.data[[gene_col]], .data[[batch_col]]) %>%
-        summarise(n_carriers = n_distinct(.data[[sample_col]]), .groups = "drop") %>%
-        left_join(batch_sizes, by = batch_col) %>%
-        mutate(
-            freq  = n_carriers / n_total,
-            Batch = factor(.data[[batch_col]], labels = batch_labels)
-        )
-
-    gene_order <- gene_freq %>%
-        group_by(.data[[gene_col]]) %>%
-        summarise(total = sum(n_carriers), .groups = "drop") %>%
-        arrange(desc(total)) %>%
-        pull(.data[[gene_col]])
-
-    gene_freq <- gene_freq %>%
-        mutate(Gene = factor(.data[[gene_col]], levels = gene_order))
-
-    # --- dot plot ---
-    p_dot <- ggplot(gene_freq, aes(x = freq, y = reorder(Gene, freq), color = Batch, shape = Batch)) +
-        geom_point(size = 3, alpha = 0.8) +
-        geom_line(aes(group = Gene), color = "grey70", linewidth = 0.4) +
-        scale_color_brewer(palette = "Set2", name = "Batch") +
-        scale_shape_manual(values = c(16, 17) %>% setNames(batch_labels), name = "Batch") +
-        scale_x_continuous(labels = scales::percent_format(accuracy = 0.1),
-                           breaks = scales::pretty_breaks(n = 8)) +
-        labs(title    = sprintf("Carrier frequency per gene by batch%s", if (label != "") sprintf(" - %s", label) else ""),
-             subtitle = subtitle_str,
-             x = "Carrier frequency", y = NULL) +
-        theme_minimal(base_size = 11) +
-        theme(plot.title       = element_text(face = "bold", hjust = 0.5),
-              plot.subtitle    = element_text(hjust = 0.5, size = 9, color = "grey40"),
-              legend.position  = "bottom",
-              panel.grid.minor = element_blank())
-
-    # --- bar plot ---
-    p_bar <- ggplot(gene_freq, aes(x = Gene, y = freq, fill = Batch)) +
-        geom_col(position = "dodge", alpha = 0.85, width = 0.7) +
-        scale_fill_brewer(palette = "Set2", name = NULL) +
-        scale_y_continuous(labels = scales::percent_format(accuracy = 0.1),
-                           expand = expansion(mult = c(0, 0.1))) +
-        labs(title    = sprintf("Carrier frequency per gene by batch%s", if (label != "") sprintf(" — %s", label) else ""),
-             subtitle = subtitle_str,
-             x = NULL, y = "Carrier frequency") +
-        theme_minimal(base_size = 11) +
-        theme(plot.title         = element_text(face = "bold", hjust = 0.5),
-              plot.subtitle      = element_text(hjust = 0.5, size = 9, color = "grey40"),
-              axis.text.x        = element_text(angle = 45, hjust = 1, size = 8),
-              legend.position    = "bottom",
-              panel.grid.major.x = element_blank(),
-              panel.grid.minor   = element_blank())
-
-    # --- save ---
-    slug <- if (label != "") paste0("_", gsub("\\s+", "_", tolower(label))) else ""
-    ggsave(file.path(out_dir, sprintf("qc_carrier_freq_dot%s.pdf",  slug)), p_dot, width = 8,  height = 10)
-    ggsave(file.path(out_dir, sprintf("qc_carrier_freq_bar%s.pdf",  slug)), p_bar, width = 14, height = 6)
-
-    invisible(list(dot = p_dot, bar = p_bar, freq_table = gene_freq))
-}
-
-# after whitelist filter
-plot_batch_gene_freq(all_ch, label = "post whitelist")
-# → qc_carrier_freq_dot_post_whitelist.pdf
-# → qc_carrier_freq_bar_post_whitelist.pdf
-
-out <- plot_batch_gene_freq(all_ch, label = "post whitelist")
-out$freq_table  # inspect the data
-out$dot         # tweak the plot further
+# plot_batch_gene_freq <- function(df, label = "",
+#                                  sample_col = "Sample.ID",
+#                                  gene_col = "Gene",
+#                                  batch_col = "Batch",
+#                                  batch_labels = c("Freeze 2", "Freeze 3"),
+#                                  out_dir = file.path("ch", "figures")) {
+#
+#     # --- overlap summary ---
+#     f2_vars <- df %>% filter(.data[[batch_col]] == 1) %>% pull(variant_id) %>% unique()
+#     f3_vars <- df %>% filter(.data[[batch_col]] == 2) %>% pull(variant_id) %>% unique()
+#     cat(sprintf("[%s] Variants only in F2: %d\n",   label, sum(!f2_vars %in% f3_vars)))
+#     cat(sprintf("[%s] Variants only in F3: %d\n",   label, sum(!f3_vars %in% f2_vars)))
+#     cat(sprintf("[%s] Variants in both:   %d\n\n",  label, sum(f2_vars %in% f3_vars)))
+#
+#     # --- batch sizes ---
+#     batch_sizes <- df %>%
+#         group_by(.data[[batch_col]]) %>%
+#         summarise(n_total = n_distinct(.data[[sample_col]]), .groups = "drop")
+#
+#     subtitle_str <- sprintf("%s n = %d  |  %s n = %d",
+#                             batch_labels[1], batch_sizes$n_total[batch_sizes[[batch_col]] == 1],
+#                             batch_labels[2], batch_sizes$n_total[batch_sizes[[batch_col]] == 2])
+#
+#     # --- carrier freq ---
+#     gene_freq <- df %>%
+#         group_by(.data[[gene_col]], .data[[batch_col]]) %>%
+#         summarise(n_carriers = n_distinct(.data[[sample_col]]), .groups = "drop") %>%
+#         left_join(batch_sizes, by = batch_col) %>%
+#         mutate(
+#             freq  = n_carriers / n_total,
+#             Batch = factor(.data[[batch_col]], labels = batch_labels)
+#         )
+#
+#     gene_order <- gene_freq %>%
+#         group_by(.data[[gene_col]]) %>%
+#         summarise(total = sum(n_carriers), .groups = "drop") %>%
+#         arrange(desc(total)) %>%
+#         pull(.data[[gene_col]])
+#
+#     gene_freq <- gene_freq %>%
+#         mutate(Gene = factor(.data[[gene_col]], levels = gene_order))
+#
+#     # --- dot plot ---
+#     p_dot <- ggplot(gene_freq, aes(x = freq, y = reorder(Gene, freq), color = Batch, shape = Batch)) +
+#         geom_point(size = 3, alpha = 0.8) +
+#         geom_line(aes(group = Gene), color = "grey70", linewidth = 0.4) +
+#         scale_color_brewer(palette = "Set2", name = "Batch") +
+#         scale_shape_manual(values = c(16, 17) %>% setNames(batch_labels), name = "Batch") +
+#         scale_x_continuous(labels = scales::percent_format(accuracy = 0.1),
+#                            breaks = scales::pretty_breaks(n = 8)) +
+#         labs(title    = sprintf("Carrier frequency per gene by batch%s", if (label != "") sprintf(" - %s", label) else ""),
+#              subtitle = subtitle_str,
+#              x = "Carrier frequency", y = NULL) +
+#         theme_minimal(base_size = 11) +
+#         theme(plot.title       = element_text(face = "bold", hjust = 0.5),
+#               plot.subtitle    = element_text(hjust = 0.5, size = 9, color = "grey40"),
+#               legend.position  = "bottom",
+#               panel.grid.minor = element_blank())
+#
+#     # --- bar plot ---
+#     p_bar <- ggplot(gene_freq, aes(x = Gene, y = freq, fill = Batch)) +
+#         geom_col(position = "dodge", alpha = 0.85, width = 0.7) +
+#         scale_fill_brewer(palette = "Set2", name = NULL) +
+#         scale_y_continuous(labels = scales::percent_format(accuracy = 0.1),
+#                            expand = expansion(mult = c(0, 0.1))) +
+#         labs(title    = sprintf("Carrier frequency per gene by batch%s", if (label != "") sprintf(" — %s", label) else ""),
+#              subtitle = subtitle_str,
+#              x = NULL, y = "Carrier frequency") +
+#         theme_minimal(base_size = 11) +
+#         theme(plot.title         = element_text(face = "bold", hjust = 0.5),
+#               plot.subtitle      = element_text(hjust = 0.5, size = 9, color = "grey40"),
+#               axis.text.x        = element_text(angle = 45, hjust = 1, size = 8),
+#               legend.position    = "bottom",
+#               panel.grid.major.x = element_blank(),
+#               panel.grid.minor   = element_blank())
+#
+#     # --- save ---
+#     slug <- if (label != "") paste0("_", gsub("\\s+", "_", tolower(label))) else ""
+#     ggsave(file.path(out_dir, sprintf("qc_carrier_freq_dot%s.pdf",  slug)), p_dot, width = 8,  height = 10)
+#     ggsave(file.path(out_dir, sprintf("qc_carrier_freq_bar%s.pdf",  slug)), p_bar, width = 14, height = 6)
+#
+#     invisible(list(dot = p_dot, bar = p_bar, freq_table = gene_freq))
+# }
+#
+# # after whitelist filter
+# plot_batch_gene_freq(all_ch, label = "post whitelist")
+# # → qc_carrier_freq_dot_post_whitelist.pdf
+# # → qc_carrier_freq_bar_post_whitelist.pdf
+#
+# out <- plot_batch_gene_freq(all_ch, label = "post whitelist")
+# out$freq_table  # inspect the data
+# out$dot         # tweak the plot further
 
 
