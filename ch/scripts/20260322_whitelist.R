@@ -9,8 +9,10 @@ source(here("R", "config.R"))
 # READ IN DATA
 # ========================
 all_ch <- read.csv(file.path("ch", "data", "ch_seq_vars.csv"), row.names = 1)
+all_ch_raw <- read.csv(file.path("ch", "data", "ch_all_vars.csv"), row.names = 1)
+
 dim(all_ch)
-# 18231
+# 29656
 
 gList<-fread(file.path("ch", "data", "whitelist_filter_20230531", "Full_CHIP_gene_list_20260324.txt"))
 whitelist.mis<-fread(file.path("ch", "data", "whitelist_filter_20230531", "CHIP_missense_vars_cv_20260324.txt"))
@@ -62,13 +64,13 @@ examine
 # 14 BCORL1 NM_001379451.1    NM_021946
 # 15  BRCC3 NM_001018055.3    NM_024332
 
-write.csv(examine,  file.path("ch", "data", "ch_gene_transcript_mismatches.csv"),   row.names = FALSE)
+write_xlsx(examine, file.path("ch", "data", "ch_gene_transcript_mismatches.xlsx"))
 
 # it seems their RefSeq isn't exactly our MANE...
 # we'll keep using MANE and manually examine mismatching transcripts
 
 # ========================
-# REMOVE LAST EXON
+# MARK LAST EXON
 # ========================
 extract_exon_info <- function(exon_field) {
     if (is.na(exon_field) || exon_field == "" || exon_field == ".") {
@@ -86,11 +88,7 @@ all_ch <- all_ch %>%
     )
 
 cat("Variants in last exon:", sum(all_ch$is_last_exon, na.rm = TRUE), "\n")
-# 6728
-all_ch <- all_ch %>% filter(!is_last_exon) %>% select(-is_last_exon)
-
-cat("Variants after last exon filter:", nrow(all_ch), "\n")
-# 22932
+# 6726
 
 # ========================
 # EXTRACT SPECIFIC FIELDS
@@ -122,15 +120,11 @@ convert_3to1 <- function(prot_change) {
     return(result)
 }
 
-# Extract numeric AA position from 1-letter change for range-based filters
-extract_aa_position <- function(prot_change) {
-    if (is.na(prot_change) || prot_change == "" || prot_change == ".") return(NA_real_)
-    as.numeric(regmatches(prot_change, regexpr("\\d+", prot_change)))
-}
-
 all_ch$ProteinChange <- sapply(all_ch$HGVSp, extractProteinChange)
 all_ch$ProteinChange_1L <- sapply(all_ch$ProteinChange, convert_3to1)
-all_ch$AAPosition <- sapply(all_ch$ProteinChange_1L, extract_aa_position)
+all_ch$Protein.position <- as.numeric(all_ch$Protein.position)
+all_ch$cDNA.position <- as.numeric(all_ch$cDNA.position)
+all_ch$CDS.position <- as.numeric(all_ch$CDS.position)
 
 write.csv(all_ch, file.path("ch", "data", "ch_seq_vars_proc.csv"),   row.names = FALSE)
 all_ch2 <- all_ch
@@ -155,15 +149,19 @@ all_ch <- all_ch %>%
 # ========================
 vmis <- grepl("missense", all_ch$Variant.Consequence)
 
+# x <- as.data.frame(paste(whitelist.mis$Gene, whitelist.mis$AAChange, sep = "_"))
+
 vmis_wl <- paste(all_ch$Gene, all_ch$ProteinChange_1L, sep = "_") %in%
     paste(whitelist.mis$Gene, whitelist.mis$AAChange, sep = "_")
-correct_transcript <- all_ch$correct_transcript
+# correct_transcript <- all_ch$correct_transcript
 
 all_ch$whitelist[vmis & vmis_wl & correct_transcript] <- TRUE
 all_ch$wl.mis[vmis & vmis_wl & correct_transcript] <- TRUE
 
-cat(sprintf("Missense variants in whitelist with correct transcript: %d\n", sum(vmis & vmis_wl)))
-# 72
+cat(sprintf("Missense variants in whitelist: %d\n", sum(vmis & vmis_wl)))
+# 87
+
+# could consider just getting variants in same position not necessarily same AA changes..
 
 # ========================
 # 2) LOF / FRAMESHIFT
@@ -178,87 +176,79 @@ vLOFgene <- all_ch$Gene %in% whitelist.LoF$Gene
 all_ch$whitelist[vlof & vLOFgene] <- TRUE
 all_ch$wl.lof[vlof & vLOFgene] <- TRUE
 cat(sprintf("LoF/frameshift variants: %d\n", sum(vlof & vLOFgene, na.rm = TRUE)))
-# 420
-
-### MAKE CSV FOR BRAD IGV ###
-# lof_check_out <- lof_check %>% group_by(Sample.ID, Gene) %>% summarise(Chr = unique(Chr), min_start = min(Start), max_start = max(Start)) %>% filter(min_start != max_start)
-#
-# write.csv(lof_check_out, file.path("ch", "data", "ch_lof_examine.csv"), row.names = FALSE)
+# 517
 
 # ========================
 # 3) SPLICE
 # ========================
-vSplice <- grepl("splice", all_ch$Variant.Consequence) & (all_ch$Variant.LoF_level %in% c(1, 2))
+#  & (all_ch$Variant.LoF_level %in% c(1, 2))
+vSplice <- grepl("splice", all_ch$Variant.Consequence)
+vSpliceStringent <- grepl("splice", all_ch$Variant.Consequence) & (all_ch$Variant.LoF_level %in% c(1, 2))
 vSplicegene <- all_ch$Gene %in% whitelist.splice$Gene
-vSpliceCorrectTranscript <- all_ch$correct_transcript
 
-all_ch$whitelist[vSplice & vSplicegene] <- TRUE
-all_ch$wl.splice[vSplice & vSplicegene] <- TRUE
+all_ch$whitelist[vSpliceStringent & vSplicegene] <- TRUE
+all_ch$wl.splice[vSpliceStringent & vSplicegene] <- TRUE
 
-cat(sprintf("Splice variants in whitelist: %d\n", sum(vSplice & vSplicegene)))
+cat(sprintf("Splice variants in whitelist: %d\n", sum(vSpliceStringent & vSplicegene)))
 # 237
-
-# cat(sprintf("Splice variants in whitelist with correct transcript: %d\n", sum(vSplice & vSplicegene & vSpliceCorrectTranscript)))
-# # 97
-# cat(sprintf("Splice variants in whitelist w/o correct transcript: %d\n", sum(vSplice & vSplicegene & !vSpliceCorrectTranscript)))
-# # 138
 
 # ========================
 # GENE-SPECIFIC RULES
 # ========================
 vFS <- grepl("fs", all_ch$ProteinChange_1L, fixed = TRUE) | grepl("frameshift_variant", all_ch$Variant.Consequence)
-vexon11 <- all_ch$ExonNumber == 11
+# vexon11 <- all_ch$ExonNumber == 11
 vexon12 <- all_ch$ExonNumber == 12
+vexon13 <- all_ch$ExonNumber == 13
 vexon5  <- all_ch$ExonNumber == 5
 vexon6  <- all_ch$ExonNumber == 6
 
-# ASXL1: frameshift/nonsense/splice in exon 11-12
-# correct transcript, no worries
-asxl1Exception <- (all_ch$Gene == "ASXL1") & (vlof | vFS) & (vexon11 | vexon12)
+# ASXL1: frameshift/nonsense/splice in exon 12-13 NOT 11-12!!!
+asxl1Exception <- (all_ch$Gene == "ASXL1") & (vlof | vFS) & (vexon12 | vexon13)
 all_ch$whitelist[asxl1Exception]    <- TRUE
 all_ch$wl.lof[asxl1Exception]       <- TRUE
 all_ch$wl.exception[asxl1Exception] <- TRUE
 cat(sprintf("ASXL1 frameshift exceptions: %d\n", sum(asxl1Exception, na.rm = TRUE)))
-# 4
+# 26
 
-# asxl1ExceptionSplice <- (all_ch$Gene == "ASXL1") & vSplice & (vexon11 | vexon12)
-asxl1ExceptionSplice <- (all_ch$Gene == "ASXL1") & vSplice & (vexon11 | vexon12)
+asxl1ExceptionSplice <- (all_ch$Gene == "ASXL1") & vSplice & (vexon12 | vexon13)
 all_ch$whitelist[asxl1ExceptionSplice]    <- TRUE
 all_ch$wl.splice[asxl1ExceptionSplice]    <- TRUE
 all_ch$wl.exception[asxl1ExceptionSplice] <- TRUE
 cat(sprintf("ASXL1 splice exceptions: %d\n", sum(asxl1ExceptionSplice, na.rm = TRUE)))
 # 0
 
-# ASXL2: frameshift/nonsense/splice in exon 11-12 - correct transcript
-asxl2Exception <- (all_ch$Gene == "ASXL2") & (vlof | vFS) & (vexon11 | vexon12)
+# ASXL2: frameshift/nonsense/splice in in exon 12-13 NOT 11-12!!!
+asxl2Exception <- (all_ch$Gene == "ASXL2") & (vlof | vFS) & (vexon12 | vexon13)
 all_ch$whitelist[asxl2Exception]    <- TRUE
 all_ch$wl.lof[asxl2Exception]       <- TRUE
 all_ch$wl.exception[asxl2Exception] <- TRUE
 cat(sprintf("ASXL2 frameshift exceptions: %d\n", sum(asxl2Exception, na.rm = TRUE)))
-# 8
+# 11
 
-asxl2ExceptionSplice <- (all_ch$Gene == "ASXL2") & vSplice & (vexon11 | vexon12)
+asxl2ExceptionSplice <- (all_ch$Gene == "ASXL2") & vSplice & (vexon12 | vexon13)
 all_ch$whitelist[asxl2ExceptionSplice]    <- TRUE
 all_ch$wl.splice[asxl2ExceptionSplice]    <- TRUE
 all_ch$wl.exception[asxl2ExceptionSplice] <- TRUE
 cat(sprintf("ASXL2 exceptions: %d\n", sum(asxl2ExceptionSplice, na.rm = TRUE)))
-# 0
+# 1
 
-# PPM1D: frameshift/nonsense in exon 5-6 - correct transcript
-# View(all_ch %>% filter(Gene == "PPM1D") %>% select(correct_transcript))
+# PPM1D: frameshift/nonsense in exon 5-6
 ppm1dException <- (all_ch$Gene == "PPM1D") & (vlof | vFS) & (vexon5 | vexon6)
 all_ch$whitelist[ppm1dException]    <- TRUE
 all_ch$wl.lof[ppm1dException]       <- TRUE
 all_ch$wl.exception[ppm1dException] <- TRUE
 cat(sprintf("PPM1D exceptions: %d\n", sum(ppm1dException, na.rm = TRUE)))
-# 0
+# 3
 
-# TET2: missense in catalytic domains (p.1104-1481 and p.1843-2002) - correct transcript
-# View(all_ch %>% filter(Gene == "TET2") %>% select(correct_transcript))
+# View(all_ch[ppm1dException, ])
+# View(all_ch %>% filter(Gene == "PPM1D", ExonNumber %in% c(5, 6)))
+# View(all_ch_raw %>% filter(Gene == "PPM1D"))
+
+# TET2: missense in catalytic domains (p.1104-1481 and p.1843-2002)
 vmis <- grepl("missense", all_ch$Variant.Consequence)
-TETidx <- which(all_ch$Gene == "TET2" & vmis & !is.na(all_ch$AAPosition))
+TETidx <- which(all_ch$Gene == "TET2" & vmis & !is.na(all_ch$Protein.position))
 for (i in TETidx) {
-    AApos <- all_ch$AAPosition[i]
+    AApos <- all_ch$Protein.position[i]
     if (!is.na(AApos) && ((AApos >= 1104 & AApos <= 1481) | (AApos >= 1843 & AApos <= 2002))) {
         all_ch$whitelist[i]    <- TRUE
         all_ch$wl.mis[i]       <- TRUE
@@ -270,9 +260,9 @@ cat(sprintf("TET2 catalytic domain exceptions: %d\n", sum(all_ch$wl.exception & 
 
 # CBL: RING finger missense p.381-421 - correct transcript
 # View(all_ch %>% filter(Gene == "CBL") %>% select(correct_transcript))
-CBLidx <- which(all_ch$Gene == "CBL" & vmis & !is.na(all_ch$AAPosition))
+CBLidx <- which(all_ch$Gene == "CBL" & vmis & !is.na(all_ch$Protein.position))
 for (i in CBLidx) {
-    AApos <- all_ch$AAPosition[i]
+    AApos <- all_ch$Protein.position[i]
     if (!is.na(AApos) && AApos >= 381 & AApos <= 421) {
         all_ch$whitelist[i]    <- TRUE
         all_ch$wl.mis[i]       <- TRUE
@@ -284,9 +274,9 @@ cat(sprintf("CBL RING finger exceptions: %d\n", sum(all_ch$wl.exception & all_ch
 
 # CBLB: RING finger missense p.372-412 - correct transcript
 # View(all_ch %>% filter(Gene == "CBLB") %>% select(correct_transcript))
-CBLBidx <- which(all_ch$Gene == "CBLB" & vmis & !is.na(all_ch$AAPosition))
+CBLBidx <- which(all_ch$Gene == "CBLB" & vmis & !is.na(all_ch$Protein.position))
 for (i in CBLBidx) {
-    AApos <- all_ch$AAPosition[i]
+    AApos <- all_ch$Protein.position[i]
     if (!is.na(AApos) && AApos >= 372 & AApos <= 412) {
         all_ch$whitelist[i]    <- TRUE
         all_ch$wl.mis[i]       <- TRUE
@@ -298,8 +288,7 @@ cat(sprintf("CBLB RING finger exceptions: %d\n", sum(all_ch$wl.exception & all_c
 
 gene_exception <- all_ch %>% filter(wl.exception == TRUE)
 table(gene_exception$correct_transcript)
-# 40 - these are all correct transcript, so no need for manual check
-
+# 88 - these are all correct transcript
 
 # ========================
 # SUMMARIZE GENE-SPECIFIC EXCEPTIONS
@@ -317,6 +306,15 @@ exception_summary <- all_ch %>%
     arrange(desc(n_total))
 
 print(exception_summary)
+# Gene  n_lof n_mis n_splice n_total
+# <chr> <int> <int>    <int>   <int>
+#     1 TET2      0    44        0      44
+# 2 ASXL1    26     0        0      26
+# 3 ASXL2    11     0        1      12
+# 4 PPM1D     3     0        0       3
+# 5 CBLB      0     2        0       2
+# 6 CBL       0     1        0       1
+
 write.csv(exception_summary,
           file.path("ch", "data", "ch_gene_exception_summary.csv"),
           row.names = FALSE)
@@ -388,23 +386,29 @@ all_ch$manualreview[vFrameshiftIndel& (all_ch$Gene == "NPM1")]                  
 all_ch$manualreview[vmis & vmis_wl & !correct_transcript] <- TRUE
 
 cat(sprintf("Gene specific flagged for manual review: %d\n", sum(all_ch$manualreview, na.rm = TRUE)))
-# 37
+# 127
 
 # filter down to any variant of interest
-all_ch <- all_ch %>% filter(whitelist | manualreview | wl.exception)
+all_ch2 <- all_ch %>% filter(whitelist | manualreview | wl.exception)
+
+# View(all_ch_raw %>% filter(Gene == "JAK2"))
+# View(all_ch %>% filter(Gene == "JAK2"))
+#
+# View(all_ch %>% filter(Gene == "JAK2", Protein.position < 680, Protein.position > 533))
+# View(all_ch2 %>% filter(Gene == "JAK2"))
 
 # ========================
 # ASSIGN VARIANT CATEGORY
 # ========================
-vlof <- grepl("Ter|\\*|X|fs*", all_ch$ProteinChange_1L) |
-    grepl("stop_gain|stop_lost|start_lost", all_ch$Variant.Consequence) |
-    grepl("fs", all_ch$ProteinChange_1L, fixed = TRUE) |
-    grepl("frameshift", all_ch$Variant.Consequence)
-vmis <- grepl("missense", all_ch$Variant.Consequence)
-vSplice <- grepl("splice", all_ch$Variant.Consequence) & (all_ch$Variant.LoF_level %in% c(1, 2))
-inframe <- grepl("inframe", all_ch$Variant.Consequence)
+vlof <- grepl("Ter|\\*|X|fs*", all_ch2$ProteinChange_1L) |
+    grepl("stop_gain|stop_lost|start_lost", all_ch2$Variant.Consequence) |
+    grepl("fs", all_ch2$ProteinChange_1L, fixed = TRUE) |
+    grepl("frameshift", all_ch2$Variant.Consequence)
+vmis <- grepl("missense", all_ch2$Variant.Consequence)
+vSplice <- grepl("splice", all_ch2$Variant.Consequence) & (all_ch2$Variant.LoF_level %in% c(1, 2))
+inframe <- grepl("inframe", all_ch2$Variant.Consequence)
 
-all_ch <- all_ch %>%
+all_ch2 <- all_ch2 %>%
     dplyr::mutate(
         variant_category = dplyr::case_when(
             vlof   ~ "lof",
@@ -415,9 +419,9 @@ all_ch <- all_ch %>%
         )
     )
 
-print(table(all_ch$variant_category, useNA = "always"))
+print(table(all_ch2$variant_category, useNA = "always"))
 # inframe      lof missense   splice     <NA>
-#     12      427      103      232        0
+#     95      529      137      232        6
 
 # ========================
 # CREATE VARIANT ID
@@ -433,7 +437,7 @@ clean_hgvsc <- function(hgvsc) {
     sub("^[A-Z]{2}_[0-9]+(?:\\.[0-9]+)?:", "", hgvsc)
 }
 
-all_ch <- all_ch %>%
+all_ch2 <- all_ch2 %>%
     dplyr::mutate(
         HGVSp_clean = dplyr::case_when(
             is.na(HGVSp) | HGVSp == "" | HGVSp == "." ~ NA_character_,
@@ -465,109 +469,103 @@ all_ch <- all_ch %>%
 # ========================
 # SAVE
 # ========================
-write_xlsx(all_ch, file.path("ch", "data", "ch_seq_wl_vars.xlsx"))
+write_xlsx(all_ch2, file.path("ch", "data", "ch_seq_wl_vars.xlsx"))
 
-cat(sprintf("Final variants: %d\n", nrow(all_ch)))
-# 774
-cat(sprintf("Final unique individuals: %d\n", length(unique(all_ch$Sample.ID))))
-# 556
-cat(sprintf("Final unique genes: %d\n", length(unique(all_ch$Gene))))
-# 56
+cat(sprintf("Final variants: %d\n", nrow(all_ch2)))
+# 999
+cat(sprintf("Final unique individuals: %d\n", length(unique(all_ch2$Sample.ID))))
+# 710
+cat(sprintf("Final unique genes: %d\n", length(unique(all_ch2$Gene))))
+# 57
 
 # ========================
 # QC PLOTTING FUNCTION
 # ========================
-# plot_batch_gene_freq <- function(df, label = "",
-#                                  sample_col = "Sample.ID",
-#                                  gene_col = "Gene",
-#                                  batch_col = "Batch",
-#                                  batch_labels = c("Freeze 2", "Freeze 3"),
-#                                  out_dir = file.path("ch", "figures")) {
-#
-#     # --- overlap summary ---
-#     f2_vars <- df %>% filter(.data[[batch_col]] == 1) %>% pull(variant_id) %>% unique()
-#     f3_vars <- df %>% filter(.data[[batch_col]] == 2) %>% pull(variant_id) %>% unique()
-#     cat(sprintf("[%s] Variants only in F2: %d\n",   label, sum(!f2_vars %in% f3_vars)))
-#     cat(sprintf("[%s] Variants only in F3: %d\n",   label, sum(!f3_vars %in% f2_vars)))
-#     cat(sprintf("[%s] Variants in both:   %d\n\n",  label, sum(f2_vars %in% f3_vars)))
-#
-#     # --- batch sizes ---
-#     batch_sizes <- df %>%
-#         group_by(.data[[batch_col]]) %>%
-#         summarise(n_total = n_distinct(.data[[sample_col]]), .groups = "drop")
-#
-#     subtitle_str <- sprintf("%s n = %d  |  %s n = %d",
-#                             batch_labels[1], batch_sizes$n_total[batch_sizes[[batch_col]] == 1],
-#                             batch_labels[2], batch_sizes$n_total[batch_sizes[[batch_col]] == 2])
-#
-#     # --- carrier freq ---
-#     gene_freq <- df %>%
-#         group_by(.data[[gene_col]], .data[[batch_col]]) %>%
-#         summarise(n_carriers = n_distinct(.data[[sample_col]]), .groups = "drop") %>%
-#         left_join(batch_sizes, by = batch_col) %>%
-#         mutate(
-#             freq  = n_carriers / n_total,
-#             Batch = factor(.data[[batch_col]], labels = batch_labels)
-#         )
-#
-#     gene_order <- gene_freq %>%
-#         group_by(.data[[gene_col]]) %>%
-#         summarise(total = sum(n_carriers), .groups = "drop") %>%
-#         arrange(desc(total)) %>%
-#         pull(.data[[gene_col]])
-#
-#     gene_freq <- gene_freq %>%
-#         mutate(Gene = factor(.data[[gene_col]], levels = gene_order))
-#
-#     # --- dot plot ---
-#     p_dot <- ggplot(gene_freq, aes(x = freq, y = reorder(Gene, freq), color = Batch, shape = Batch)) +
-#         geom_point(size = 3, alpha = 0.8) +
-#         geom_line(aes(group = Gene), color = "grey70", linewidth = 0.4) +
-#         scale_color_brewer(palette = "Set2", name = "Batch") +
-#         scale_shape_manual(values = c(16, 17) %>% setNames(batch_labels), name = "Batch") +
-#         scale_x_continuous(labels = scales::percent_format(accuracy = 0.1),
-#                            breaks = scales::pretty_breaks(n = 8)) +
-#         labs(title    = sprintf("Carrier frequency per gene by batch%s", if (label != "") sprintf(" - %s", label) else ""),
-#              subtitle = subtitle_str,
-#              x = "Carrier frequency", y = NULL) +
-#         theme_minimal(base_size = 11) +
-#         theme(plot.title       = element_text(face = "bold", hjust = 0.5),
-#               plot.subtitle    = element_text(hjust = 0.5, size = 9, color = "grey40"),
-#               legend.position  = "bottom",
-#               panel.grid.minor = element_blank())
-#
-#     # --- bar plot ---
-#     p_bar <- ggplot(gene_freq, aes(x = Gene, y = freq, fill = Batch)) +
-#         geom_col(position = "dodge", alpha = 0.85, width = 0.7) +
-#         scale_fill_brewer(palette = "Set2", name = NULL) +
-#         scale_y_continuous(labels = scales::percent_format(accuracy = 0.1),
-#                            expand = expansion(mult = c(0, 0.1))) +
-#         labs(title    = sprintf("Carrier frequency per gene by batch%s", if (label != "") sprintf(" — %s", label) else ""),
-#              subtitle = subtitle_str,
-#              x = NULL, y = "Carrier frequency") +
-#         theme_minimal(base_size = 11) +
-#         theme(plot.title         = element_text(face = "bold", hjust = 0.5),
-#               plot.subtitle      = element_text(hjust = 0.5, size = 9, color = "grey40"),
-#               axis.text.x        = element_text(angle = 45, hjust = 1, size = 8),
-#               legend.position    = "bottom",
-#               panel.grid.major.x = element_blank(),
-#               panel.grid.minor   = element_blank())
-#
-#     # --- save ---
-#     slug <- if (label != "") paste0("_", gsub("\\s+", "_", tolower(label))) else ""
-#     ggsave(file.path(out_dir, sprintf("qc_carrier_freq_dot%s.pdf",  slug)), p_dot, width = 8,  height = 10)
-#     ggsave(file.path(out_dir, sprintf("qc_carrier_freq_bar%s.pdf",  slug)), p_bar, width = 14, height = 6)
-#
-#     invisible(list(dot = p_dot, bar = p_bar, freq_table = gene_freq))
-# }
-#
-# # after whitelist filter
-# plot_batch_gene_freq(all_ch, label = "post whitelist")
-# # → qc_carrier_freq_dot_post_whitelist.pdf
-# # → qc_carrier_freq_bar_post_whitelist.pdf
-#
-# out <- plot_batch_gene_freq(all_ch, label = "post whitelist")
+plot_batch_gene_freq <- function(df, label = "",
+                                 sample_col = "Sample.ID",
+                                 gene_col   = "Gene",
+                                 batch_col  = "Batch",
+                                 batch_labels = c("Freeze 2", "Freeze 3"),
+                                 out_dir    = file.path("ch", "figures")) {
+
+    # --- overlap summary ---
+    f2_vars <- df %>% filter(.data[[batch_col]] == 1) %>% pull(variant_id) %>% unique()
+    f3_vars <- df %>% filter(.data[[batch_col]] == 2) %>% pull(variant_id) %>% unique()
+    cat(sprintf("[%s] Variants only in F2: %d\n",  label, sum(!f2_vars %in% f3_vars)))
+    cat(sprintf("[%s] Variants only in F3: %d\n",  label, sum(!f3_vars %in% f2_vars)))
+    cat(sprintf("[%s] Variants in both:   %d\n\n", label, sum(f2_vars %in% f3_vars)))
+
+    # --- batch sizes ---
+    batch_sizes <- df %>%
+        group_by(.data[[batch_col]]) %>%
+        summarise(n_total = n_distinct(.data[[sample_col]]), .groups = "drop")
+
+    n_total_overall <- n_distinct(df[[sample_col]])
+    subtitle_str <- sprintf("%s n = %d  |  %s n = %d  |  Overall n = %d",
+                            batch_labels[1], batch_sizes$n_total[batch_sizes[[batch_col]] == 1],
+                            batch_labels[2], batch_sizes$n_total[batch_sizes[[batch_col]] == 2],
+                            n_total_overall)
+
+    # --- batch carrier freq ---
+    gene_freq <- df %>%
+        group_by(.data[[gene_col]], .data[[batch_col]]) %>%
+        summarise(n_carriers = n_distinct(.data[[sample_col]]), .groups = "drop") %>%
+        left_join(batch_sizes, by = batch_col) %>%
+        mutate(freq  = n_carriers / n_total,
+               Batch = factor(.data[[batch_col]], labels = batch_labels))
+
+    # --- overall carrier freq ---
+    gene_freq_overall <- df %>%
+        group_by(.data[[gene_col]]) %>%
+        summarise(n_carriers = n_distinct(.data[[sample_col]]),
+                  n_total    = n_total_overall,
+                  freq       = n_carriers / n_total_overall,
+                  Batch      = "Overall",
+                  .groups    = "drop")
+
+    # gene order by overall freq
+    gene_order <- gene_freq_overall %>%
+        arrange(desc(freq)) %>%
+        pull(.data[[gene_col]])
+
+    gene_freq <- bind_rows(gene_freq, gene_freq_overall) %>%
+        mutate(Gene  = factor(.data[[gene_col]], levels = gene_order),
+               Batch = factor(Batch, levels = c(batch_labels, "Overall")))
+
+    batch_colors <- c(RColorBrewer::brewer.pal(3, "Set2")[1:2], "grey30") %>%
+        setNames(c(batch_labels, "Overall"))
+
+    # --- dot plot (horizontal) ---
+    p_dot <- ggplot(gene_freq, aes(x = Gene, y = freq, color = Batch)) +
+        geom_line(aes(group = Gene), color = "grey80", linewidth = 0.4) +
+        geom_point(size = 2.5, alpha = 0.9) +
+        scale_color_manual(values = batch_colors, name = NULL) +
+        scale_y_continuous(labels = scales::percent_format(accuracy = 0.1),
+                           breaks = scales::pretty_breaks(n = 6),
+                           expand = expansion(mult = c(0.02, 0.1))) +
+        labs(title    = sprintf("Carrier frequency per gene by batch%s",
+                                if (label != "") sprintf(" - %s", label) else ""),
+             subtitle = subtitle_str,
+             x = NULL, y = "Carrier frequency") +
+        theme_minimal(base_size = 11) +
+        theme(plot.title       = element_text(face = "bold", hjust = 0.5),
+              plot.subtitle    = element_text(hjust = 0.5, size = 9, color = "grey40"),
+              axis.text.x      = element_text(angle = 45, hjust = 1, size = 8),
+              legend.position  = "bottom",
+              panel.grid.minor = element_blank(),
+              panel.grid.major.x = element_blank())
+
+    slug <- if (label != "") paste0("_", gsub("\\s+", "_", tolower(label))) else ""
+    ggsave(file.path(out_dir, sprintf("qc_carrier_freq_dot%s.pdf", slug)),
+           p_dot, width = 14, height = 6)
+
+    invisible(list(dot = p_dot, freq_table = gene_freq))
+}
+
+plot_batch_gene_freq(all_ch2, label = "post whitelist")
+
+# out <- plot_batch_gene_freq(all_ch2, label = "post whitelist")
 # out$freq_table  # inspect the data
 # out$dot         # tweak the plot further
-
+#
 

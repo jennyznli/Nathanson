@@ -29,6 +29,9 @@ extra_covs <- "Smoke_History + Sequenced_gender + PC1 + PC2 + PC3 + PC4 + PC5 + 
 # READ IN DATA
 # ========================
 all_ch <- read_excel(file.path("ch", "data", "ch_seq_wl_vars.xlsx"))
+dim(all_ch)
+# 999
+
 all_ch$gnomAD.MAX_AF <- as.numeric(all_ch$gnomAD.MAX_AF)
 all_ch <- all_ch %>% mutate(
         VAF_Strata = case_when(
@@ -48,8 +51,6 @@ dim(cov)
 # 3004
 
 all_ch <- all_ch %>% left_join(cov %>% select(person_id, Sample_age), by = c("Sample.ID" = "person_id"))
-dim(all_ch)
-# 774 85
 
 # ========================
 # 1. HIGH FREQ VARIANTS

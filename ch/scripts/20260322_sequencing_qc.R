@@ -272,3 +272,50 @@ create_diagnostic_pdf(
     output_file = file.path("ch", "figures", "ch_seq_filtering.pdf")
 )
 
+### BY GENE - ALT DEPTHS
+highlight_genes <- c("ASXL1", "PPM1D", "JAK2", "SF3B1", "TP53", "SRSF2")
+
+gene_ad <- all_ch %>%
+    filter(Gene %in% gList$Gene) %>%
+    mutate(
+        Gene      = factor(Gene, levels = names(sort(tapply(Sample.AltDepth, Gene, median), decreasing = TRUE))),
+        highlight = Gene %in% highlight_genes
+    )
+ad_faces <- ifelse(levels(gene_ad$Gene) %in% highlight_genes, "bold", "plain")
+
+p_ad_gene <- ggplot(gene_ad, aes(x = Gene, y = Sample.AltDepth, fill = highlight)) +
+    geom_boxplot(aes(color = highlight), alpha = 0.7, outlier.size = 0.5, outlier.alpha = 0.3) +
+    scale_fill_manual(values  = c("FALSE" = "grey70", "TRUE" = "steelblue")) +
+    scale_color_manual(values = c("FALSE" = "grey50", "TRUE" = "steelblue4")) +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+    coord_cartesian(ylim = c(0, 75)) +
+    labs(title = "Alt Depth by Gene", x = NULL, y = "Alt Depth") +
+    theme_minimal(base_size = 11) +
+    theme(panel.grid.minor = element_blank(),
+          plot.title       = element_text(face = "bold", hjust = 0.5),
+          axis.text.x      = element_text(angle = 45, hjust = 1, size = 7, face = ad_faces),
+          legend.position  = "none")
+ggsave(file.path("ch", "figures", "qc_altdepth_by_gene.pdf"), p_ad_gene, width = 14, height = 5)
+
+### BY GENE - TOTAL DEPTHS
+gene_td <- all_ch %>%
+    filter(Gene %in% gList$Gene) %>%
+    mutate(
+        Gene      = factor(Gene, levels = names(sort(tapply(Sample.Depth, Gene, median), decreasing = TRUE))),
+        highlight = Gene %in% highlight_genes
+    )
+td_faces <- ifelse(levels(gene_td$Gene) %in% highlight_genes, "bold", "plain")
+
+p_d_gene <- ggplot(gene_td, aes(x = Gene, y = Sample.Depth, fill = highlight)) +
+    geom_boxplot(aes(color = highlight), alpha = 0.7, outlier.size = 0.5, outlier.alpha = 0.3) +
+    scale_fill_manual(values  = c("FALSE" = "grey70", "TRUE" = "steelblue")) +
+    scale_color_manual(values = c("FALSE" = "grey50", "TRUE" = "steelblue4")) +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+    coord_cartesian(ylim = c(0, 175)) +
+    labs(title = "Total Depth by Gene", x = NULL, y = "Total Depth") +
+    theme_minimal(base_size = 11) +
+    theme(panel.grid.minor = element_blank(),
+          plot.title       = element_text(face = "bold", hjust = 0.5),
+          axis.text.x      = element_text(angle = 45, hjust = 1, size = 7, face = td_faces),
+          legend.position  = "none")
+ggsave(file.path("ch", "figures", "qc_totaldepth_by_gene.pdf"), p_d_gene, width = 14, height = 5)
