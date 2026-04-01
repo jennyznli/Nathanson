@@ -798,4 +798,13 @@ plot_batch_gene_freq <- function(df, label = "",
 
 plot_batch_gene_freq(all_ch_clean, label = "post artifact")
 
+controls <- cov %>% filter(BRCA12_Case == 0)
+dim(controls)
+# 2327
+
+control_clean_vars <- all_ch_clean %>% filter(Sample.ID %in% controls$person_id)
+plot_batch_gene_freq(control_clean_vars, label = "post artifact controls")
+
+
+
 

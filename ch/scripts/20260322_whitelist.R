@@ -9,7 +9,7 @@ source(here("R", "config.R"))
 # READ IN DATA
 # ========================
 all_ch <- read.csv(file.path("ch", "data", "ch_seq_vars.csv"), row.names = 1)
-all_ch_raw <- read.csv(file.path("ch", "data", "ch_all_vars.csv"), row.names = 1)
+# all_ch <- read.csv(file.path("ch", "data", "ch_all_vars.csv"), row.names = 1)
 
 dim(all_ch)
 # 29656
@@ -241,8 +241,13 @@ cat(sprintf("PPM1D exceptions: %d\n", sum(ppm1dException, na.rm = TRUE)))
 # 3
 
 # View(all_ch[ppm1dException, ])
-# View(all_ch %>% filter(Gene == "PPM1D", ExonNumber %in% c(5, 6)))
-# View(all_ch_raw %>% filter(Gene == "PPM1D"))
+# View(all_ch %>% filter(Gene == "TP53", ExonNumber %in% c(5, 6)))
+# View(all_ch %>% filter(Gene == "TP53", Protein.position < 400, Protein.position > 100,
+#                        Variant.Consequence == "missense_variant") %>% arrange(Protein.position))
+#
+# View(all_ch %>% filter(Gene == "SRSF2") %>% arrange(Protein.position))
+# View(all_ch %>% filter(Gene == "JAK2", wl.exception) %>% arrange(Protein.position))
+
 
 # TET2: missense in catalytic domains (p.1104-1481 and p.1843-2002)
 vmis <- grepl("missense", all_ch$Variant.Consequence)
@@ -394,7 +399,7 @@ all_ch2 <- all_ch %>% filter(whitelist | manualreview | wl.exception)
 # View(all_ch_raw %>% filter(Gene == "JAK2"))
 # View(all_ch %>% filter(Gene == "JAK2"))
 #
-# View(all_ch %>% filter(Gene == "JAK2", Protein.position < 680, Protein.position > 533))
+View(all_ch %>% filter(Gene == "SF3B1"))
 # View(all_ch2 %>% filter(Gene == "JAK2"))
 
 # ========================
@@ -564,8 +569,19 @@ plot_batch_gene_freq <- function(df, label = "",
 
 plot_batch_gene_freq(all_ch2, label = "post whitelist")
 
-# out <- plot_batch_gene_freq(all_ch2, label = "post whitelist")
-# out$freq_table  # inspect the data
-# out$dot         # tweak the plot further
-#
+
+cov <- read.csv(file.path("ch", "data", "pmbb_brca12_cov_df.csv"), row.names = 1)
+all_ids <- read.csv(file.path("ch", "data", "ch_psm_matched4_case_control_ids.csv"))$x
+cov <- cov %>% filter(person_id %in% all_ids)
+table(cov$Batch)
+# 1    2
+# 760 2244
+dim(cov)
+# 3004
+controls <- cov %>% filter(BRCA12_Case == 0)
+dim(controls)
+# 2327
+
+control_vars <- all_ch2 %>% filter(Sample.ID %in% controls$person_id)
+plot_batch_gene_freq(control_vars, label = "post whitelist controls")
 
