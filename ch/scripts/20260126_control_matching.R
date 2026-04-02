@@ -330,8 +330,6 @@ m.out0 <- matchit(
 )
 
 # check balance
-summary(m.out0)
-
 # Summary of Balance for All Data:
 #     Means Treated Means Control Std. Mean Diff. Var. Ratio eCDF Mean eCDF Max
 # distance                      0.1316        0.0215          1.1750     4.3665    0.3606   0.6333
@@ -349,99 +347,12 @@ summary(m.out0)
 # PC5                           0.0059        0.0113         -0.4913     0.9661    0.1474   0.2160
 # PC6                          -0.0005        0.0002         -0.0930     0.7457    0.0177   0.0375
 
+m.out0$
+
+
 # ========================
 # PROPENSITY SCORE MATCHING
 # ========================
-# try out different ratios
-m.out1 <- matchit(
-    match_formula,
-    data = unaff,
-    method = "nearest",
-    distance = "glm",
-    ratio = 1,
-    caliper = c(0.2, # use 0.2 STD of logit(PS)
-                Sample_age = 5), # +- 5 years for sample age
-    std.caliper = c(TRUE, FALSE), # goes with caliper field
-    exact = ~ Sequenced_gender + Batch + Smoke_History,
-    replace = FALSE
-)
-
-m.out2 <- matchit(
-    match_formula,
-    data = unaff,
-    method = "nearest",
-    distance = "glm",
-    ratio = 2,
-    caliper = c(0.2, # use 0.2 STD of logit(PS)
-                Sample_age = 5), # +- 5 years for sample age
-    std.caliper = c(TRUE, FALSE), # goes with caliper field
-    exact = ~ Sequenced_gender + Batch + Smoke_History,
-    replace = FALSE
-)
-summary(m.out2, un = FALSE)
-# Summary of Balance for Matched Data:
-#     Means Treated Means Control Std. Mean Diff. Var. Ratio eCDF Mean eCDF Max Std. Pair Dist.
-# distance                      0.1277        0.1272          0.0054     1.0135    0.0005   0.0162          0.0116
-# Sample_age                   42.9196       42.6119          0.0231     0.9825    0.0059   0.0310          0.1834
-# Sequenced_genderFemale        0.7622        0.7622         -0.0000          .    0.0000   0.0000          0.0000
-# Sequenced_genderMale          0.2378        0.2378         -0.0000          .    0.0000   0.0000          0.0000
-# Smoke_History0                0.7120        0.7120         -0.0000          .    0.0000   0.0000          0.0000
-# Smoke_History1                0.2880        0.2880         -0.0000          .    0.0000   0.0000          0.0000
-# Batch1                        0.2245        0.2245         -0.0000          .    0.0000   0.0000          0.0000
-# Batch2                        0.7755        0.7755         -0.0000          .    0.0000   0.0000          0.0000
-# PC1                           0.0106        0.0105          0.0079     0.8576    0.0166   0.0443          0.2627
-# PC2                           0.0443        0.0439          0.0245     0.7961    0.0333   0.0746          0.3288
-# PC3                          -0.0175       -0.0168         -0.0672     0.5401    0.0184   0.0465          0.7989
-# PC4                          -0.0094       -0.0094          0.0018     1.7935    0.0164   0.0406          0.4780
-# PC5                           0.0063        0.0064         -0.0116     1.4383    0.0144   0.0340          0.5009
-# PC6                          -0.0004       -0.0005          0.0101     0.8797    0.0080   0.0266          1.0881
-#
-# Sample Sizes:
-#     Control Treated
-# All           28125.       697
-# Matched (ESS)  1252.27     677
-# Matched        1299.       677
-# Unmatched     26826.        20
-# Discarded         0.         0
-
-m.out3 <- matchit(
-    match_formula,
-    data = unaff,
-    method = "nearest",
-    distance = "glm",
-    ratio = 3,
-    caliper = c(0.2, # use 0.2 STD of logit(PS)
-                Sample_age = 5), # +- 5 years for sample age
-    std.caliper = c(TRUE, FALSE), # goes with caliper field
-    exact = ~ Sequenced_gender + Batch + Smoke_History,
-    replace = FALSE
-)
-summary(m.out3, un = FALSE)
-# Summary of Balance for Matched Data:
-#     Means Treated Means Control Std. Mean Diff. Var. Ratio eCDF Mean eCDF Max Std. Pair Dist.
-# distance                      0.1277        0.1271          0.0067     1.0161    0.0006   0.0155          0.0139
-# Sample_age                   42.9196       42.6037          0.0237     0.9640    0.0067   0.0357          0.1861
-# Sequenced_genderFemale        0.7622        0.7622          0.0000          .    0.0000   0.0000          0.0000
-# Sequenced_genderMale          0.2378        0.2378         -0.0000          .    0.0000   0.0000          0.0000
-# Smoke_History0                0.7120        0.7120         -0.0000          .    0.0000   0.0000          0.0000
-# Smoke_History1                0.2880        0.2880         -0.0000          .    0.0000   0.0000          0.0000
-# Batch1                        0.2245        0.2245         -0.0000          .    0.0000   0.0000          0.0000
-# Batch2                        0.7755        0.7755         -0.0000          .    0.0000   0.0000          0.0000
-# PC1                           0.0106        0.0108         -0.0130     0.9031    0.0193   0.0588          0.2710
-# PC2                           0.0443        0.0441          0.0091     0.8237    0.0348   0.0886          0.3279
-# PC3                          -0.0175       -0.0171         -0.0408     0.5843    0.0213   0.0515          0.7971
-# PC4                          -0.0094       -0.0092         -0.0118     1.4590    0.0153   0.0384          0.4864
-# PC5                           0.0063        0.0063         -0.0018     1.3522    0.0143   0.0318          0.5028
-# PC6                          -0.0004       -0.0004         -0.0090     0.8722    0.0055   0.0226          1.0932
-#
-# Sample Sizes:
-#     Control Treated
-# All           28125.       697
-# Matched (ESS)  1675.79     677
-# Matched        1854.       677
-# Unmatched     26271.        20
-# Discarded         0.         0
-
 m.out4 <- matchit(
     match_formula,
     data = unaff,
@@ -454,7 +365,6 @@ m.out4 <- matchit(
     exact = ~ Sequenced_gender + Batch + Smoke_History,
     replace = FALSE
 )
-summary(m.out4, un = FALSE)
 # Summary of Balance for Matched Data:
 #     Means Treated Means Control Std. Mean Diff. Var. Ratio eCDF Mean eCDF Max Std. Pair Dist.
 # distance                      0.1277        0.1269          0.0082     1.0169    0.0007   0.0149          0.0164
@@ -480,6 +390,10 @@ summary(m.out4, un = FALSE)
 # Unmatched     25798.        20
 # Discarded         0.         0
 
+m.out4.summary <- summary(m.out4)
+write.csv(m.out4.summary$sum.all, file.path("ch", "data", "prematch_balance_df.csv"))
+write.csv(m.out4.summary$sum.matched, file.path("ch", "data", "postmatch_balance_df.csv"))
+
 composite_plot <- plot_psm_balance(
     m.out4,
     data = unaff,
@@ -491,104 +405,6 @@ composite_plot <- plot_psm_balance(
     composite_ncol = 3,
     name = "psm4"
 )
-
-# 1:4 PROBIT
-m.out42 <- matchit(
-    match_formula,
-    data = unaff,
-    method = "nearest",
-    distance = "glm",
-    ratio = 4,
-    caliper = c(0.2, # use 0.2 STD of logit(PS)
-                Sample_age = 5), # +- 5 years for sample age
-    std.caliper = c(TRUE, FALSE), # goes with caliper field
-    exact = ~ Sequenced_gender + Batch + Smoke_History,
-    replace = FALSE,
-    link = "probit"
-)
-summary(m.out42, un = FALSE)
-# Summary of Balance for Matched Data:
-#     Means Treated Means Control Std. Mean Diff. Var. Ratio eCDF Mean eCDF Max Std. Pair Dist.
-# distance                      0.1179        0.1171          0.0102     1.0185    0.0007   0.0158          0.0176
-# Sample_age                   42.9561       42.5563          0.0300     0.9536    0.0080   0.0415          0.1916
-# Sequenced_genderFemale        0.7635        0.7635         -0.0000          .    0.0000   0.0000          0.0000
-# Sequenced_genderMale          0.2365        0.2365         -0.0000          .    0.0000   0.0000          0.0000
-# Smoke_History0                0.7124        0.7124         -0.0000          .    0.0000   0.0000          0.0000
-# Smoke_History1                0.2876        0.2876         -0.0000          .    0.0000   0.0000          0.0000
-# Batch1                        0.2219        0.2219         -0.0000          .    0.0000   0.0000          0.0000
-# Batch2                        0.7781        0.7781         -0.0000          .    0.0000   0.0000          0.0000
-# PC1                           0.0106        0.0101          0.0534     0.7350    0.0151   0.0468          0.3830
-# PC2                           0.0443        0.0437          0.0454     0.7305    0.0380   0.0842          0.4051
-# PC3                          -0.0175       -0.0173         -0.0193     0.7119    0.0177   0.0518          0.7602
-# PC4                          -0.0095       -0.0090         -0.0349     1.7819    0.0267   0.0562          0.5341
-# PC5                           0.0061        0.0062         -0.0093     1.3686    0.0091   0.0270          0.4935
-# PC6                          -0.0004       -0.0002         -0.0305     0.8443    0.0101   0.0293          1.1027
-#
-# Sample Sizes:
-#     Control Treated
-# All           28125.      697
-# Matched (ESS)  1974.3     685
-# Matched        2353.      685
-# Unmatched     25772.       12
-# Discarded         0.        0
-
-composite_plot <- plot_psm_balance(
-    m.out42,
-    data = unaff,
-    continuous_vars = continuous_vars,
-    discrete_vars = discrete_vars,
-    var_labels = var_labels,
-    save_dir = file.path("ch", "figures"),
-    create_composite = TRUE,
-    composite_ncol = 3,
-    name = "psm4_probit"
-)
-
-
-### 1:5
-m.out5 <- matchit(
-    match_formula,
-    data = unaff,
-    method = "nearest",
-    distance = "glm",
-    ratio = 5,
-    caliper = c(0.2, # use 0.2 STD of logit(PS)
-                Sample_age = 5), # +- 5 years for sample age
-    std.caliper = c(TRUE, FALSE), # goes with caliper field
-    exact = ~ Sequenced_gender + Batch + Smoke_History,
-    replace = FALSE
-)
-summary(m.out5, un = FALSE)
-# Call:
-#     matchit(formula = match_formula, data = unaff, method = "nearest",
-#             distance = "glm", link = "probit", exact = ~Sequenced_gender +
-#                 Batch + Smoke_History, replace = FALSE, caliper = c(0.2,
-#                                                                     Sample_age = 5), std.caliper = c(TRUE, FALSE), ratio = 5)
-#
-# Summary of Balance for Matched Data:
-#     Means Treated Means Control Std. Mean Diff. Var. Ratio eCDF Mean eCDF Max Std. Pair Dist.
-# distance                      0.1179        0.1171          0.0111     1.0186    0.0008   0.0172          0.0187
-# Sample_age                   42.9561       42.5415          0.0311     0.9501    0.0081   0.0415          0.1915
-# Sequenced_genderFemale        0.7635        0.7635          0.0000          .    0.0000   0.0000          0.0000
-# Sequenced_genderMale          0.2365        0.2365          0.0000          .    0.0000   0.0000          0.0000
-# Smoke_History0                0.7124        0.7124          0.0000          .    0.0000   0.0000          0.0000
-# Smoke_History1                0.2876        0.2876          0.0000          .    0.0000   0.0000          0.0000
-# Batch1                        0.2219        0.2219          0.0000          .    0.0000   0.0000          0.0000
-# Batch2                        0.7781        0.7781          0.0000          .    0.0000   0.0000          0.0000
-# PC1                           0.0106        0.0101          0.0498     0.7408    0.0151   0.0473          0.3995
-# PC2                           0.0443        0.0437          0.0453     0.7311    0.0372   0.0829          0.4147
-# PC3                          -0.0175       -0.0173         -0.0198     0.6877    0.0193   0.0533          0.7693
-# PC4                          -0.0095       -0.0091         -0.0291     1.8541    0.0260   0.0570          0.5340
-# PC5                           0.0061        0.0063         -0.0147     1.3956    0.0091   0.0252          0.4903
-# PC6                          -0.0004       -0.0002         -0.0329     0.8436    0.0099   0.0299          1.1096
-#
-# Sample Sizes:
-#     Control Treated
-# All           28125.       697
-# Matched (ESS)  2145.85     685
-# Matched        2733.       685
-# Unmatched     25392.        12
-# Discarded         0.         0
 
 # ========================
 # EXTRACT MATCHED DATA

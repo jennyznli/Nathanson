@@ -12,7 +12,7 @@ library(ggrepel)
 # ========================
 # SET GLOBALS
 # ========================
-# GNOMAD_THRESHOLD  <- 0.005
+GNOMAD_THRESHOLD  <- 0.005
 FREQ_THRESHOLD    <- 4
 CLUSTER_THRESHOLD <- 50
 MIN_AD_THRESHOLDS <- 3:8
@@ -31,7 +31,7 @@ extra_covs <- "Smoke_History + Sequenced_gender + PC1 + PC2 + PC3 + PC4 + PC5 + 
 # ========================
 all_ch <- read_excel(file.path("ch", "data", "ch_seq_wl_vars.xlsx")) %>% filter(keep == 1)
 dim(all_ch)
-# 893
+# 891
 
 all_ch$gnomAD.MAX_AF <- as.numeric(all_ch$gnomAD.MAX_AF)
 all_ch <- all_ch %>% mutate(
@@ -73,7 +73,7 @@ variant_counts <- all_ch %>%
     mutate(flag_high_freq = (n_carriers >= FREQ_THRESHOLD))
 
 dim(variant_counts)
-# 571 unique variants
+# 607 unique variants
 
 high_freq <- variant_counts %>% filter(flag_high_freq)
 high_freq_var <- unique(high_freq$variant_id)
@@ -111,8 +111,84 @@ freeze_removed_var <- all_ch %>% filter(variant_id %in% freeze_enriched_var) %>%
 dim(freeze_removed_var)
 # 149
 
+# # ========================
+# # 3. AGE ASSOCIATION
+# # ========================
+# run_age_tests <- function(data, variants) {
+#     variants %>%
+#         rowwise() %>%
+#         mutate(res = list(artifact_test_age(variant_id, data, extra_covs = extra_covs))) %>%
+#         unnest(res) %>%
+#         ungroup() %>%
+#         mutate(
+#             p_age_adj = p.adjust(p_age, method = "BH"),
+#             flag_age_associated = !is.na(p_age) & !separation & p_age < AGE_SIG
+#         )
+# }
+#
+# # test age association per variant category
+# artifact_test_age <- function(vkey, vars, extra_covs = NULL) {
+#     carriers <- vars %>%
+#         filter(variant_id == vkey) %>%
+#         distinct(Sample.ID) %>%
+#         mutate(carrier = 1)
+#
+#     df <- cov %>%
+#         left_join(carriers, by = c("person_id" = "Sample.ID")) %>%
+#         mutate(carrier = ifelse(is.na(carrier), 0, carrier))
+#
+#     base    <- "carrier ~ Sample_age + as.factor(Batch)"
+#     formula <- if (!is.null(extra_covs)) {
+#         as.formula(paste(base, "+", extra_covs))
+#     } else {
+#         as.formula(base)
+#     }
+#
+#     tryCatch({
+#         m <- withCallingHandlers(
+#             glm(formula, data = df, family = binomial()),
+#             warning = function(w) {
+#                 if (grepl("fitted probabilities numerically 0 or 1", conditionMessage(w)))
+#                     invokeRestart("muffleWarning")
+#             }
+#         )
+#         separation <- any(fitted(m) %in% c(0, 1)) | !m$converged
+#         s  <- coef(summary(m))
+#         ci <- confint.default(m)
+#         data.frame(
+#             OR         = exp(coef(m)["Sample_age"]),
+#             CI_lo      = exp(ci["Sample_age", 1]),
+#             CI_hi      = exp(ci["Sample_age", 2]),
+#             p_age      = s["Sample_age", "Pr(>|z|)"],
+#             separation = separation
+#         )
+#     }, error = function(e) {
+#         warning(sprintf("Model failed for %s: %s", vkey, conditionMessage(e)))
+#         data.frame(OR = NA_real_, CI_lo = NA_real_, CI_hi = NA_real_,
+#                    p_age = NA_real_, separation = NA)
+#     })
+# }
+#
+# age_association <- high_freq2 %>%
+#     rowwise() %>%
+#     mutate(res = list(artifact_test_age(variant_id, all_ch, extra_covs = extra_covs))) %>%
+#     unnest(res) %>% ungroup() %>%
+#     mutate(
+#         p_age_adj = p.adjust(p_age, method = "BH"),
+#         flag_age_associated = !is.na(p_age) & !separation & p_age < AGE_SIG
+#     )
+#
+# not_age_associated <- age_association %>% filter(!flag_age_associated)
+# not_age_associated_var <- not_age_associated %>% pull(variant_id)
+# length(not_age_associated_var)
+# # 21
+#
+# age_removed_var <- all_ch %>% filter(variant_id %in% not_age_associated_var) %>% arrange(variant_id)
+# dim(age_removed_var)
+# # 265
+
 # ========================
-# 3. GERMLINE TESTING
+# 4. GERMLINE TESTING
 # ========================
 binomial_germline_test <- function(alt_count, total_depth, p_germline = 0.5) {
     if (is.na(alt_count) || is.na(total_depth) || total_depth == 0) {
@@ -151,7 +227,7 @@ germline_summary <- germline_test_vars %>%
     )
 fail_majority_germline <- germline_summary %>% filter(flag_germline_var)
 dim(fail_majority_germline)
-# 37 - most of these are singletons...
+# 51 - most of these are singletons...
 
 # from all vars tested, remove those individuals' variants failing binomial
 # as well as entire variant categories whose majority failed
@@ -161,7 +237,7 @@ germline_fail_vars <- germline_test_vars %>%
 
 germline_removed_vars <- all_ch %>% inner_join(germline_fail_vars, by = c("Sample.ID", "variant_id"))
 dim(germline_removed_vars)
-# 43
+# 84
 
 ### PLOT ###
 # colored by TET2 missense
@@ -295,7 +371,7 @@ p <- ggplot(germline_test_vars,
 ggsave(file.path("ch", "figures", "germline_vaf_age_gnomad.pdf"), p, width = 9, height = 6)
 
 # ========================
-# 4. CLUSTERS
+# 5. CLUSTERS
 # ========================
 # annotate with cluster cols
 all_ch_clustered <- all_ch %>%
@@ -340,7 +416,7 @@ cluster_summary <- cluster_all %>%
     ) %>%
     arrange(Sample.ID, Chr, Start_min)
 dim(cluster_summary)
-# 97 unique clusters
+# 99 unique clusters
 
 # get one representative variant per cluster
 cluster_rep <- cluster_all %>%
@@ -361,15 +437,17 @@ all_ch2 <- all_ch %>%
     mutate(
         flag_high_freq          = variant_id %in% high_freq_var,
         flag_freeze_enriched    = variant_id %in% freeze_enriched_var,
+        flag_not_age_associated = variant_id %in% not_age_associated_var,
         flag_germline_ind       = paste(Sample.ID, variant_id) %in%
             paste(germline_removed_vars$Sample.ID, germline_removed_vars$variant_id),
         flag_cluster            = variant_id %in% cluster_not_rep_var,
-        flag_full               =  flag_freeze_enriched | flag_germline_ind | flag_cluster
+        flag_full               =  flag_freeze_enriched | flag_not_age_associated | flag_germline_ind | flag_cluster
     )
 all_ch2 <- all_ch2 %>% mutate(n_flags = rowSums(across(c("flag_freeze_enriched",
-                                       "flag_germline_ind", "flag_cluster"), as.integer), na.rm = TRUE))
+                                      "flag_not_age_associated", "flag_germline_ind",
+                                      "flag_cluster"), as.integer), na.rm = TRUE))
 
-flags <- c("flag_high_freq", "flag_freeze_enriched",
+flags <- c("flag_high_freq", "flag_freeze_enriched", "flag_not_age_associated",
            "flag_germline_ind", "flag_cluster", "flag_full")
 
 # summary of how many rows each flag removes
@@ -378,6 +456,7 @@ flag_summary <- tibble(
     n_rows_flagged          = c(
         sum(all_ch2$flag_high_freq),
         sum(all_ch2$flag_freeze_enriched),
+        sum(all_ch2$flag_not_age_associated),
         sum(all_ch2$flag_germline_ind),
         sum(all_ch2$flag_cluster),
         sum(all_ch2$flag_full)
@@ -385,6 +464,7 @@ flag_summary <- tibble(
     n_individuals_flagged   = c(
         n_distinct(all_ch2$Sample.ID[all_ch2$flag_high_freq]),
         n_distinct(all_ch2$Sample.ID[all_ch2$flag_freeze_enriched]),
+        n_distinct(all_ch2$Sample.ID[all_ch2$flag_not_age_associated]),
         n_distinct(all_ch2$Sample.ID[all_ch2$flag_germline_ind]),
         n_distinct(all_ch2$Sample.ID[all_ch2$flag_cluster]),
         n_distinct(all_ch2$Sample.ID[all_ch2$flag_full])
@@ -392,156 +472,44 @@ flag_summary <- tibble(
     n_variants_flagged      = c(
         n_distinct(all_ch2$variant_id[all_ch2$flag_high_freq]),
         n_distinct(all_ch2$variant_id[all_ch2$flag_freeze_enriched]),
+        n_distinct(all_ch2$variant_id[all_ch2$flag_not_age_associated]),
         n_distinct(all_ch2$variant_id[all_ch2$flag_germline_ind]),
         n_distinct(all_ch2$variant_id[all_ch2$flag_cluster]),
         n_distinct(all_ch2$variant_id[all_ch2$flag_full])
     )
 )
 flag_summary
-# flag                 n_rows_flagged n_individuals_flagged n_variants_flagged
-# <chr>                         <int>                 <int>              <int>
-#     1 flag_high_freq                  263                   231                 20
-# 2 flag_freeze_enriched            149                   148                  2
-# 3 flag_germline_ind                43                    41                 37
-# 4 flag_cluster                    145                    78                112
-# 5 flag_full                       336                   255                150
+# flag                    n_rows_flagged n_individuals_flagged n_variants_flagged
+# <chr>                            <int>                 <int>              <int>
+#     1 flag_high_freq                     329                   287                 25
+# 2 flag_freeze_enriched               149                   148                  2
+# 3 flag_not_age_associated            265                   241                 21
+# 4 flag_germline_ind                   84                    82                 51
+# 5 flag_cluster                       147                    80                114
+# 6 flag_full                          500                   387                180
 
 cat("\nRows by number of flags triggered:\n")
 print(table(all_ch2$n_flags))
 # 0   1   2
-# 557 335   1
+# 499 355 145
 
-# ========================
-# FLAGS UPSET PLOT
-# =======================
-upset_flags <- c("flag_freeze_enriched", "flag_germline_ind", "flag_cluster")
-
-flag_mat <- all_ch2 %>%
-    select(all_of(upset_flags)) %>%
-    mutate(across(everything(), as.integer))
-
-pdf(file.path("ch", "figures", "qc_flag_overlap_upset.pdf"), width = 10, height = 5)
-upset(
-    as.data.frame(flag_mat),
-    sets           = upset_flags,
-    order.by       = "freq",
-    sets.bar.color = "#378ADD",
-    main.bar.color = "#1D9E75",
-    text.scale     = 1.2,
-    mb.ratio       = c(0.6, 0.4)
-)
-dev.off()
-
-# ========================
-# COMPILE RESULTS FOR MANUAL REVIEW
-# ========================
-flag_overview <- tibble(
-    filter_step        = c("1. High frequency",
-                           "2. Freeze enriched",
-                           "3. Germline (majority fail)",
-                           "4. Cluster (non-representative)"),
-    n_variants_tested  = c(nrow(variant_counts),
-                           nrow(high_freq2),
-                           nrow(germline_summary),
-                           n_distinct(cluster_all$variant_id)),
-    n_variants_flagged = c(sum(variant_counts$flag_high_freq),
-                           sum(high_freq2$flag_freeze_enriched, na.rm = TRUE),
-                           sum(germline_summary$flag_germline_var, na.rm = TRUE),
-                           length(cluster_not_rep_var)),
-    n_rows_flagged     = c(sum(all_ch2$flag_high_freq),
-                           sum(all_ch2$flag_freeze_enriched),
-                           sum(all_ch2$flag_germline_ind),
-                           sum(all_ch2$flag_cluster)),
-    n_individuals      = c(n_distinct(all_ch2$Sample.ID[all_ch2$flag_high_freq]),
-                           n_distinct(all_ch2$Sample.ID[all_ch2$flag_freeze_enriched]),
-                           n_distinct(all_ch2$Sample.ID[all_ch2$flag_germline_ind]),
-                           n_distinct(all_ch2$Sample.ID[all_ch2$flag_cluster])),
-    threshold          = c(sprintf("n_carriers >= %d", FREQ_THRESHOLD),
-                           sprintf("p_freeze_adj < %.2f", FREEZE_SIG),
-                           sprintf("prop_fail_binom > 0.50, p_binom >= %.2f", GERMLINE_SIG),
-                           sprintf("within %d bp, same Sample/Gene/Chr", CLUSTER_THRESHOLD))
-)
-
-all_variants_master <- variant_counts %>%
-    left_join(
-        high_freq2 %>% select(variant_id, p_freeze, p_freeze_adj, flag_freeze_enriched),
-        by = "variant_id"
-    ) %>%
-    left_join(
-        germline_summary %>% select(variant_id, n_tested, n_fail_binom,
-                                    prop_fail_binom, flag_germline_var),
-        by = "variant_id"
-    ) %>%
-    left_join(
-        all_ch %>%
-            group_by(variant_id) %>%
-            summarise(
-                across(c(whitelist, wl.mis, wl.lof, wl.splice, wl.exception), first),
-                # wl_manualreview = any(manualreview, na.rm = TRUE),
-                .groups = "drop"
-            ),
-        by = "variant_id"
-    ) %>%
-    mutate(
-        flag_cluster            = variant_id %in% cluster_not_rep_var,
-        flag_high_freq          = flag_high_freq == 1,
-        flag_freeze_enriched    = ifelse(is.na(flag_freeze_enriched), FALSE, flag_freeze_enriched),
-        flag_germline_var       = ifelse(is.na(flag_germline_var), FALSE, flag_germline_var),
-        n_flags                 = flag_high_freq + flag_freeze_enriched +
-                                    + flag_germline_var + flag_cluster
-    ) %>%
-    arrange(desc(n_flags), desc(n_carriers))
-
-write_xlsx(
-    list(
-        "flag_overview"           = flag_overview,
-        "variant_categories"      = all_variants_master,
-        "all_variants"            = all_ch2,
-        "high_freq_summary"       = freeze_enriched %>% arrange(desc(n_carriers)),
-        "high_freq_vars"          = high_freq_vars,
-        "freeze_enriched_vars"    = freeze_removed_var %>% arrange(variant_id),
-        "germline_summary" = germline_summary %>%
-            arrange(desc(prop_fail_binom)),
-        "germline_vars"          = germline_removed_vars %>% arrange(variant_id),
-        "cluster_summary"         = cluster_summary,
-        "cluster_rep_vars"        = cluster_rep,
-        "cluster_not_rep_vars"    = cluster_all %>%
-            filter(variant_id %in% cluster_not_rep_var)
-    ),
-    file.path("ch", "data", "ch_wl_artifact_review.xlsx")
-)
-
-# ========================
-# MANUAL REVIEW completed
-# ========================
-all_ch3 <- read_excel(file.path("ch", "data", "ch_wl_artifact_review.xlsx"), sheet = "all_variants") %>% filter(keep == 1)
-dim(all_ch3)
-# 564
-
+# final clean dataset
+all_ch_clean <- all_ch2 %>% filter(!flag_full)
 cat(sprintf("Rows before filtering: %d\n", nrow(all_ch2)))
-# 893
-cat(sprintf("Rows after filtering:  %d\n", nrow(all_ch3)))
-# 564
-cat(sprintf("Rows removed:          %d\n", nrow(all_ch2) - nrow(all_ch3)))
-# 336
+# 999
+cat(sprintf("Rows after filtering:  %d\n", nrow(all_ch_clean)))
+# 499
+cat(sprintf("Rows removed:          %d\n", nrow(all_ch2) - nrow(all_ch_clean)))
+# 500
 
-write_xlsx(all_ch3, file.path("ch", "data", "ch_seq_wl_art_vars.xlsx"))
+write_xlsx(all_ch2, file.path("ch", "data", "ch_seq_wl_flags_vars.xlsx"))
+write_xlsx(all_ch_clean, file.path("ch", "data", "ch_seq_wl_art_vars.xlsx"))
 write_xlsx(flag_summary, file.path("ch", "data", "ch_flags_summary.xlsx"))
-
-# ========================
-# MANUAL REVIEW AGAIN...
-# ========================
-all_ch4 <- read_excel(file.path("ch", "data", "ch_seq_wl_art_vars copy.xlsx")) %>% filter(keep == 1)
-dim(all_ch4)
-unique(all_ch4$Gene)
-
-write_xlsx(all_ch4, file.path("ch", "data", "ch_seq_wl_art_manual_vars.xlsx"))
-
 
 # ========================
 # CHIP VARIANT COUNT PER INDIVIDUAL
 # ========================
-chip_per_ind <- all_ch4 %>%
+chip_per_ind <- all_ch_clean %>%
     group_by(Sample.ID) %>%
     summarise(n_chip = n_distinct(variant_id), .groups = "drop")
 
@@ -571,9 +539,134 @@ ggsave(file.path("ch", "figures", "ch_variants_per_individual.pdf"),
        p_chip, width = 6, height = 5)
 
 # ========================
+# FLAGS UPSET PLOT
+# =======================
+upset_flags <- c("flag_freeze_enriched", "flag_not_age_associated",
+           "flag_germline_ind", "flag_cluster")
+
+flag_mat <- all_ch2 %>%
+    select(all_of(upset_flags)) %>%
+    mutate(across(everything(), as.integer))
+
+pdf(file.path("ch", "figures", "qc_flag_overlap_upset.pdf"), width = 10, height = 5)
+upset(
+    as.data.frame(flag_mat),
+    sets           = upset_flags,
+    order.by       = "freq",
+    sets.bar.color = "#378ADD",
+    main.bar.color = "#1D9E75",
+    text.scale     = 1.2,
+    mb.ratio       = c(0.6, 0.4)
+)
+dev.off()
+
+# ========================
+# COMPILE RESULTS FOR MANUAL REVIEW
+# ========================
+flag_overview <- tibble(
+    filter_step        = c("1. High frequency",
+                           "2. Freeze enriched",
+                           "3. Not age associated",
+                           "4. Germline (majority fail)",
+                           "5. Cluster (non-representative)"),
+    n_variants_tested  = c(nrow(variant_counts),
+                           nrow(high_freq2),
+                           nrow(age_association),
+                           nrow(germline_summary),
+                           n_distinct(cluster_all$variant_id)),
+    n_variants_flagged = c(sum(variant_counts$flag_high_freq),
+                           sum(high_freq2$flag_freeze_enriched, na.rm = TRUE),
+                           sum(!age_association$flag_age_associated &
+                                   !age_association$separation, na.rm = TRUE),
+                           sum(germline_summary$flag_germline_var, na.rm = TRUE),
+                           length(cluster_not_rep_var)),
+    n_rows_flagged     = c(sum(all_ch2$flag_high_freq),
+                           sum(all_ch2$flag_freeze_enriched),
+                           sum(all_ch2$flag_not_age_associated),
+                           sum(all_ch2$flag_germline_ind),
+                           sum(all_ch2$flag_cluster)),
+    n_individuals      = c(n_distinct(all_ch2$Sample.ID[all_ch2$flag_high_freq]),
+                           n_distinct(all_ch2$Sample.ID[all_ch2$flag_freeze_enriched]),
+                           n_distinct(all_ch2$Sample.ID[all_ch2$flag_not_age_associated]),
+                           n_distinct(all_ch2$Sample.ID[all_ch2$flag_germline_ind]),
+                           n_distinct(all_ch2$Sample.ID[all_ch2$flag_cluster])),
+    threshold          = c(sprintf("n_carriers >= %d", FREQ_THRESHOLD),
+                           sprintf("p_freeze_adj < %.2f", FREEZE_SIG),
+                           sprintf("p_age < %.2f (among high-freq variants)", AGE_SIG),
+                           sprintf("prop_fail_binom > 0.50, p_binom >= %.2f", GERMLINE_SIG),
+                           sprintf("within %d bp, same Sample/Gene/Chr", CLUSTER_THRESHOLD))
+)
+
+all_variants_master <- variant_counts %>%
+    left_join(
+        high_freq2 %>% select(variant_id, p_freeze, p_freeze_adj, flag_freeze_enriched),
+        by = "variant_id"
+    ) %>%
+    left_join(
+        age_association %>% select(variant_id, OR, CI_lo, CI_hi,
+                                   p_age, p_age_adj, separation, flag_age_associated),
+        by = "variant_id"
+    ) %>%
+    left_join(
+        germline_summary %>% select(variant_id, n_tested, n_fail_binom,
+                                    prop_fail_binom, flag_germline_var),
+        by = "variant_id"
+    ) %>%
+    left_join(
+        all_ch %>%
+            group_by(variant_id) %>%
+            summarise(
+                across(c(whitelist, wl.mis, wl.lof, wl.splice, wl.exception), first),
+                wl_manualreview = any(manualreview, na.rm = TRUE),
+                .groups = "drop"
+            ),
+        by = "variant_id"
+    ) %>%
+    mutate(
+        flag_cluster            = variant_id %in% cluster_not_rep_var,
+        flag_high_freq          = flag_high_freq == 1,
+        flag_freeze_enriched    = ifelse(is.na(flag_freeze_enriched), FALSE, flag_freeze_enriched),
+        flag_not_age_associated = variant_id %in% not_age_associated_var,
+        flag_germline_var       = ifelse(is.na(flag_germline_var), FALSE, flag_germline_var),
+        n_flags                 = flag_high_freq + flag_freeze_enriched +
+            flag_not_age_associated + flag_germline_var + flag_cluster,
+        final_manual_review     = as.integer(n_flags > 0 | wl_manualreview)
+    ) %>%
+    arrange(desc(final_manual_review), desc(n_flags), desc(n_carriers))
+
+write_xlsx(
+    list(
+        "flag_overview"           = flag_overview,
+        "all_variants"            = all_variants_master,
+        "whitelist_manual"        = all_ch %>% filter(manualreview),
+        "high_freq_summary"       = age_association %>%
+            arrange(desc(n_carriers)),
+        "high_freq_vars"          = high_freq_vars,
+        "freeze_enriched_vars"    = freeze_removed_var %>% arrange(variant_id),
+        "not_age_association_vars" = age_removed_var %>% arrange(variant_id),
+        "germline_summary" = germline_summary %>%
+            arrange(desc(prop_fail_binom)),
+        "germline_vars"          = germline_removed_vars %>% arrange(variant_id),
+        "cluster_summary"         = cluster_summary,
+        "cluster_rep_vars"        = cluster_rep,
+        "cluster_not_rep_vars"    = cluster_all %>%
+            filter(variant_id %in% cluster_not_rep_var)
+    ),
+    file.path("ch", "data", "ch_wl_artifact_review.xlsx")
+)
+
+cat("Master review sheet written.\n")
+cat(sprintf("Total variants:     %d\n", nrow(all_variants_master)))
+# 481
+cat(sprintf("Flagged for review: %d\n", sum(all_variants_master$manual_review)))
+# 182
+cat(sprintf("Clean variants:     %d\n", sum(all_variants_master$manual_review == 0)))
+# 425
+
+# ========================
 # OVERLAP VENN DIAGRAMS
 # ========================
-variant_counts2 <- all_ch4 %>%
+variant_counts2 <- all_ch_clean %>%
     group_by(variant_id) %>%
     summarise(
         n_carriers          = n_distinct(Sample.ID),
@@ -604,8 +697,8 @@ p_venn <- ggVennDiagram(
 
 ggsave(file.path("ch", "figures", "qc_variant_overlap_venn.pdf"), p_venn, width = 6, height = 4)
 
-gene_f2 <- sort(unique(all_ch4 %>% filter(Batch == 1) %>% pull(Gene)))
-gene_f3 <- sort(unique(all_ch4 %>% filter(Batch == 2) %>% pull(Gene)))
+gene_f2 <- sort(unique(all_ch_clean %>% filter(Batch == 1) %>% pull(Gene)))
+gene_f3 <- sort(unique(all_ch_clean %>% filter(Batch == 2) %>% pull(Gene)))
 
 p_venn_gene <- ggVennDiagram(
     list("Freeze 2" = gene_f2, "Freeze 3" = gene_f3),
@@ -703,13 +796,13 @@ plot_batch_gene_freq <- function(df, label = "",
     invisible(list(dot = p_dot, freq_table = gene_freq))
 }
 
-plot_batch_gene_freq(all_ch4, label = "post artifact")
+plot_batch_gene_freq(all_ch_clean, label = "post artifact")
 
 controls <- cov %>% filter(BRCA12_Case == 0)
 dim(controls)
 # 2327
 
-control_clean_vars <- all_ch4 %>% filter(Sample.ID %in% controls$person_id)
+control_clean_vars <- all_ch_clean %>% filter(Sample.ID %in% controls$person_id)
 plot_batch_gene_freq(control_clean_vars, label = "post artifact controls")
 
 

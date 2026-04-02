@@ -1,21 +1,8 @@
-# ========================
-# CHIP - LOGISTIC REGRESSION
-# ========================
 library(here)
 setwd("/Users/jennyzli/Documents/Nathanson")
 source(here("R", "config.R"))
-
 library(data.table, quietly = T)
 library(MatchIt)
-library(MASS)
-library(logistf)
-library(p.adjust)
-library(splines)
-library(lmtest)
-library(sandwich)
-library(logistf)
-library(pROC)
-
 # ========================
 # READ IN DATA
 # ========================
@@ -29,14 +16,197 @@ weights <- m.out4$weights
 m.data <- match_data(m.out4)
 
 ### VARS
-vars <- read_excel(file.path("ch", "data", "ch_seq_wl_art_minad4_vars.xlsx"))
+vars <- read_excel(file.path("ch", "data", "ch_wl_art_checked.xlsx")) %>% filter(Keep == 1)
 cat("Variants:", nrow(vars), "\n")
 cat("Unique carriers:", length(unique(vars$Sample.ID)), "\n")
+# 220
 
-cov <- read_excel(file.path("ch", "data", "pmbb_brca12_cov_chip_df.xlsx"))
+cov <- read.csv(file.path("ch", "data", "pmbb_brca12_cov_df.csv"))
+cov <- cov %>% filter(person_id %in% all_ids, Strata == 1)
+
+cov <- cov %>%
+    mutate(
+        CHIP_Binary = person_id %in% vars$Sample.ID,
+        CHIP_Count  = sapply(person_id, function(id) sum(vars$Sample.ID == id))
+    )
+
+cat("\nCHIP prevalence:\n")
+print(table(cov$CHIP_Binary))
+cat("\nCHIP by case/control:\n")
+tab <- table(cov$BRCA12_Case, cov$CHIP_Binary)
+print(tab)
+# FALSE TRUE
+# 0  1933  134
+# 1   483   55
+
+prop.table(tab, margin = 1)
+# FALSE       TRUE
+# 0 0.93517175 0.06482825
+# 1 0.89776952 0.10223048
+
+tab2 <- table(cov$Carrier, cov$CHIP_Binary)
+prop.table(tab2, margin = 1)
+# FALSE       TRUE
+# BRCA1       0.88888889 0.11111111
+# BRCA1+BRCA2 1.00000000 0.00000000
+# BRCA2       0.90545455 0.09454545
+# Non-carrier 0.93517175 0.06482825
 
 # ========================
-# FUNCTIONS
+# CHIP PREVALENCE BY DECADE - ALL
+# ========================
+prev_by_decade <- cov %>%
+    mutate(
+        age_group = cut(Sample_age,
+                        breaks = c(-Inf, 30, 40, 50, 60, 70, Inf),
+                        labels = c("≤30", "30-40", "40-50", "50-60",
+                                   "60-70", "≥70"),
+                        right  = TRUE)
+    ) %>%
+    group_by(age_group) %>%
+    summarise(
+        n_total  = n(),
+        n_chip   = sum(CHIP_Binary),
+        prev_pct = 100 * mean(CHIP_Binary),
+        .groups  = "drop"
+    ) %>%
+    mutate(x_num = as.numeric(age_group))
+
+p_prev <- ggplot(prev_by_decade, aes(x = x_num, y = prev_pct)) +
+    geom_smooth(method = "loess", se = FALSE, color = "#C0392B", linewidth = 1) +
+    geom_point(color = "#C0392B", size = 3) +
+    scale_x_continuous(
+        breaks = prev_by_decade$x_num,
+        labels = prev_by_decade$age_group
+    ) +
+    scale_y_continuous(limits = c(0, NA), expand = expansion(mult = c(0, 0.1))) +
+    labs(
+        title = "CHIP prevalence by decade",
+        x     = "Age group (years)",
+        y     = "CHIP prevalence (%)"
+    ) +
+    theme_minimal(base_size = 13) +
+    theme(
+        panel.grid.minor   = element_blank(),
+        panel.grid.major.x = element_blank(),
+        plot.title         = element_text(face = "bold", hjust = 0.5)
+    )
+
+ggsave(file.path("ch", "figures", "chip_prevalence_by_decade.pdf"),
+       p_prev, width = 7, height = 5)
+
+# ========================
+# CHIP PREVALENCE BY DECADE - BRCA1/2 CARRIERS
+# ========================
+prev_by_decade <- cov %>%
+    filter(BRCA12_Case == 0) %>%
+    mutate(
+        age_group = cut(Sample_age,
+                        breaks = c(-Inf, 30, 40, 50, 60, 70, Inf),
+                        labels = c("≤30", "30-40", "40-50", "50-60",
+                                   "60-70", "≥70"),
+                        right  = TRUE)
+    ) %>%
+    group_by(age_group) %>%
+    summarise(
+        n_total  = n(),
+        n_chip   = sum(CHIP_Binary),
+        prev_pct = 100 * mean(CHIP_Binary),
+        .groups  = "drop"
+    ) %>%
+    mutate(x_num = as.numeric(age_group))
+
+p_prev <- ggplot(prev_by_decade, aes(x = x_num, y = prev_pct)) +
+    geom_smooth(method = "loess", se = FALSE, color = "#C0392B", linewidth = 1) +
+    geom_point(color = "#C0392B", size = 3) +
+    scale_x_continuous(
+        breaks = prev_by_decade$x_num,
+        labels = prev_by_decade$age_group
+    ) +
+    scale_y_continuous(limits = c(0, NA), expand = expansion(mult = c(0, 0.1))) +
+    labs(
+        title = "CHIP prevalence by decade",
+        x     = "Age group (years)",
+        y     = "CHIP prevalence (%)"
+    ) +
+    theme_minimal(base_size = 13) +
+    theme(
+        panel.grid.minor   = element_blank(),
+        panel.grid.major.x = element_blank(),
+        plot.title         = element_text(face = "bold", hjust = 0.5)
+    )
+
+ggsave(file.path("ch", "figures", "chip_prevalence_by_decade_no_brca12.pdf"),
+       p_prev, width = 7, height = 5)
+
+# ========================
+# CHIP PREVALENCE BY DECADE - BRCA1/2 CARRIERS
+# ========================
+prev_by_decade <- cov %>%
+    filter(BRCA12_Case == 1) %>%
+    mutate(
+        age_group = cut(Sample_age,
+                        breaks = c(-Inf, 30, 40, 50, 60, 70),
+                        labels = c("≤30", "30-40", "40-50", "50-60",
+                                   "60-70"),
+                        right  = TRUE)
+    ) %>%
+    group_by(age_group) %>%
+    summarise(
+        n_total  = n(),
+        n_chip   = sum(CHIP_Binary),
+        prev_pct = 100 * mean(CHIP_Binary),
+        .groups  = "drop"
+    ) %>%
+    mutate(x_num = as.numeric(age_group))
+
+p_prev <- ggplot(prev_by_decade, aes(x = x_num, y = prev_pct)) +
+    geom_smooth(method = "loess", se = FALSE, color = "#C0392B", linewidth = 1) +
+    geom_point(color = "#C0392B", size = 3) +
+    scale_x_continuous(
+        breaks = prev_by_decade$x_num,
+        labels = prev_by_decade$age_group
+    ) +
+    scale_y_continuous(limits = c(0, NA), expand = expansion(mult = c(0, 0.1))) +
+    labs(
+        title = "CHIP prevalence by decade",
+        x     = "Age group (years)",
+        y     = "CHIP prevalence (%)"
+    ) +
+    theme_minimal(base_size = 13) +
+    theme(
+        panel.grid.minor   = element_blank(),
+        panel.grid.major.x = element_blank(),
+        plot.title         = element_text(face = "bold", hjust = 0.5)
+    )
+
+ggsave(file.path("ch", "figures", "chip_prevalence_by_decade_brca12.pdf"),
+       p_prev, width = 7, height = 5)
+
+# ========================
+# HISTOGRAM OF AGE
+# ========================
+p <- ggplot(cov, aes(x = Sample_age)) +
+    geom_histogram(binwidth = 5, fill = "steelblue", color = "white") +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+    labs(title = "Age distribution", x = "Age (years)", y = "Frequency") +
+    theme_minimal(base_size = 13) +
+    theme(panel.grid.minor = element_blank(),
+          plot.title = element_text(face = "bold", hjust = 0.5))
+ggsave(file.path("ch", "figures", "strata1_age_hist.png"),
+       p, width = 7, height = 5)
+
+# ========================
+# CHIP LOGISTIC REGRESSION — MODEL COMPARISON
+# ========================
+library(splines)
+library(lmtest)
+library(sandwich)
+library(logistf)
+library(pROC)
+
+# ========================
+# HELPER: extract OR + cluster-robust SE + AUC
 # ========================
 extract_or <- function(fit, term) {
     s  <- coef(summary(fit))
@@ -243,150 +413,3 @@ results_all <- bind_rows(
 # BRCA2_Case    BRCA2 firth_linear 1.37 (0.87–2.09) 0.166748514 0.6589973
 
 results_all
-
-# ========================
-# CHIP COUNT: POISSON vs NEGATIVE BINOMIAL
-# ========================
-library(MASS)
-
-# first test for overdispersion with Poisson
-fit_pois <- glm(
-    as.formula(paste("CHIP_Count ~ BRCA12_Case + ns(Sample_age, df=4) +", base_covs)),
-    data = cov, weights = weights, family = poisson()
-)
-
-# overdispersion test: ratio of residual deviance to df should be ~1
-overdisp_ratio <- fit_pois$deviance / fit_pois$df.residual
-cat("Overdispersion ratio:", overdisp_ratio, "\n")
-# > 1 = overdispersed → use NB
-
-# negative binomial (unweighted — glm.nb doesn't support weights well)
-fit_nb12 <- glm.nb(
-    as.formula(paste("CHIP_Count ~ BRCA12_Case + ns(Sample_age, df=4) +", base_covs)),
-    data = cov
-)
-
-fit_nb1 <- glm.nb(
-    as.formula(paste("CHIP_Count ~ BRCA1_Case + ns(Sample_age, df=4) +", base_covs)),
-    data = cov
-)
-
-fit_nb2 <- glm.nb(
-    as.formula(paste("CHIP_Count ~ BRCA2_Case + ns(Sample_age, df=4) +", base_covs)),
-    data = cov
-)
-
-# compare Poisson vs NB with LRT
-cat("\n=== Poisson vs NB LRT ===\n")
-pchisq(2 * (logLik(fit_nb12) - logLik(fit_pois)), df = 1, lower.tail = FALSE)
-
-# extract IRR (incidence rate ratio) instead of OR for count models
-extract_irr <- function(fit, term) {
-    s  <- coef(summary(fit))
-    ci <- confint.default(fit)
-    data.frame(
-        IRR   = exp(coef(fit)[term]),
-        CI_lo = exp(ci[term, 1]),
-        CI_hi = exp(ci[term, 2]),
-        p     = s[term, 4],
-        IRR_fmt = sprintf("%.2f (%.2f\u2013%.2f)",
-                          exp(coef(fit)[term]),
-                          exp(ci[term, 1]),
-                          exp(ci[term, 2]))
-    )
-}
-
-count_results <- bind_rows(
-    extract_irr(fit_nb12, "BRCA12_Case") %>% mutate(model = "BRCA1/2"),
-    extract_irr(fit_nb1,  "BRCA1_Case")  %>% mutate(model = "BRCA1"),
-    extract_irr(fit_nb2,  "BRCA2_Case")  %>% mutate(model = "BRCA2")
-) %>% select(model, IRR_fmt, p)
-
-print(count_results)
-write.csv(count_results, file.path("ch", "data", "ch_nb_results.csv"), row.names = FALSE)
-
-# ========================
-# GENE-SPECIFIC CHIP: FIRTH LOGISTIC PER GENE
-# ========================
-
-# get genes with enough carriers to fit
-gene_counts <- vars %>%
-    count(Gene, name = "n_carriers") %>%
-    filter(n_carriers >= 5) %>%   # minimum 5 carriers to attempt fit
-    arrange(desc(n_carriers))
-
-cat("Genes with >= 5 carriers:", nrow(gene_counts), "\n")
-print(gene_counts)
-
-# add per-gene binary carrier flags to cov
-run_gene_firth <- function(gene, term = "BRCA12_Case") {
-    gene_carriers <- vars %>%
-        filter(Gene == gene) %>%
-        distinct(Sample.ID) %>%
-        pull(Sample.ID)
-
-    cov_gene <- cov %>%
-        mutate(gene_chip = person_id %in% gene_carriers)
-
-    # skip if no variance
-    if (sum(cov_gene$gene_chip) < 3) return(NULL)
-
-    tryCatch({
-        fit <- logistf(
-            as.formula(paste("gene_chip ~", term, "+ ns(Sample_age, df=4) +", base_covs)),
-            data = cov_gene
-        )
-        idx <- which(names(coef(fit)) == term)
-        data.frame(
-            Gene   = gene,
-            term   = term,
-            n      = sum(cov_gene$gene_chip),
-            OR     = exp(coef(fit)[idx]),
-            CI_lo  = exp(fit$ci.lower[idx]),
-            CI_hi  = exp(fit$ci.upper[idx]),
-            p      = fit$prob[idx]
-        ) %>%
-            mutate(OR_fmt = sprintf("%.2f (%.2f\u2013%.2f)", OR, CI_lo, CI_hi))
-    }, error = function(e) {
-        cat("Failed for gene:", gene, "\n")
-        NULL
-    })
-}
-
-# run for BRCA1/2 combined, BRCA1, BRCA2
-gene_results12 <- gene_counts$Gene %>%
-    lapply(run_gene_firth, term = "BRCA12_Case") %>%
-    bind_rows() %>%
-    mutate(
-        p_fdr        = p.adjust(p, method = "BH"),
-        p_bonferroni = p.adjust(p, method = "bonferroni"),
-        model        = "BRCA1/2"
-    )
-
-gene_results1 <- gene_counts$Gene %>%
-    lapply(run_gene_firth, term = "BRCA1_Case") %>%
-    bind_rows() %>%
-    mutate(
-        p_fdr        = p.adjust(p, method = "BH"),
-        p_bonferroni = p.adjust(p, method = "bonferroni"),
-        model        = "BRCA1"
-    )
-
-gene_results2 <- gene_counts$Gene %>%
-    lapply(run_gene_firth, term = "BRCA2_Case") %>%
-    bind_rows() %>%
-    mutate(
-        p_fdr        = p.adjust(p, method = "BH"),
-        p_bonferroni = p.adjust(p, method = "bonferroni"),
-        model        = "BRCA2"
-    )
-
-gene_results_all <- bind_rows(gene_results12, gene_results1, gene_results2) %>%
-    arrange(Gene)
-
-print(gene_results_all %>% arrange((gene_results_all$Gene)))
-write.csv(gene_results_all, file.path("ch", "data", "ch_gene_firth_results.csv"), row.names = FALSE)
-
-
-
-
