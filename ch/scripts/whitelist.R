@@ -1,252 +1,556 @@
+# ========================
+# Whitelist filtering
+# ========================
 library(here)
 setwd("/Users/jennyzli/Documents/Nathanson")
 source(here("R", "config.R"))
 
-library(data.table, quietly=T)
+# ========================
+# READ IN DATA
+# ========================
+all_ch <- read.csv(file.path("ch", "data", "ch_seq_vars.csv"), row.names = 1)
+# all_ch <- read.csv(file.path("ch", "data", "ch_all_vars.csv"), row.names = 1)
 
-gList<-fread(file.path("ch", "data", "whitelist_filter_20230531", "NEJM_2017_genes_01262020.txt"))
-whitelist.mis<-fread(file.path("ch", "data", "whitelist_filter_20230531", "CHIP_missense_vars_cv_04102022.txt"))
-whitelist.splice<-fread(file.path("ch", "data", "whitelist_filter_20230531", "CHIP_splice_vars_agb_01262020.txt"))
-whitelist.LoF<-fread(file.path("ch", "data", "whitelist_filter_20230531", "CHIP_nonsense_FS_vars_agb_01262020.txt"))
+dim(all_ch)
+# 29656
 
-args <- commandArgs(trailingOnly=TRUE)
-sample_id<-args[2]
-vars1<-fread(paste(sample_id, ".annovar_out.hg38_multianno.txt", sep = ""))
-vars<-transform(vars1, Sample=sample_id) # adds sample col
+gList<-fread(file.path("ch", "data", "whitelist_filter_20230531", "Full_CHIP_gene_list_20260324.txt"))
+whitelist.mis<-fread(file.path("ch", "data", "whitelist_filter_20230531", "CHIP_missense_vars_cv_20260324.txt"))
+whitelist.splice<-fread(file.path("ch", "data", "whitelist_filter_20230531", "CHIP_splice_vars_cv_20260324.txt"))
+whitelist.LoF<-fread(file.path("ch", "data", "whitelist_filter_20230531", "CHIP_nonsense_FS_vars_cv_20260324.txt"))
 
-# standardize the column names
-colnames=c("Chr","Start","End","Ref","Alt","Func.refGene","Gene.refGene","GeneDetail.refGene","ExonicFunc.refGene","AAChange.refGene")
-names(vars)[1:10]<-colnames
-rm(colnames)
+# ========================
+# MATCH TRANSCRIPTS
+# ========================
+all_ch <- all_ch %>% mutate(across(where(is.character), ~ URLdecode(.x)))
 
-# subset to genes of interest
-varsOI<-vars[Gene.refGene%in%gList$Gene,]
+all_ch <- all_ch %>% left_join(gList[, c("Gene", "Accession")], by = "Gene")
+all_ch <- all_ch %>%
+    dplyr::mutate(
+        MANE_Select_Str   = gsub("\\.\\d+$", "", MANE_SELECT),
+        Accession_Str     = gsub("\\.\\d+$", "", Accession),
+        correct_transcript     = (MANE_Select_Str == Accession_Str)
+    )
 
-# FILTER FUNCTIONAL VARIANTS
-varsOI.func<-varsOI[Gene.refGene%in%gList$Gene&
-                        (grepl("exonic",varsOI$Func.refGene,fixed=T)|
-                             grepl("splicing",varsOI$Func.refGene,fixed=T)),]
+table(all_ch$correct_transcript)
+# FALSE  TRUE
+# 5436 24220
 
-# MERGES IN CANONICAL TRANSCRIPT ACCESSION
-varsOI.func<-merge(varsOI.func,gList[,c("Gene", "Accession")],by.x="Gene.refGene", by.y="Gene")
+# examine transcript mismatch
+wrong_transcript <- all_ch %>% filter(!correct_transcript)
+table(wrong_transcript$Gene)
+# BCORL1  BRCC3  CSF1R   EZH2  GATA2  IKZF2  KDM6A  KMT2A   KRAS    NF1  RUNX1 SETDB1  SRSF2  STAG2   TP53
+# 307     33    387    178    211    152    179    774     93    604    277    593    139    863    646
 
+examine <- all_ch %>%
+    filter(!correct_transcript) %>%
+    distinct(Gene, MANE_SELECT, Accession) %>%
+    print()
+examine
+# Gene    MANE_SELECT    Accession
+# 1    TP53    NM_000546.6 NM_001126112
+# 2   GATA2    NM_032638.5 NM_001145661
+# 3    EZH2    NM_004456.5 NM_001203247
+# 4     NF1 NM_001042492.3    NM_000267
+# 5  SETDB1 NM_001366418.1 NM_001145415
+# 6   RUNX1    NM_001754.5 NM_001001890
+# 7   KMT2A NM_001197104.2    NM_005933
+# 8   IKZF2 NM_001387220.1    NM_016260
+# 9   CSF1R NM_001288705.3    NM_005211
+# 10  SRSF2 NM_001195427.2    NM_003016
+# 11  STAG2 NM_001042750.2    NM_006603
+# 12   KRAS    NM_004985.5    NM_033360
+# 13  KDM6A NM_001291415.2    NM_021140
+# 14 BCORL1 NM_001379451.1    NM_021946
+# 15  BRCC3 NM_001018055.3    NM_024332
 
-#Func.refGene # (exonic, splicing or some wierd merged combination)
-#GeneDetail.refGene # NM_017940:exon16:c.1380-2A>G
-#ExonicFunc.refGene #"nonsynonymous SNV"
-#AAChange.refGene #"ASXL1:NM_015338:exon11:c.G1718A:p.R573Q"
-#Accession          "NM_015338"
-### ONLY TAKES THE ANNOTATIONS THAT MATCH THE CANONICAL TRANSCRIPT
-extractTranscript<-function(GeneDetail,AAChange,Accession){
-    splice<-grep(Accession,strsplit(GeneDetail,",")[[1]], value=T, fixed=T)
-    nonsyn<-grep(Accession,strsplit(AAChange,",")[[1]], value=T, fixed=T)
-    if(length(splice)>0){return(splice)} else {
-        if(length(nonsyn)>0){return(nonsyn)} else{
-            return("nan")}
+write_xlsx(examine, file.path("ch", "data", "ch_gene_transcript_mismatches.xlsx"))
+
+# it seems their RefSeq isn't exactly our MANE...
+# we'll keep using MANE and manually examine mismatching transcripts
+
+# ========================
+# EXTRACT SPECIFIC FIELDS
+# ========================
+aa_3to1 <- c(
+    Ala = "A", Arg = "R", Asn = "N", Asp = "D", Cys = "C",
+    Gln = "Q", Glu = "E", Gly = "G", His = "H", Ile = "I",
+    Leu = "L", Lys = "K", Met = "M", Phe = "F", Pro = "P",
+    Ser = "S", Thr = "T", Trp = "W", Tyr = "Y", Val = "V",
+    fsTer = "fs*", Ter = "X"
+)
+
+# Extract protein change from HGVSp
+extractProteinChange <- function(hgvsp) {
+    if (is.na(hgvsp) || hgvsp == "" || hgvsp == ".") return(NA_character_)
+    prot_change <- gsub("^p\\.", "", hgvsp)
+    prot_change <- gsub("%3D", "=", prot_change)
+    return(prot_change)
+}
+
+# Replace each 3-letter code with its 1-letter equivalent
+convert_3to1 <- function(prot_change) {
+    if (is.na(prot_change) || prot_change == "" || prot_change == ".") return(NA_character_)
+
+    result <- prot_change
+    for (aa3 in names(aa_3to1)) {
+        result <- gsub(aa3, aa_3to1[[aa3]], result, fixed = TRUE)
+    }
+    return(result)
+}
+
+extract_exon_info <- function(exon_field) {
+    if (is.na(exon_field) || exon_field == "" || exon_field == ".") {
+        return(list(exon_num = NA_real_, exon_total = NA_real_))
+    }
+    parts <- strsplit(as.character(exon_field), "\\|")[[1]]
+    list(exon_num = as.numeric(parts[1]), exon_total = as.numeric(parts[2]))
+}
+
+all_ch$ProteinChange <- sapply(all_ch$HGVSp, extractProteinChange)
+all_ch$ProteinChange_1L <- sapply(all_ch$ProteinChange, convert_3to1)
+all_ch$Protein.position <- as.numeric(all_ch$Protein.position)
+all_ch$cDNA.position <- as.numeric(all_ch$cDNA.position)
+all_ch$CDS.position <- as.numeric(all_ch$CDS.position)
+
+all_ch <- all_ch %>%
+    mutate(
+        ExonNumber   = sapply(EXON, function(x) extract_exon_info(x)$exon_num),
+        ExonTotal    = sapply(EXON, function(x) extract_exon_info(x)$exon_total)
+    )
+
+write.csv(all_ch, file.path("ch", "data", "ch_seq_vars_proc.csv"),   row.names = FALSE)
+
+# ========================
+# INITIALIZE WHITELIST FLAGS
+# ========================
+all_ch <- all_ch %>%
+    dplyr::mutate(
+        whitelist    = FALSE,
+        wl.mis       = FALSE,
+        wl.lof       = FALSE,
+        wl.splice    = FALSE,
+        wl.exception = FALSE,
+        manualreview = FALSE
+    )
+
+# ========================
+# 1. MISSENSE
+# ========================
+vmis <- grepl("missense", all_ch$Variant.Consequence)
+correct_transcript <- all_ch$correct_transcript
+vmis_wl <- paste(all_ch$Gene, all_ch$ProteinChange_1L, sep = "_") %in%
+    paste(whitelist.mis$Gene, whitelist.mis$AAChange, sep = "_")
+
+all_ch$whitelist[vmis & vmis_wl & correct_transcript] <- TRUE
+all_ch$wl.mis[vmis & vmis_wl & correct_transcript] <- TRUE
+
+cat(sprintf("Missense variants in whitelist: %d\n", sum(vmis & vmis_wl)))
+# 87
+
+# ========================
+# 2. LOF / FRAMESHIFT
+# ========================
+vlof <- grepl("Ter|\\*|X|fs*", all_ch$ProteinChange_1L) |
+    grepl("stop_gain|stop_lost|start_lost", all_ch$Variant.Consequence) |
+    grepl("fs", all_ch$ProteinChange_1L, fixed = TRUE) |
+    grepl("frameshift", all_ch$Variant.Consequence)
+
+vLOFgene <- all_ch$Gene %in% whitelist.LoF$Gene
+
+all_ch$whitelist[vlof & vLOFgene] <- TRUE
+all_ch$wl.lof[vlof & vLOFgene] <- TRUE
+cat(sprintf("LoF/frameshift variants: %d\n", sum(vlof & vLOFgene, na.rm = TRUE)))
+# 517
+
+# ========================
+# 3. SPLICE
+# ========================
+vSpliceStringent <- grepl("splice", all_ch$Variant.Consequence) & (all_ch$Variant.LoF_level %in% c(1, 2))
+vSplicegene <- all_ch$Gene %in% whitelist.splice$Gene
+
+all_ch$whitelist[vSpliceStringent & vSplicegene] <- TRUE
+all_ch$wl.splice[vSpliceStringent & vSplicegene] <- TRUE
+
+cat(sprintf("Splice variants in whitelist: %d\n", sum(vSpliceStringent & vSplicegene)))
+# 237
+
+# ========================
+# GENE-SPECIFIC RULES
+# ========================
+vFS <- grepl("fs", all_ch$ProteinChange_1L, fixed = TRUE) | grepl("frameshift_variant", all_ch$Variant.Consequence)
+vexon12 <- all_ch$ExonNumber == 12
+vexon13 <- all_ch$ExonNumber == 13
+vexon5  <- all_ch$ExonNumber == 5
+vexon6  <- all_ch$ExonNumber == 6
+
+# ASXL1: frameshift/nonsense/splice in exon 12-13 NOT 11-12!!!
+asxl1Exception <- (all_ch$Gene == "ASXL1") & (vlof | vFS) & (vexon12 | vexon13)
+all_ch$whitelist[asxl1Exception]    <- TRUE
+all_ch$wl.lof[asxl1Exception]       <- TRUE
+all_ch$wl.exception[asxl1Exception] <- TRUE
+cat(sprintf("ASXL1 frameshift exceptions: %d\n", sum(asxl1Exception, na.rm = TRUE)))
+# 26
+
+asxl1ExceptionSplice <- (all_ch$Gene == "ASXL1") & vSpliceStringent & (vexon12 | vexon13)
+all_ch$whitelist[asxl1ExceptionSplice]    <- TRUE
+all_ch$wl.splice[asxl1ExceptionSplice]    <- TRUE
+all_ch$wl.exception[asxl1ExceptionSplice] <- TRUE
+cat(sprintf("ASXL1 splice exceptions: %d\n", sum(asxl1ExceptionSplice, na.rm = TRUE)))
+# 0
+
+# ASXL2: frameshift/nonsense/splice in in exon 12-13 NOT 11-12!!!
+asxl2Exception <- (all_ch$Gene == "ASXL2") & (vlof | vFS) & (vexon12 | vexon13)
+all_ch$whitelist[asxl2Exception]    <- TRUE
+all_ch$wl.lof[asxl2Exception]       <- TRUE
+all_ch$wl.exception[asxl2Exception] <- TRUE
+cat(sprintf("ASXL2 frameshift exceptions: %d\n", sum(asxl2Exception, na.rm = TRUE)))
+# 11
+
+asxl2ExceptionSplice <- (all_ch$Gene == "ASXL2") & vSpliceStringent & (vexon12 | vexon13)
+all_ch$whitelist[asxl2ExceptionSplice]    <- TRUE
+all_ch$wl.splice[asxl2ExceptionSplice]    <- TRUE
+all_ch$wl.exception[asxl2ExceptionSplice] <- TRUE
+cat(sprintf("ASXL2 exceptions: %d\n", sum(asxl2ExceptionSplice, na.rm = TRUE)))
+# 0
+
+# PPM1D: frameshift/nonsense in exon 5-6
+ppm1dException <- (all_ch$Gene == "PPM1D") & (vlof | vFS) & (vexon5 | vexon6)
+all_ch$whitelist[ppm1dException]    <- TRUE
+all_ch$wl.lof[ppm1dException]       <- TRUE
+all_ch$wl.exception[ppm1dException] <- TRUE
+cat(sprintf("PPM1D exceptions: %d\n", sum(ppm1dException, na.rm = TRUE)))
+# 3
+
+# TET2: missense in catalytic domains (p.1104-1481 and p.1843-2002)
+vmis <- grepl("missense", all_ch$Variant.Consequence)
+TETidx <- which(all_ch$Gene == "TET2" & vmis & !is.na(all_ch$Protein.position))
+for (i in TETidx) {
+    AApos <- all_ch$Protein.position[i]
+    if (!is.na(AApos) && ((AApos >= 1104 & AApos <= 1481) | (AApos >= 1843 & AApos <= 2002))) {
+        all_ch$whitelist[i]    <- TRUE
+        all_ch$wl.mis[i]       <- TRUE
+        all_ch$wl.exception[i] <- TRUE
     }
 }
+cat(sprintf("TET2 catalytic domain exceptions: %d\n", sum(all_ch$wl.exception & all_ch$Gene == "TET2")))
+# 44
 
-aa<-apply(varsOI.func[,c('GeneDetail.refGene', 'AAChange.refGene','Accession')],
-          1, function(x) {extractTranscript(x[1],x[2],x[3]) })
-aa2<-lapply(aa, `[[`, 1)
-varsOI.func$transcriptOI<-unlist(aa2)
-varsOI.func<-varsOI.func[varsOI.func$transcriptOI!="nan",]
-rm(aa,aa2)
-
-### EXTRACTS THE PROTEIN CHANGE FROM SELECTED ANNOTATIONS
-extractNonsyn<-function(transcriptOI){
-    protChange<-grep("p.",strsplit(transcriptOI,":")[[1]], value=T,fixed=T)
-    if(length(protChange)>0){return(gsub("p\\.","",protChange))} else {return("nan")}
-}
-
-bb<-apply(varsOI.func[,c('transcriptOI')],1, function(x) {extractNonsyn(x[1]) })
-bb2<-lapply(bb, `[[`, 1)
-varsOI.func$NonsynOI<-unlist(bb2)
-rm(bb,bb2)
-
-### MAKE FLAG COLS FOR EACH OF THE WHITELISTS
-#Annotate and filter
-varsOI.func<-transform(varsOI.func,whitelist=F,
-                       wl.mis=F,wl.lof=F,wl.splice=F,wl.exception=F,
-                       manualreview=F)
-#1) Handle missense vars - MISSENSE (NONSYNONYMOUS) AND IN WHITELIST
-vmis<-varsOI.func$ExonicFunc.refGene=="nonsynonymous SNV"
-vmis_wl<-paste(varsOI.func$Gene.refGene,varsOI.func$NonsynOI,sep="_")%in% paste(whitelist.mis$Gene,whitelist.mis$AAChange,sep="_")
-varsOI.func[vmis&vmis_wl,"whitelist"]=T
-varsOI.func[vmis&vmis_wl,"wl.mis"]=T
-
-#2) Handle LoF and frame shift vars
-vlof<-grepl("X|\\*",varsOI.func$NonsynOI) #stop gain or stop loss
-vFS<-grepl("fs",varsOI.func$NonsynOI, fixed=T) #frameshift
-vLOFgene<-varsOI.func$Gene.refGene%in%whitelist.LoF$Gene #genes are Lof Genes
-varsOI.func[(vlof|vFS)&vLOFgene,"whitelist"]=T
-varsOI.func[(vlof|vFS)&vLOFgene,"wl.lof"]=T
-
-#3) Handle Splice vars
-#possible splicing variant
-vSplice<-grepl("splicing",varsOI.func$Func.refGene, fixed=T)
-#genes are splice Genes
-vSplicegene<-varsOI.func$Gene.refGene%in%whitelist.splice$Gene
-#confirm that the splicing refers to the correct transcript
-vSpliceCorrectTranscript<-apply(varsOI.func[,c('GeneDetail.refGene','Accession')],
-                                1, function(x) {grepl(x[2],x[1],fixed=T)})
-varsOI.func[vSplice&vSplicegene&vSpliceCorrectTranscript,"whitelist"]=T
-varsOI.func[vSplicegene&vSplicegene&vSpliceCorrectTranscript,"wl.splice"]=T
-#If not the correct transcript, flag for manual review
-varsOI.func[(vSplice&vSplicegene) & (!vSpliceCorrectTranscript),"manualreview"]=T
-
-### GENE SPECIFIC RULES
-#LoF OR SPLICE VARIANTS RESTRICTED TO EXONS 11 AND 12
-#4) Handle the following exceptions
-#ASXL1	Frameshift/nonsense/splice-site in exon 11-12
-vlof<-grepl("X",varsOI.func$NonsynOI, fixed=T) #stop gain or stop loss
-vFS<-grepl("fs",varsOI.func$NonsynOI, fixed=T) #frameshift
-vexon11<-grepl("exon11",varsOI.func$transcriptOI, fixed=T)
-vexon12<-grepl("exon12",varsOI.func$transcriptOI, fixed=T)
-asxl1Exception<-(varsOI.func$Gene.refGene=="ASXL1")&(vlof|vFS)&(vexon11|vexon12)
-varsOI.func[asxl1Exception,"whitelist"]=T
-varsOI.func[asxl1Exception,"wl.lof"]=T
-varsOI.func[asxl1Exception,"wl.exception"]=T
-#Splicing
-vSplice<-grepl("splicing",varsOI.func$Func.refGene, fixed=T)
-vSpliceCorrectTranscript<-apply(varsOI.func[,c('GeneDetail.refGene','Accession')],
-                                1, function(x) {grepl(x[2],x[1],fixed=T)})
-vexon11splice<-grepl("exon11",varsOI.func$GeneDetail.refGene, fixed=T)
-vexon12splice<-grepl("exon12",varsOI.func$GeneDetail.refGene, fixed=T)
-asxl1ExceptionSplice<-(varsOI.func$Gene.refGene=="ASXL1")&
-    vSplice&vSpliceCorrectTranscript&
-    (vexon11splice|vexon12splice)
-varsOI.func[asxl1ExceptionSplice,"whitelist"]=T
-varsOI.func[asxl1ExceptionSplice,"wl.splice"]=T
-varsOI.func[asxl1ExceptionSplice,"wl.exception"]=T
-#ASXL2	Frameshift/nonsense/splice-site in exon 11-12
-#Lof
-asxl2Exception<-(varsOI.func$Gene.refGene=="ASXL2")&(vlof|vFS)&(vexon11|vexon12)
-varsOI.func[asxl2Exception,"whitelist"]=T
-varsOI.func[asxl2Exception,"wl.lof"]=T
-varsOI.func[asxl2Exception,"wl.exception"]=T
-#Splice
-asxl2ExceptionSplice<-(varsOI.func$Gene.refGene=="ASXL2")&
-    vSplice&vSpliceCorrectTranscript&
-    (vexon11splice|vexon12splice)
-varsOI.func[asxl2ExceptionSplice,"whitelist"]=T
-varsOI.func[asxl2ExceptionSplice,"wl.splice"]=T
-varsOI.func[asxl2ExceptionSplice,"wl.exception"]=T
-
-
-#PPM1D	Frameshift/nonsense in exon 5 or 6
-vlof<-grepl("X",varsOI.func$NonsynOI, fixed=T) #stop gain or stop loss
-vFS<-grepl("fs",varsOI.func$NonsynOI, fixed=T) #frameshift
-vexon5<-grepl("exon5",varsOI.func$transcriptOI, fixed=T)
-vexon6<-grepl("exon6",varsOI.func$transcriptOI, fixed=T)
-ppm1dException<-(varsOI.func$Gene.refGene=="PPM1D")&(vlof|vFS)&(vexon5|vexon6)
-varsOI.func[ppm1dException,"whitelist"]=T
-varsOI.func[ppm1dException,"wl.lof"]=T
-varsOI.func[ppm1dException,"wl.exception"]=T
-
-#TET2	missense mutations in catalytic domains (p.1104-1481 and 1843-2002)
-TETidx<-which(varsOI.func$Gene.refGene=="TET2"&
-                  varsOI.func$ExonicFunc.refGene=="nonsynonymous SNV"&
-                  nchar(varsOI.func$NonsynOI)==6)
-for(i in TETidx){
-    AApos<-as.numeric(substr(varsOI.func$NonsynOI[i],2,5))
-    if((AApos>=1104&AApos<=1481)|(AApos>=1843&AApos<=2002))
-    {
-        varsOI.func[i,"whitelist"]=T
-        varsOI.func[i,"wl.mis"]=T
-        varsOI.func[i,"wl.exception"]=T
+# CBL: RING finger missense p.381-421 - correct transcript
+CBLidx <- which(all_ch$Gene == "CBL" & vmis & !is.na(all_ch$Protein.position))
+for (i in CBLidx) {
+    AApos <- all_ch$Protein.position[i]
+    if (!is.na(AApos) && AApos >= 381 & AApos <= 421) {
+        all_ch$whitelist[i]    <- TRUE
+        all_ch$wl.mis[i]       <- TRUE
+        all_ch$wl.exception[i] <- TRUE
     }
 }
+cat(sprintf("CBL RING finger exceptions: %d\n", sum(all_ch$wl.exception & all_ch$Gene == "CBL")))
+# 1
 
-#CBL	RING finger missense p.381-421
-CBLidx<-which(varsOI.func$Gene.refGene=="CBL"&
-                  varsOI.func$ExonicFunc.refGene=="nonsynonymous SNV"&
-                  nchar(varsOI.func$NonsynOI)==5)
-for(i in CBLidx){
-    AApos<-as.numeric(substr(varsOI.func$NonsynOI[i],2,4))
-    if(AApos>=381&AApos<=421)
-    {
-        varsOI.func[i,"whitelist"]=T
-        varsOI.func[i,"wl.mis"]=T
-        varsOI.func[i,"wl.exception"]=T
+# CBLB: RING finger missense p.372-412 - correct transcript
+# View(all_ch %>% filter(Gene == "CBLB") %>% select(correct_transcript))
+CBLBidx <- which(all_ch$Gene == "CBLB" & vmis & !is.na(all_ch$Protein.position))
+for (i in CBLBidx) {
+    AApos <- all_ch$Protein.position[i]
+    if (!is.na(AApos) && AApos >= 372 & AApos <= 412) {
+        all_ch$whitelist[i]    <- TRUE
+        all_ch$wl.mis[i]       <- TRUE
+        all_ch$wl.exception[i] <- TRUE
     }
 }
+cat(sprintf("CBLB RING finger exceptions: %d\n", sum(all_ch$wl.exception & all_ch$Gene == "CBLB")))
+# 2
 
-#CBLB	RING finger missense p.372-412
-CBLBidx<-which(varsOI.func$Gene.refGene=="CBLB"&
-                   varsOI.func$ExonicFunc.refGene=="nonsynonymous SNV"&
-                   nchar(varsOI.func$NonsynOI)==5)
-for(i in CBLBidx){
-    AApos<-as.numeric(substr(varsOI.func$NonsynOI[i],2,4))
-    if(AApos>=372&AApos<=412)
-    {
-        varsOI.func[i,"whitelist"]=T
-        varsOI.func[i,"wl.mis"]=T
-        varsOI.func[i,"wl.exception"]=T
-    }
+gene_exception <- all_ch %>% filter(wl.exception == TRUE)
+table(gene_exception$correct_transcript)
+# 87 - these are all correct transcript
+
+# ========================
+# SUMMARIZE GENE-SPECIFIC EXCEPTIONS
+# ========================
+exception_summary <- all_ch %>%
+    filter(wl.exception) %>%
+    group_by(Gene) %>%
+    summarise(
+        n_lof    = sum(wl.lof,    na.rm = TRUE),
+        n_mis    = sum(wl.mis,    na.rm = TRUE),
+        n_splice = sum(wl.splice, na.rm = TRUE),
+        n_total  = n(),
+        .groups  = "drop"
+    ) %>%
+    arrange(desc(n_total))
+
+print(exception_summary)
+# Gene  n_lof n_mis n_splice n_total
+# <chr> <int> <int>    <int>   <int>
+#     1 TET2      0    44        0      44
+# 2 ASXL1    26     0        0      26
+# 3 ASXL2    11     0        0      11
+# 4 PPM1D     3     0        0       3
+# 5 CBLB      0     2        0       2
+# 6 CBL       0     1        0       1
+
+write.csv(exception_summary,
+          file.path("ch", "data", "ch_gene_exception_summary.csv"),
+          row.names = FALSE)
+
+exception_long <- exception_summary %>%
+    tidyr::pivot_longer(cols = c(n_lof, n_mis, n_splice),
+                        names_to  = "type",
+                        values_to = "count") %>%
+    mutate(
+        type = factor(type,
+                      levels = c("n_lof", "n_mis", "n_splice"),
+                      labels = c("LoF / frameshift", "Missense", "Splice")),
+        Gene = factor(Gene, levels = exception_summary$Gene)
+    )
+
+p_exceptions <- ggplot(exception_long, aes(x = Gene, y = count, fill = type)) +
+    geom_col(position = "stack", width = 0.65) +
+    scale_fill_manual(
+        values = c("LoF / frameshift" = "#1D9E75",
+                   "Missense"         = "#378ADD",
+                   "Splice"           = "#D85A30"),
+        name = NULL
+    ) +
+    scale_y_continuous(breaks = scales::pretty_breaks(n = 6),
+                       expand = expansion(mult = c(0, 0.1))) +
+    labs(title    = "Gene-specific whitelist exceptions",
+         subtitle = sprintf("Total: %d exceptions across %d genes",
+                            sum(exception_summary$n_total),
+                            nrow(exception_summary)),
+         x = NULL, y = "Exception count") +
+    theme_minimal(base_size = 11) +
+    theme(
+        plot.title       = element_text(face = "bold", hjust = 0.5),
+        plot.subtitle    = element_text(hjust = 0.5, size = 9, color = "grey40"),
+        legend.position  = "bottom",
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor   = element_blank()
+    )
+
+ggsave(file.path("ch", "figures", "qc_gene_exception_counts.pdf"),
+       p_exceptions, width = 7, height = 5)
+
+# ========================
+# MANUAL REVIEW
+# ========================
+vNonFrameshiftDel <- grepl("inframe_deletion",  all_ch$Variant.Consequence)
+vNonFrameshiftIns <- grepl("inframe_insertion", all_ch$Variant.Consequence)
+vFrameshiftIndel  <- grepl("frameshift_variant", all_ch$Variant.Consequence)
+
+# loss of function / splice
+all_ch$manualreview[(vlof | vFS | vSpliceStringent) & (all_ch$Gene == "GATA3")]                    <- TRUE
+all_ch$manualreview[(vlof | vFS | vSpliceStringent) & (all_ch$Gene == "CSF3R")]                    <- TRUE
+
+# non frameshift
+all_ch$manualreview[vNonFrameshiftDel       & (all_ch$Gene == "CREBBP")]                   <- TRUE
+all_ch$manualreview[vNonFrameshiftDel       & (all_ch$Gene == "DNMT3A")]                   <- TRUE
+all_ch$manualreview[vNonFrameshiftDel       & (all_ch$Gene == "EP300")]                    <- TRUE
+all_ch$manualreview[(vNonFrameshiftDel | vNonFrameshiftIns) & (all_ch$Gene == "FLT3")]    <- TRUE
+all_ch$manualreview[(vNonFrameshiftDel | vNonFrameshiftIns) & (all_ch$Gene == "JAK2")]    <- TRUE
+all_ch$manualreview[vNonFrameshiftDel       & (all_ch$Gene == "KDM6A")]                   <- TRUE
+all_ch$manualreview[(vNonFrameshiftDel | vNonFrameshiftIns) & (all_ch$Gene == "KIT")]     <- TRUE
+all_ch$manualreview[(vNonFrameshiftDel | vNonFrameshiftIns) & (all_ch$Gene == "MPL")]     <- TRUE
+
+# frameshifts
+all_ch$manualreview[vFrameshiftIndel& (all_ch$Gene == "NPM1")]                    <- TRUE
+
+# without correct transcript
+all_ch$manualreview[vmis & vmis_wl & !correct_transcript] <- TRUE
+
+cat(sprintf("Gene specific flagged for manual review: %d\n", sum(all_ch$manualreview, na.rm = TRUE)))
+# 122
+
+# filter down to any variant of interest
+all_ch2 <- all_ch %>% filter(whitelist | manualreview | wl.exception)
+
+# ========================
+# ASSIGN VARIANT CATEGORY
+# ========================
+vlof <- grepl("Ter|\\*|X|fs*", all_ch2$ProteinChange_1L) |
+    grepl("stop_gain|stop_lost|start_lost", all_ch2$Variant.Consequence) |
+    grepl("fs", all_ch2$ProteinChange_1L, fixed = TRUE) |
+    grepl("frameshift", all_ch2$Variant.Consequence)
+vmis <- grepl("missense", all_ch2$Variant.Consequence)
+vSplice <- grepl("splice", all_ch2$Variant.Consequence) & (all_ch2$Variant.LoF_level %in% c(1, 2))
+inframe <- grepl("inframe", all_ch2$Variant.Consequence)
+
+all_ch2 <- all_ch2 %>%
+    dplyr::mutate(
+        variant_category = dplyr::case_when(
+            vlof   ~ "lof",
+            vmis   ~ "missense",
+            vSplice ~ "splice",
+            inframe ~ "inframe",
+            TRUE    ~ NA_character_
+        )
+    )
+
+print(table(all_ch2$variant_category, useNA = "always"))
+# inframe      lof missense   splice     <NA>
+#     95      529      137      232        0
+
+# ========================
+# CREATE VARIANT ID
+# ========================
+trim_splice_hgvsc <- function(hgvsc) {
+    if (is.na(hgvsc) || hgvsc == "" || hgvsc == ".") return(NA_character_)
+    hgvsc_clean <- sub("^[A-Z]{2}_[0-9]+(?:\\.[0-9]+)?:", "", hgvsc)
+    sub("(c\\.\\d+)[+\\-].*", "\\1", hgvsc_clean)
 }
 
-#5) flag remaining exceptions for manual review
-
-vlof<-grepl("X|\\*",varsOI.func$NonsynOI, fixed=T) #stop gain or stop loss
-vFS<-grepl("fs",varsOI.func$NonsynOI, fixed=T) #frameshift
-vSplice<-grepl("splicing",varsOI.func$Func.refGene)
-
-#GATA3	Frameshift/nonsense/splice-site ZNF domain
-varsOI.func[(vlof|vFS|vSplice)&(varsOI.func$Gene.refGene=="GATA3"),"manualreview"]=T
-#CREBBP	S1680del
-varsOI.func[varsOI.func$ExonicFunc.refGene=="nonframeshift deletion" &
-                (varsOI.func$Gene.refGene=="CREBBP"),"manualreview"]=T
-#CSF3R	truncating c.741-791
-varsOI.func[(vlof|vFS|vSplice)&(varsOI.func$Gene.refGene=="CSF3R"),"manualreview"]=T
-#DNMT3A	F732del,	F752del
-varsOI.func[varsOI.func$ExonicFunc.refGene=="nonframeshift deletion" &
-                (varsOI.func$Gene.refGene=="DNMT3A"),"manualreview"]=T
-#EP300	VF1148_1149del
-varsOI.func[varsOI.func$ExonicFunc.refGene=="nonframeshift deletion" &
-                (varsOI.func$Gene.refGene=="EP300"),"manualreview"]=T
-#FLT3	FY590-591GD,	del835
-varsOI.func[(varsOI.func$ExonicFunc.refGene=="nonframeshift deletion"|
-                 varsOI.func$ExonicFunc.refGene=="nonframeshift insertion")
-            &(varsOI.func$Gene.refGene=="FLT3"),"manualreview"]=T
-#JAK2	del/ins537-539L, del/ins538-539L, del/ins540-543MK, del/ins540-544MK, del542-543, del543-544,	ins11546-547
-varsOI.func[(varsOI.func$ExonicFunc.refGene=="nonframeshift deletion"|
-                 varsOI.func$ExonicFunc.refGene=="nonframeshift insertion")
-            &(varsOI.func$Gene.refGene=="JAK2"),"manualreview"]=T
-#KDM6A	del419
-varsOI.func[(varsOI.func$ExonicFunc.refGene=="nonframeshift deletion")
-            &(varsOI.func$Gene.refGene=="KDM6A"),"manualreview"]=T
-#KIT	ins503,	del560,	del579,	del551-559
-varsOI.func[(varsOI.func$ExonicFunc.refGene=="nonframeshift deletion"|
-                 varsOI.func$ExonicFunc.refGene=="nonframeshift insertion")
-            &(varsOI.func$Gene.refGene=="KIT"),"manualreview"]=T
-#MPL	del513 W515-518KT
-varsOI.func[(varsOI.func$ExonicFunc.refGene=="nonframeshift deletion"|
-                 varsOI.func$ExonicFunc.refGene=="nonframeshift insertion")
-            &(varsOI.func$Gene.refGene=="MPL"),"manualreview"]=T
-#NPM1	Frameshift p.W288fs (insertion at c.859_860, 860_861, 862_863, 863_864)
-varsOI.func[(varsOI.func$ExonicFunc.refGene=="frameshift deletion"|
-                 varsOI.func$ExonicFunc.refGene=="frameshift insertion")
-            &(varsOI.func$Gene.refGene=="NPM1"),"manualreview"]=T
-
-# Removed length of protein code
-
-# Columns to be removed if they exist
-if ("aalen" %in% colnames(varsOI.func)) {
-    varsOI.func <- varsOI.func[,-c("aalen", "aapos", "aafirst10pctPeptide", "aalast10pctPeptide", "LOFfirst10pct", "LOFlast10pct")]
+clean_hgvsc <- function(hgvsc) {
+    if (is.na(hgvsc) || hgvsc == "" || hgvsc == ".") return(NA_character_)
+    sub("^[A-Z]{2}_[0-9]+(?:\\.[0-9]+)?:", "", hgvsc)
 }
 
-#"aalen", "aapos", "aafirst10pctPeptide", "aalast10pctPeptide", "LOFfirst10pct", "LOFlast10pct"
+all_ch2 <- all_ch2 %>%
+    dplyr::mutate(
+        HGVSp_clean = dplyr::case_when(
+            is.na(HGVSp) | HGVSp == "" | HGVSp == "." ~ NA_character_,
+            TRUE ~ sub("^[A-Z]{2}_[0-9]+(?:\\.[0-9]+)?:", "", HGVSp)
+        ),
+        exon_label = dplyr::case_when(
+            !is.na(ExonNumber) ~ paste0("exon", ExonNumber),
+            TRUE               ~ "exonUnk"
+        ),
+        variant_id = dplyr::case_when(
+            variant_category == "non_whitelist" ~ NA_character_,
+            variant_category == "splice" ~ paste(
+                Gene, MANE_Select_Str, exon_label,
+                sapply(HGVSc, trim_splice_hgvsc), sep = ":"
+            ),
+            TRUE ~ paste(
+                Gene, MANE_Select_Str, exon_label,
+                sapply(HGVSc, clean_hgvsc),
+                ifelse(!is.na(ProteinChange_1L), paste0("p.", ProteinChange_1L), ""),
+                sep = ":"
+            )
+        ),
+        variant_id = sub(":$", "", variant_id)
+    ) %>%
+    dplyr::select(-exon_label, -HGVSp_clean)
 
+# ========================
+# SAVE
+# ========================
+write_xlsx(all_ch2, file.path("ch", "data", "ch_seq_wl_vars.xlsx"))
 
+cat(sprintf("Final variants: %d\n", nrow(all_ch2)))
+# 993
+cat(sprintf("Final unique individuals: %d\n", length(unique(all_ch2$Sample.ID))))
+# 705
+cat(sprintf("Final unique genes: %d\n", length(unique(all_ch2$Gene))))
+# 57
 
-check_vars <- data.frame(Sample=sample_id,
-                         total_num_variants=length(varsOI.func$Sample),
-                         total_num_whitelist=length(varsOI.func[whitelist==T,]$Sample),
-                         total_num_manualreview=length(varsOI.func[manualreview==T,]$Sample))
+# ========================
+# MANUAL REVIEW...
+# ========================
+all_ch3 <- read_excel(file.path("ch", "data", "ch_seq_wl_vars.xlsx")) %>% filter(keep == 1)
+dim(all_ch3)
+# 891
 
-#write out files
-write.csv(check_vars,paste(sample_id, ".annovar.varsOI.varcount.csv", sep=""), row.names=FALSE)
-write.csv(varsOI.func,paste(sample_id, ".annovar.varsOI.allvariants.csv", sep=""), row.names=FALSE)
-write.csv(varsOI.func[whitelist==T,],paste(sample_id, ".annovar.varsOI.wl.csv", sep=""), row.names=FALSE)
-write.csv(varsOI.func[manualreview==T,],paste(sample_id, ".annovar.varsOI.manualreview.csv", sep=""), row.names=FALSE)
+# ========================
+# QC PLOTTING FUNCTION
+# ========================
+plot_batch_gene_freq <- function(df, label = "",
+                                 sample_col = "Sample.ID",
+                                 gene_col   = "Gene",
+                                 batch_col  = "Batch",
+                                 batch_labels = c("Freeze 2", "Freeze 3"),
+                                 out_dir    = file.path("ch", "figures")) {
+
+    # --- overlap summary ---
+    f2_vars <- df %>% filter(.data[[batch_col]] == 1) %>% pull(variant_id) %>% unique()
+    f3_vars <- df %>% filter(.data[[batch_col]] == 2) %>% pull(variant_id) %>% unique()
+    cat(sprintf("[%s] Variants only in F2: %d\n",  label, sum(!f2_vars %in% f3_vars)))
+    cat(sprintf("[%s] Variants only in F3: %d\n",  label, sum(!f3_vars %in% f2_vars)))
+    cat(sprintf("[%s] Variants in both:   %d\n\n", label, sum(f2_vars %in% f3_vars)))
+
+    # --- batch sizes ---
+    batch_sizes <- df %>%
+        group_by(.data[[batch_col]]) %>%
+        summarise(n_total = n_distinct(.data[[sample_col]]), .groups = "drop")
+
+    n_total_overall <- n_distinct(df[[sample_col]])
+    subtitle_str <- sprintf("%s n = %d  |  %s n = %d  |  Overall n = %d",
+                            batch_labels[1], batch_sizes$n_total[batch_sizes[[batch_col]] == 1],
+                            batch_labels[2], batch_sizes$n_total[batch_sizes[[batch_col]] == 2],
+                            n_total_overall)
+
+    # --- batch carrier freq ---
+    gene_freq <- df %>%
+        group_by(.data[[gene_col]], .data[[batch_col]]) %>%
+        summarise(n_carriers = n_distinct(.data[[sample_col]]), .groups = "drop") %>%
+        left_join(batch_sizes, by = batch_col) %>%
+        mutate(freq  = n_carriers / n_total,
+               Batch = factor(.data[[batch_col]], labels = batch_labels))
+
+    # --- overall carrier freq ---
+    gene_freq_overall <- df %>%
+        group_by(.data[[gene_col]]) %>%
+        summarise(n_carriers = n_distinct(.data[[sample_col]]),
+                  n_total    = n_total_overall,
+                  freq       = n_carriers / n_total_overall,
+                  Batch      = "Overall",
+                  .groups    = "drop")
+
+    # gene order by overall freq
+    gene_order <- gene_freq_overall %>%
+        arrange(desc(freq)) %>%
+        pull(.data[[gene_col]])
+
+    gene_freq <- bind_rows(gene_freq, gene_freq_overall) %>%
+        mutate(Gene  = factor(.data[[gene_col]], levels = gene_order),
+               Batch = factor(Batch, levels = c(batch_labels, "Overall")))
+
+    batch_colors <- c(RColorBrewer::brewer.pal(3, "Set2")[1:2], "grey30") %>%
+        setNames(c(batch_labels, "Overall"))
+
+    # --- dot plot (horizontal) ---
+    p_dot <- ggplot(gene_freq, aes(x = Gene, y = freq, color = Batch)) +
+        geom_line(aes(group = Gene), color = "grey80", linewidth = 0.4) +
+        geom_point(size = 2.5, alpha = 0.9) +
+        scale_color_manual(values = batch_colors, name = NULL) +
+        scale_y_continuous(labels = scales::percent_format(accuracy = 0.1),
+                           breaks = scales::pretty_breaks(n = 6),
+                           expand = expansion(mult = c(0.02, 0.1))) +
+        labs(title    = sprintf("Carrier frequency per gene by batch%s",
+                                if (label != "") sprintf(" - %s", label) else ""),
+             subtitle = subtitle_str,
+             x = NULL, y = "Carrier frequency") +
+        theme_minimal(base_size = 11) +
+        theme(plot.title       = element_text(face = "bold", hjust = 0.5),
+              plot.subtitle    = element_text(hjust = 0.5, size = 9, color = "grey40"),
+              axis.text.x      = element_text(angle = 45, hjust = 1, size = 8),
+              legend.position  = "bottom",
+              panel.grid.minor = element_blank(),
+              panel.grid.major.x = element_blank())
+
+    slug <- if (label != "") paste0("_", gsub("\\s+", "_", tolower(label))) else ""
+    ggsave(file.path(out_dir, sprintf("qc_carrier_freq_dot%s.pdf", slug)),
+           p_dot, width = 14, height = 6)
+
+    invisible(list(dot = p_dot, freq_table = gene_freq))
+}
+
+plot_batch_gene_freq(all_ch3, label = "post whitelist")
+
+cov <- read.csv(file.path("ch", "data", "pmbb_brca12_cov_df.csv"), row.names = 1)
+all_ids <- read.csv(file.path("ch", "data", "ch_psm_matched4_case_control_ids.csv"))$x
+cov <- cov %>% filter(person_id %in% all_ids)
+table(cov$Batch)
+# 1    2
+# 760 2244
+dim(cov)
+# 3004
+controls <- cov %>% filter(BRCA12_Case == 0)
+dim(controls)
+# 2327
+
+control_vars <- all_ch3 %>% filter(Sample.ID %in% controls$person_id)
+plot_batch_gene_freq(control_vars, label = "post whitelist controls")
+
