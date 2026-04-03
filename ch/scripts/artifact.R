@@ -1,5 +1,6 @@
 # ========================
-# Age association for artifacts
+# Artifact identification for
+# CHIP variants.
 # ========================
 library(here)
 setwd("/Users/jennyzli/Documents/Nathanson")
@@ -7,12 +8,10 @@ source(here("R", "config.R"))
 library(data.table, quietly = T)
 library(ggVennDiagram)
 library(UpSetR)
-library(ggrepel)
 
 # ========================
 # SET GLOBALS
 # ========================
-# GNOMAD_THRESHOLD  <- 0.005
 FREQ_THRESHOLD    <- 4
 CLUSTER_THRESHOLD <- 50
 MIN_AD_THRESHOLDS <- 3:8
@@ -163,9 +162,12 @@ germline_removed_vars <- all_ch %>% inner_join(germline_fail_vars, by = c("Sampl
 dim(germline_removed_vars)
 # 43
 
-### PLOT ###
-# colored by TET2 missense
+### PLOT VAF by AGE ###
+# TET2 missense
 tet2_vars <- germline_test_vars %>% filter(Gene == "TET2")
+
+labeled_variants <- tet2_vars %>% filter(flag_germline_ind) %>% pull(ProteinChange_1L) %>% unique() %>% sort()
+n_labeled <- length(labeled_variants)
 
 p <- ggplot(tet2_vars,
             aes(x = Sample_age, y = Sample.AltFrac,
@@ -184,12 +186,11 @@ p <- ggplot(tet2_vars,
         segment.size  = 0.3,
         show.legend   = FALSE
     ) +
-    scale_color_manual(
-        values = setNames(
-            colorRampPalette(c("#4B0082", "#C0392B", "#E67E22", "#F1C40F"))(n_distinct(tet2_vars$ProteinChange_1L)),
-            sort(unique(tet2_vars$ProteinChange_1L))
-        ),
-        name = "Protein change"
+    scale_color_viridis_d(
+        name   = "Protein change",
+        breaks = labeled_variants,
+        labels = labeled_variants,
+        option = "viridis"  # try: "viridis", "plasma", "inferno", "magma", "turbo"
     ) +
     scale_size_manual(
         values = c("TRUE" = 2, "FALSE" = 4),
@@ -211,88 +212,62 @@ p <- ggplot(tet2_vars,
     )
 
 ggsave(file.path("ch", "figures", "germline_vaf_age_tet2_missense.pdf"),
-       p, width = 9, height = 6)
+       p, width = 6, height = 5)
 
-# colored by type
-p <- ggplot(germline_test_vars,
-                 aes(x = Sample_age, y = Sample.AltFrac,
-                     color = variant_category,
-                     size  = !flag_germline_ind)) +
-    geom_point(alpha = 0.85) +
-    scale_size_manual(
-        values = c("TRUE" = 2, "FALSE" = 4),
-        labels = c("TRUE" = "p \u2265 0.05", "FALSE" = "p < 0.05"),
-        name   = "Binomial test"
-    ) +
-    scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
-    labs(x = "Baseline age", y = "Variant allele fraction (VAF %)") +
-    theme_minimal(base_size = 11) +
-    theme(
-        panel.grid.minor = element_blank(),
-        legend.position  = "right",
-        legend.title     = element_text(face = "bold", size = 9),
-        legend.text      = element_text(size = 9)
-    ) +
-    guides(
-        color = guide_legend(order = 2, override.aes = list(size = 3)),
-        size  = guide_legend(order = 1)
-    )
-ggsave(file.path("ch", "figures", "germline_vaf_age_category.pdf"), p, width = 9, height = 6)
-
-# colored by gene
-p <- ggplot(germline_test_vars,
-            aes(x = Sample_age, y = Sample.AltFrac,
-                color = Gene,
-                size  = !flag_germline_ind)) +
-    geom_point(alpha = 0.85) +
-    scale_size_manual(
-        values = c("TRUE" = 2, "FALSE" = 4),
-        labels = c("TRUE" = "p \u2265 0.05", "FALSE" = "p < 0.05"),
-        name   = "Binomial test"
-    ) +
-    scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
-    labs(x = "Baseline age", y = "Variant allele fraction (VAF %)") +
-    theme_minimal(base_size = 11) +
-    theme(
-        panel.grid.minor = element_blank(),
-        legend.position  = "right",
-        legend.title     = element_text(face = "bold", size = 9),
-        legend.text      = element_text(size = 9)
-    ) +
-    guides(
-        color = guide_legend(order = 2, override.aes = list(size = 3)),
-        size  = guide_legend(order = 1)
-    )
-ggsave(file.path("ch", "figures", "germline_vaf_age_gene.pdf"), p, width = 9, height = 6)
-
-# colored by MAX AF
-germline_test_vars$gnomAD.MAX_AF[germline_test_vars$gnomAD.MAX_AF == 0] <- NA
-p <- ggplot(germline_test_vars,
-            aes(x = Sample_age, y = Sample.AltFrac,
-                color = gnomAD.MAX_AF,
-                size  = !flag_germline_ind)) +
-    geom_point(alpha = 0.85) +
-    scale_color_gradient(low = "blue", high = "red", trans = "log10") +
-    scale_size_manual(
-        values = c("TRUE" = 2, "FALSE" = 4),
-        labels = c("TRUE" = "p \u2265 0.05", "FALSE" = "p < 0.05"),
-        name   = "Binomial test"
-    ) +
-    scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
-    labs(x = "Baseline age", y = "Variant allele fraction (VAF %)") +
-    theme_minimal(base_size = 11) +
-    theme(
-        panel.grid.minor = element_blank(),
-        legend.position  = "right",
-        legend.title     = element_text(face = "bold", size = 9),
-        legend.text      = element_text(size = 9)
-    ) +
-    guides(
-        color = guide_colorbar(order = 2),
-        size  = guide_legend(order = 1)
-    )
-
-ggsave(file.path("ch", "figures", "germline_vaf_age_gnomad.pdf"), p, width = 9, height = 6)
+# # colored by type
+# p <- ggplot(germline_test_vars,
+#                  aes(x = Sample_age, y = Sample.AltFrac,
+#                      color = variant_category,
+#                      size  = !flag_germline_ind)) +
+#     geom_point(alpha = 0.85) +
+#     scale_size_manual(
+#         values = c("TRUE" = 2, "FALSE" = 4),
+#         labels = c("TRUE" = "p \u2265 0.05", "FALSE" = "p < 0.05"),
+#         name   = "Binomial test"
+#     ) +
+#     scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+#     labs(x = "Baseline age", y = "Variant allele fraction (VAF %)") +
+#     theme_minimal(base_size = 11) +
+#     theme(
+#         panel.grid.minor = element_blank(),
+#         legend.position  = "right",
+#         legend.title     = element_text(face = "bold", size = 9),
+#         legend.text      = element_text(size = 9)
+#     ) +
+#     guides(
+#         color = guide_legend(order = 2, override.aes = list(size = 3)),
+#         size  = guide_legend(order = 1)
+#     )
+# ggsave(file.path("ch", "figures", "germline_vaf_age_category.pdf"), p, width = 6, height = 5)
+#
+# # colored by MAX AF
+# germline_test_vars$gnomAD.MAX_AF[germline_test_vars$gnomAD.MAX_AF == 0] <- NA
+# p <- ggplot(germline_test_vars,
+#             aes(x = Sample_age, y = Sample.AltFrac,
+#                 color = gnomAD.MAX_AF,
+#                 size  = !flag_germline_ind)) +
+#     geom_point(alpha = 0.85) +
+#     scale_color_gradient(low = "blue", high = "red", trans = "log10") +
+#     scale_size_manual(
+#         values = c("TRUE" = 2, "FALSE" = 4),
+#         labels = c("TRUE" = "p \u2265 0.05", "FALSE" = "p < 0.05"),
+#         name   = "Binomial test"
+#     ) +
+#     scale_y_continuous(labels = scales::percent_format(accuracy = 1)) +
+#     labs(x = "Baseline age", y = "Variant allele fraction (VAF %)") +
+#     theme_minimal(base_size = 11) +
+#     theme(
+#         panel.grid.minor = element_blank(),
+#         legend.position  = "right",
+#         legend.title     = element_text(face = "bold", size = 9),
+#         legend.text      = element_text(size = 9)
+#     ) +
+#     guides(
+#         color = guide_colorbar(order = 2),
+#         size  = guide_legend(order = 1)
+#     )
+#
+# ggsave(file.path("ch", "figures", "germline_vaf_age_gnomad.pdf"), p, width = 6, height = 5)
 
 # ========================
 # 4. CLUSTERS
@@ -412,15 +387,15 @@ print(table(all_ch2$n_flags))
 # 557 335   1
 
 # ========================
-# FLAGS UPSET PLOT
+# FLAGS - UPSET PLOT
 # =======================
-upset_flags <- c("flag_freeze_enriched", "flag_germline_ind", "flag_cluster")
+upset_flags <- c("flag_high_freq", "flag_freeze_enriched", "flag_germline_ind", "flag_cluster")
 
 flag_mat <- all_ch2 %>%
     select(all_of(upset_flags)) %>%
     mutate(across(everything(), as.integer))
 
-pdf(file.path("ch", "figures", "qc_flag_overlap_upset.pdf"), width = 10, height = 5)
+pdf(file.path("ch", "figures", "qc_flag_overlap_upset.pdf"), width = 5, height = 3)
 upset(
     as.data.frame(flag_mat),
     sets           = upset_flags,
@@ -532,11 +507,13 @@ write_xlsx(flag_summary, file.path("ch", "data", "ch_flags_summary.xlsx"))
 # MANUAL REVIEW AGAIN...
 # ========================
 all_ch4 <- read_excel(file.path("ch", "data", "ch_seq_wl_art_vars copy.xlsx")) %>% filter(keep == 1)
+
 dim(all_ch4)
-unique(all_ch4$Gene)
+# 477
+length(unique(all_ch4$Sample.ID))
+# 418
 
 write_xlsx(all_ch4, file.path("ch", "data", "ch_seq_wl_art_manual_vars.xlsx"))
-
 
 # ========================
 # CHIP VARIANT COUNT PER INDIVIDUAL

@@ -18,17 +18,22 @@ vars2 <- read.csv(file.path("ch", "data", "f2_ch.csv"))
 vars2$Batch <- 1
 vars3$Batch <- 2
 vars <- rbind(vars2, vars3)
-write.csv(vars, file.path("ch", "data", "ch_all_vars.csv"))
 
+cat("Variants:", nrow(vars), "\n")
+# 141424
 cat("Unique samples:", length(unique(vars$Sample.ID)), "\n")
 # 3003
 cat("Unique genes:",   length(unique(vars$Gene)), "\n")
 # 74
+cat("Variants per person:",  nrow(vars) / length(unique(vars$Sample.ID)), "\n")
+# 47.09...
 
+write.csv(vars, file.path("ch", "data", "ch_all_vars.csv"))
+
+# read in whitelist
+gList <- fread(file.path("ch", "data", "whitelist_filter_20230531", "Full_CHIP_gene_list_08262022.txt"))
 genes_found <- unique(vars$Gene)
 
-# reaad in whitelist
-gList <- fread(file.path("ch", "data", "whitelist_filter_20230531", "Full_CHIP_gene_list_08262022.txt"))
 cat("Genes in list not found:", paste(gList$Gene[!(gList$Gene %in% genes_found)], collapse = ", "), "\n")
 # SRCAP, ZBTB33, YLPM1 i don't think we need these?
 

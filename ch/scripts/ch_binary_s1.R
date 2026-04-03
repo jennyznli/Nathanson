@@ -33,21 +33,32 @@ library(writexl)
 # ============================================================
 # READ DATA
 # ============================================================
-m.out4   <- readRDS(file.path("ch", "data", "ch_psm_matched4.rds"))
-m.data   <- match.data(m.out4)   # includes 'weights' and 'subclass'
+cov <- read_excel(file.path("ch", "data", "pmbb_brca12_cov_chip_df.xlsx")) %>% filter(Sequenced_gender == "Female", Strata == 1)
+dim(cov)
+# 1924
 
-cov <- read_excel(file.path("ch", "data", "pmbb_brca12_cov_chip_df.xlsx")) %>%
+vars <- read_excel(file.path("ch", "data", "ch_seq_wl_art_minad4_vars.xlsx"))
+dim(vars)
+# 217
+
+m.out4   <- readRDS(file.path("ch", "data", "ch_psm_matched4.rds"))
+m.data   <- match.data(m.out4)
+
+# ============================================================
+# JOIN COVs
+# ============================================================
+cov <- cov %>%
     left_join(
         m.data %>% dplyr::select(person_id, distance, weights, subclass),
         by = "person_id"
     ) %>%
-    filter(!is.na(weights), Strata == 1)
+    filter(!is.na(weights), Strata == 1, Sequenced_gender == "Female")
 cat("Matched N:", nrow(cov), "\n")
-# 2605
+# 1924
 cat("Cases:", sum(cov$BRCA12_Case), "| Controls:", sum(cov$BRCA12_Case == 0), "\n")
-# 538, 2067
+# 405, 1519
 cat("CHIP positive:", sum(cov$CHIP_Binary), "\n")
-# 189
+# 149
 
 # ============================================================
 # FORMULA COMPONENTS
