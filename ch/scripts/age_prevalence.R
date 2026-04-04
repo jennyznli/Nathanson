@@ -1,126 +1,52 @@
-# ========================
-# PREVALENCE + AGE ANALYSIS
-# ========================
+# ============================================================
+# CHIP prevalence + age analysis
+# ============================================================
 library(here)
 setwd("/Users/jennyzli/Documents/Nathanson")
 source(here("R", "config.R"))
+library(binom)
 
-# ========================
-# READ IN DATA
-# ========================
-all_ids <- read.csv(file.path("ch", "data", "ch_psm_matched4_case_control_ids.csv"))$x
+OUT_DIR <- file.path("ch", "data")
+FIG_DIR <- file.path("ch", "figures")
+dir.create(FIG_DIR, showWarnings = FALSE)
 
-### CHIP variants
-vars <- read_excel(file.path("ch", "data", "ch_seq_wl_art_minad4_vars.xlsx"))
-dim(vars)
-length(unique(vars$Sample.ID))
+# ============================================================
+# READ DATA
+# ============================================================
+cov <- read_excel(file.path(OUT_DIR, "pmbb_brca12_cov_chip_df.xlsx"))
 
-### covariates
-cov_all <- read.csv(file.path("ch", "data", "pmbb_brca12_cov_df.csv"), row.names = 1) %>% filter(person_id %in% all_ids)
+vars <- read_excel(file.path(OUT_DIR, "ch_seq_wl_art_minad4_vars.xlsx"))
 
-cov_all <- cov_all %>%
+cov <- cov %>%
     mutate(
         CHIP_Binary = person_id %in% vars$Sample.ID,
         CHIP_Count  = sapply(person_id, function(id) sum(vars$Sample.ID == id))
     )
 
-# split into various sections..
-cov_f <- cov_all %>% filter(Sequenced_gender == "Female")
-cov_m <- cov_all %>% filter(Sequenced_gender == "Male")
-cov_s1 <- cov_all %>% filter(Strata == 1)
-cov_s1f <- cov_all %>% filter(Strata == 1, Sequenced_gender == "Female")
-cov_s1m <- cov_all %>% filter(Strata == 1, Sequenced_gender == "Male")
+cat("Overall cohort: N =", nrow(cov),
+    "| CHIP+ =", sum(cov$CHIP_Binary),
+    sprintf("(%.1f%%)\n", 100 * mean(cov$CHIP_Binary)))
+# Overall cohort: N = 3004 | CHIP+ = 193 (6.4%)
 
-# ========================
-# AGE DISTRIBUTION HISTOGRAM
-# ========================
-plot_age_hist <- function(df, title_str, fill_var = NULL, binwidth = 2) {
+# ============================================================
+# SHARED THEME
+# ============================================================
+theme_ch <- theme_minimal(base_size = 12) +
+    theme(
+        plot.title         = element_text(face = "bold", hjust = 0.5),
+        plot.subtitle      = element_text(hjust = 0.5, color = "grey40", size = 10),
+        panel.grid.minor   = element_blank(),
+        panel.grid.major.x = element_blank(),
+        legend.position    = "bottom"
+    )
 
-    if (!is.null(fill_var)) {
-        p <- ggplot(df, aes(x = Sample_age, fill = as.factor(.data[[fill_var]]))) +
-            geom_histogram(binwidth = binwidth, color = "white", linewidth = 0.3,
-                           alpha = 0.75, position = "identity") +
-            scale_fill_manual(
-                values = c("0" = "gray", "1" = "#C2185B",
-                           "Female" = "purple", "Male" = "orange"),
-                name = fill_var
-            )
-    } else {
-        p <- ggplot(df, aes(x = Sample_age)) +
-            geom_histogram(binwidth = binwidth, fill = "#546E7A",
-                           color = "white", linewidth = 0.3, alpha = 0.85)
-    }
-
-    p <- p +
-        geom_density(
-            data        = df,
-            mapping     = aes(x = Sample_age, y = after_stat(count) * binwidth),
-            color       = "darkgray",
-            linewidth   = 0.4,
-            inherit.aes = FALSE
-        ) +
-        scale_x_continuous(breaks = seq(20, 90, by = 10), limits = c(18, 92)) +
-        scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
-        labs(
-            title    = title_str,
-            subtitle = sprintf("N = %d | median age = %.1f | IQR = %.1f\u2013%.1f",
-                               nrow(df),
-                               median(df$Sample_age, na.rm = TRUE),
-                               quantile(df$Sample_age, 0.25, na.rm = TRUE),
-                               quantile(df$Sample_age, 0.75, na.rm = TRUE)),
-            x = "Age at Sample Collection (years)",
-            y = "Count"
-        ) +
-        theme_minimal(base_size = 12) +
-        theme(
-            plot.title         = element_text(face = "bold", hjust = 0.5),
-            plot.subtitle      = element_text(hjust = 0.5, color = "grey40", size = 10),
-            panel.grid.minor   = element_blank(),
-            panel.grid.major.x = element_blank(),
-            legend.position    = "bottom"
-        )
-
-    p
-}
-
-# --- Run and save ---
-datasets <- list(
-    list(df = cov_all,  tag = "all",  lab = "Full"),
-    list(df = cov_f,  tag = "female",  lab = "Full, Female"),
-    list(df = cov_m,  tag = "male",  lab = "Full, Male"),
-    list(df = cov_s1,  tag = "s1",  lab = "Strata 1"),
-    list(df = cov_s1f,  tag = "s1_female",  lab = "Strata 1, Female"),
-    list(df = cov_s1m,  tag = "s1_male",  lab = "Strata 1, Male")
-)
-
-for (d in datasets) {
-
-    # Overall
-    p <- plot_age_hist(d$df, paste("Age Distribution —", d$lab))
-    ggsave(file.path("ch", "figures", paste0("age_hist_", d$tag, ".pdf")),
-           p, width = 7, height = 4.5, dpi = 300)
-
-    # Stratified by carrier status
-    p_carrier <- plot_age_hist(d$df, paste("Age Distribution by Carrier Status —", d$lab),
-                               fill_var = "BRCA12_Case")
-    ggsave(file.path("ch", "figures", paste0("age_hist_by_carrier_", d$tag, ".pdf")),
-           p_carrier, width = 7, height = 4.5, dpi = 300)
-
-    # Stratified by sex
-    p_sex <- plot_age_hist(d$df, paste("Age Distribution by Sex —", d$lab),
-                           fill_var = "Sequenced_gender")
-    ggsave(file.path("ch", "figures", paste0("age_hist_by_sex_", d$tag, ".pdf")),
-           p_sex, width = 7, height = 4.5, dpi = 300)
-}
-
-
-# ========================
-# QUICK STATS
-# ========================
-sink(file.path("ch", "data", "ch_summary_stats.log"), split = TRUE)
+# ============================================================
+# QUICK SUMMARY STATS
+# ============================================================
+sink(file.path(OUT_DIR, "ch_overall_summary_stats.log"), split = TRUE)
 cat("Run date:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n")
+cat("N =", nrow(cov), "\n")
 
-# --- helper: simple count + % table for any variable ---
 basic_crosstab <- function(df, var) {
     tab  <- table(df[[var]], useNA = "ifany")
     prop <- prop.table(tab) * 100
@@ -155,154 +81,338 @@ chip_crosstab <- function(df, strat_var) {
     invisible(out)
 }
 
-for (tag in c("all", "s1", "s1f")) {
-    cov <- get(paste0("cov_", tag))
-    cat("\n", strrep("=", 40), "\n")
-    cat(" Dataset:", tag, "| N =", nrow(cov), "\n")
-    cat(strrep("=", 40), "\n")
-
-    # --- basic demographic counts ---
-    cat("\n--- Basic counts ---\n")
-    for (sv in c("Sequenced_gender", "Carrier", "Batch")) {
-        basic_crosstab(cov, sv)
-    }
-
-    # --- CHIP prevalence ---
-    cat("\nOverall CHIP prevalence:\n")
-    ov_n    <- table(cov$CHIP_Binary)
-    ov_prop <- prop.table(ov_n) * 100
-    cat(sprintf("  No CHIP : %d (%.1f%%)\n", ov_n["FALSE"], ov_prop["FALSE"]))
-    cat(sprintf("  CHIP    : %d (%.1f%%)\n", ov_n["TRUE"],  ov_prop["TRUE"]))
-
-    for (sv in c("BRCA12_Case", "Carrier", "Sequenced_gender", "Batch")) {
-        chip_crosstab(cov, sv)
-    }
+cat("\n--- Basic counts ---\n")
+for (sv in c("Sequenced_gender", "Carrier", "Batch")) {
+    basic_crosstab(cov, sv)
 }
+
+cat("\nOverall CHIP prevalence:\n")
+ov_n    <- table(cov$CHIP_Binary)
+ov_prop <- prop.table(ov_n) * 100
+cat(sprintf("  No CHIP : %d (%.1f%%)\n", ov_n["FALSE"], ov_prop["FALSE"]))
+cat(sprintf("  CHIP    : %d (%.1f%%)\n", ov_n["TRUE"],  ov_prop["TRUE"]))
+
+for (sv in c("BRCA12_Case", "Carrier", "Sequenced_gender", "Batch")) {
+    chip_crosstab(cov, sv)
+}
+
+cat("\nAge summary:\n")
+cat(sprintf("  Median (IQR): %.1f (%.1f-%.1f)\n",
+            median(cov$Sample_age, na.rm = TRUE),
+            quantile(cov$Sample_age, 0.25, na.rm = TRUE),
+            quantile(cov$Sample_age, 0.75, na.rm = TRUE)))
+
 sink()
 
-# ========================
-# HELPER: AGE-DECADE PREVALENCE PLOT
-# ========================
-plot_prev_by_decade <- function(df, title_str, strat_var = NULL, max_age = Inf,
-                                strat_colors = NULL) {
+# ============================================================
+# AGE DISTRIBUTION HISTOGRAM
+# ============================================================
+fig_age <- ggplot(cov, aes(x = Sample_age,
+                           fill = as.factor(BRCA12_Case))) +
+    geom_histogram(binwidth = 2, color = "white", linewidth = 0.3,
+                   alpha = 0.75, position = "identity") +
+    geom_density(mapping = aes(x = Sample_age, y = after_stat(count) * 2),
+                 color = "darkgray", linewidth = 0.4,
+                 inherit.aes = FALSE) +
+    scale_fill_manual(
+        values = c("0" = "darkgray", "1" = "#C2185B"),
+        labels = c("0" = "Non-carrier", "1" = "gBRCA1/2 Carrier"),
+        name   = NULL
+    ) +
+    scale_x_continuous(breaks = seq(20, 90, by = 10), limits = c(18, 92)) +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.05))) +
+    labs(
+        title    = "Age distribution at sample collection",
+        x = "Age at sample collection (years)",
+        y = "Count"
+    ) +
+    theme_ch
 
-    breaks <- if (is.finite(max_age)) c(-Inf, 30, 40, 50, 60, max_age)
-    else                    c(-Inf, 30, 40, 50, 60, 70, Inf)
-    labels <- if (is.finite(max_age)) c("≤30", "30-40", "40-50", "50-60", paste0("60-", max_age))
-    else                    c("≤30", "30-40", "40-50", "50-60", "60-70", "≥70")
+ggsave(file.path(FIG_DIR, "fig_age_hist.pdf"), fig_age, width = 5.5, height = 4.5)
 
-    # --- overall summary (always computed) ---
-    overall <- df %>%
-        mutate(age_group = cut(Sample_age, breaks = breaks, labels = labels, right = TRUE)) %>%
-        group_by(age_group) %>%
-        summarise(n_total  = n(),
-                  n_chip   = sum(CHIP_Binary),
-                  prev_pct = 100 * mean(CHIP_Binary),
-                  .groups  = "drop") %>%
-        mutate(x_num = as.numeric(age_group))
+# ============================================================
+# CHIP PREVALENCE BY AGE
+# ============================================================
+age_breaks <- c(-Inf, 30, 40, 50, 60, Inf)
+age_labels <- c("≤30", "30–40", "40–50", "50–60", "≥60")
 
-    p <- ggplot() +
-        scale_x_continuous(breaks = overall$x_num, labels = overall$age_group) +
-        scale_y_continuous(limits = c(0, NA), expand = expansion(mult = c(0, 0.1))) +
-        labs(title = title_str, x = "Age group (years)", y = "CHIP prevalence (%)") +
-        theme_minimal(base_size = 13) +
-        theme(panel.grid.minor   = element_blank(),
-              panel.grid.major.x = element_blank(),
-              plot.title         = element_text(face = "bold", hjust = 0.5),
-              legend.position    = "bottom")
+prev_overall <- cov %>%
+    mutate(age_group = cut(Sample_age, breaks = age_breaks,
+                           labels = age_labels, right = TRUE)) %>%
+    group_by(age_group) %>%
+    summarise(n_total  = n(),
+              n_chip   = sum(CHIP_Binary),
+              prev_pct = 100 * mean(CHIP_Binary),
+              .groups  = "drop") %>%
+    mutate(x_num = as.numeric(age_group))
 
-    # --- stratified layer (optional) ---
-    if (!is.null(strat_var)) {
-        strat <- df %>%
-            mutate(age_group = cut(Sample_age, breaks = breaks, labels = labels, right = TRUE),
-                   strat_fac = as.factor(.data[[strat_var]])) %>%
-            group_by(age_group, strat_fac) %>%
-            summarise(n_total  = n(),
-                      n_chip   = sum(CHIP_Binary),
-                      prev_pct = 100 * mean(CHIP_Binary),
-                      .groups  = "drop") %>%
-            mutate(x_num = as.numeric(age_group))
+fig_prev <- ggplot(prev_overall, aes(x = x_num, y = prev_pct)) +
+    geom_smooth(method = "loess", span = 1.2, se = FALSE,
+                color = "#546E7A", linewidth = 0.9) +
+    geom_point(size = 3, color = "#546E7A") +
+    scale_x_continuous(breaks = prev_overall$x_num,
+                       labels = prev_overall$age_group) +
+    scale_y_continuous(limits = c(0, NA),
+                       labels = function(x) paste0(x, "%"),
+                       expand = expansion(mult = c(0.02, 0.1))) +
+    labs(
+        title   = "CHIP prevalence by age decade",
+        x       = "Age group (years)",
+        y       = "CHIP prevalence (%)"
+    ) +
+    theme_ch +
+    theme(plot.caption = element_text(size = 8, color = "grey50", hjust = 0))
 
-        # default colors if not supplied
-        if (is.null(strat_colors)) {
-            n_levels     <- nlevels(strat$strat_fac)
-            strat_colors <- setNames(
-                scales::hue_pal()(n_levels),
-                levels(strat$strat_fac)
-            )
-        }
+ggsave(file.path(FIG_DIR, "fig_chip_prevalence_by_decade.pdf"),
+       fig_prev, width = 5, height = 4)
 
-        p <- p +
-            geom_smooth(data = strat,
-                        aes(x = x_num, y = prev_pct,
-                            color = strat_fac, group = strat_fac),
-                        method = "loess", se = FALSE, linewidth = 0.8, linetype = "solid") +
-            geom_point(data = strat,
-                       aes(x = x_num, y = prev_pct, color = strat_fac),
-                       size = 2.5) +
-            scale_color_manual(values = strat_colors, name = strat_var)
-    }
+# shared y-axis and x-axis scale for both figures
+scale_y_prev <- scale_y_continuous(
+    limits = c(0, NA),
+    labels = function(x) paste0(x, "%"),
+    expand = expansion(mult = c(0.02, 0.1))
+)
+scale_x_prev <- scale_x_continuous(
+    breaks = prev_overall$x_num,
+    labels = prev_overall$age_group
+)
 
-    # --- overall layer on top (always, in dark grey/black, labeled) ---
-    p <- p +
-        geom_smooth(data = overall,
-                    aes(x = x_num, y = prev_pct, group = 1),
-                    method = "loess", se = FALSE,
-                    color = "darkgray", linewidth = 0.8) +
-        geom_point(data = overall,
-                   aes(x = x_num, y = prev_pct),
-                   color = "darkgray", size = 3.5, shape = 18) +   # diamond shape distinguishes overall
-        annotate("text",
-                 x     = max(overall$x_num),
-                 y     = overall$prev_pct[which.max(overall$x_num)] + 1.5,
-                 label = "Overall",
-                 color = "darkgray", size = 3.5, hjust = 1, fontface = "italic")
+# ── Overall ──
+fig_prev_overall <- ggplot(prev_overall, aes(x = x_num, y = prev_pct)) +
+    geom_smooth(method = "loess", span = 1.2, se = FALSE,
+                color = "#546E7A", linewidth = 0.9) +
+    geom_point(size = 3, color = "#546E7A") +
+    scale_x_prev + scale_y_prev +
+    labs(title = "CHIP prevalence by age decade",
+         x = "Age group (years)", y = "CHIP prevalence (%)") +
+    theme_ch
 
-    p
-}
+ggsave(file.path(FIG_DIR, "fig_chip_prevalence_by_decade.pdf"),
+       fig_prev_overall, width = 5, height = 4)
 
-# ========================
-# CHIP PREVALENCE BY DECADE — ALL / NO-BRCA12 / BRCA12
-# ========================
-for (tag in c("all", "s1", "s1f")) {
-    cov     <- get(paste0("cov_", tag))
-    tag_lab <- if (tag == "all") "All" else "Strata 1"
-    sex_lab <- if (tag == "s1f") "Female" else "All sexes"
+# ── Stratified by carrier ──
+fig_prev_carrier <- ggplot() +
+    geom_smooth(data = prev_by_carrier,
+                aes(x = x_num, y = prev_pct, color = Carrier_label),
+                method = "loess", span = 1.2, se = FALSE, linewidth = 0.9) +
+    geom_point(data = prev_by_carrier,
+               aes(x = x_num, y = prev_pct, color = Carrier_label),
+               size = 3) +
+    geom_smooth(data = prev_overall,
+                aes(x = x_num, y = prev_pct, group = 1),
+                method = "loess", span = 1.2, se = FALSE,
+                color = "darkgray", linewidth = 0.8, linetype = "dashed") +
+    geom_point(data = prev_overall,
+               aes(x = x_num, y = prev_pct),
+               color = "darkgray", size = 3, shape = 18) +
+    scale_color_manual(
+        values = c("gBRCA1/2 Carrier" = "#C2185B", "Non-carrier" = "#546E7A"),
+        name = NULL
+    ) +
+    scale_x_prev + scale_y_prev +
+    labs(title = "CHIP prevalence by age decade",
+         x = "Age group (years)", y = "CHIP prevalence (%)") +
+    theme_ch +
+    theme(legend.position = "none")
 
-    # overall only
-    p <- plot_prev_by_decade(cov, sprintf("CHIP prevalence by decade (%s | %s)", tag_lab, sex_lab))
-    ggsave(file.path("ch", "figures", paste0("chip_prevalence_by_decade_", tag, ".pdf")),
-           p, width = 7, height = 5)
+ggsave(file.path(FIG_DIR, "fig_chip_prevalence_by_decade_carrier_nokey.pdf"),
+       fig_prev_carrier, width = 5, height = 4)
 
-    # stratified by carrier, with overall on top
-    p <- plot_prev_by_decade(
-        cov,
-        sprintf("CHIP prevalence by decade — carriers vs controls (%s | %s)", tag_lab, sex_lab),
-        strat_var    = "BRCA12_Case",
-        strat_colors = c("0" = "#546E7A", "1" = "#C2185B")
+fig_prev_carrier <- ggplot() +
+    geom_smooth(data = prev_by_carrier,
+                aes(x = x_num, y = prev_pct, color = Carrier_label),
+                method = "loess", span = 1.2, se = FALSE, linewidth = 0.9) +
+    geom_point(data = prev_by_carrier,
+               aes(x = x_num, y = prev_pct, color = Carrier_label),
+               size = 3) +
+    geom_smooth(data = prev_overall,
+                aes(x = x_num, y = prev_pct, group = 1),
+                method = "loess", span = 1.2, se = FALSE,
+                color = "darkgray", linewidth = 0.8, linetype = "dashed") +
+    geom_point(data = prev_overall,
+               aes(x = x_num, y = prev_pct),
+               color = "darkgray", size = 3, shape = 18) +
+    scale_color_manual(
+        values = c("gBRCA1/2 Carrier" = "#C2185B", "Non-carrier" = "#546E7A"),
+        name = NULL
+    ) +
+    scale_x_prev + scale_y_prev +
+    labs(title = "CHIP prevalence by age decade",
+         x = "Age group (years)", y = "CHIP prevalence (%)") +
+    theme_ch
+
+ggsave(file.path(FIG_DIR, "fig_chip_prevalence_by_decade_carrier.pdf"),
+       fig_prev_carrier, width = 5, height = 4)
+
+
+# ============================================================
+# GENE FREQUENCY ANALYSIS
+# ============================================================
+vars_cov <- vars %>%
+    left_join(
+        cov %>% dplyr::select(person_id, BRCA12_Case, BRCA1_Case,
+                              BRCA2_Case, Carrier, Sample_age,
+                              Batch, Smoke_History, starts_with("PC")),
+        by = c("Sample.ID" = "person_id")
+    ) %>%
+    filter(!is.na(BRCA12_Case))
+
+gene_person <- vars_cov %>%
+    dplyr::select(Sample.ID, Gene, BRCA12_Case) %>%
+    distinct()
+
+n_carrier_total    <- sum(cov$BRCA12_Case == 1)
+n_noncarrier_total <- sum(cov$BRCA12_Case == 0)
+
+gene_freq <- gene_person %>%
+    group_by(Gene, BRCA12_Case) %>%
+    summarise(n_mutated = n(), .groups = "drop") %>%
+    pivot_wider(names_from  = BRCA12_Case,
+                values_from = n_mutated,
+                values_fill = 0,
+                names_prefix = "n_") %>%
+    rename(n_noncarrier = n_0, n_carrier = n_1) %>%
+    mutate(
+        pct_noncarrier = n_noncarrier / n_noncarrier_total * 100,
+        pct_carrier    = n_carrier    / n_carrier_total    * 100,
+        n_total        = n_carrier + n_noncarrier
+    ) %>%
+    arrange(desc(n_total))
+
+dim(gene_freq)
+# 46 6
+cat("\nGene frequency table (top 15):\n")
+print(head(gene_freq, 15))
+
+# ============================================================
+# FISHER'S EXACT TEST PER GENE
+# ============================================================
+gene_fisher <- gene_freq %>%
+    rowwise() %>%
+    mutate(
+        fisher_p = fisher.test(matrix(
+            c(n_carrier,
+              n_carrier_total    - n_carrier,
+              n_noncarrier,
+              n_noncarrier_total - n_noncarrier),
+            nrow = 2
+        ))$p.value,
+        OR_crude = (n_carrier / (n_carrier_total - n_carrier)) /
+            (n_noncarrier / (n_noncarrier_total - n_noncarrier))
+    ) %>%
+    ungroup() %>%
+    arrange(fisher_p)
+
+# Separate reportable genes BEFORE computing FDR
+gene_fisher_reportable <- gene_fisher %>%
+    filter(is.finite(OR_crude), n_noncarrier >= 1) %>%
+    mutate(fdr = p.adjust(fisher_p, method = "BH"))
+
+# Keep full table with FDR for saving, but compute separately
+gene_fisher <- gene_fisher %>%
+    mutate(fdr = p.adjust(fisher_p, method = "BH"))
+
+cat("\nFisher results (top 10):\n")
+print(head(gene_fisher_reportable %>% dplyr::select(Gene, n_carrier, n_noncarrier,
+                                                    pct_carrier, pct_noncarrier,
+                                                    OR_crude, fisher_p, fdr), 10))
+
+# ============================================================
+# GENE PREVALENCE PLOT - STRATIFIED
+# ============================================================
+# shared y scale for both gene figures
+scale_y_gene <- scale_y_continuous(
+    labels = function(x) paste0(x, "%"),
+    expand = expansion(mult = c(0, 0.1))
+)
+
+# shared theme additions for both
+theme_gene <- list(
+    theme_ch,
+    theme(
+        axis.text.x        = element_text(angle = 45, hjust = 1),
+        panel.grid.major.x = element_blank(),
+        panel.grid.major.y = element_line(color = "grey92", linewidth = 0.3)
     )
-    ggsave(file.path("ch", "figures", paste0("chip_prevalence_by_decade_by_case_", tag, ".pdf")),
-           p, width = 7, height = 5)
+)
 
-    # stratified by sex — skip for s1f since it's already female-only
-    if (tag != "s1f") {
-        p <- plot_prev_by_decade(
-            cov,
-            sprintf("CHIP prevalence by decade — by sex (%s | %s)", tag_lab, sex_lab),
-            strat_var    = "Sequenced_gender",
-            strat_colors = c("Female" = "#7B2D8B", "Male" = "#0277BD")
-        )
-        ggsave(file.path("ch", "figures", paste0("chip_prevalence_by_decade_by_sex_", tag, ".pdf")),
-               p, width = 7, height = 5)
-    }
-
-    # stratified by batch, with overall on top
-    p <- plot_prev_by_decade(
-        cov,
-        sprintf("CHIP prevalence by decade — by batch (%s | %s)", tag_lab, sex_lab),
-        strat_var = "Batch"
+# ── Overall ──
+bar_data_overall <- gene_freq %>%
+    filter(Gene %in% top_genes) %>%
+    mutate(
+        pct_total = n_total / (n_carrier_total + n_noncarrier_total) * 100,
+        Gene      = factor(Gene, levels = top_genes)
     )
-    ggsave(file.path("ch", "figures", paste0("chip_prevalence_by_decade_by_batch_", tag, ".pdf")),
-           p, width = 7, height = 5)
-}
+
+fig_gene_overall <- ggplot(bar_data_overall, aes(x = Gene, y = pct_total)) +
+    geom_col(fill = "#546E7A", width = 0.7, alpha = 0.9) +
+    scale_y_gene +
+    labs(title = "CHIP gene prevalence",
+         x = NULL, y = "Prevalence (%)") +
+    theme_gene
+
+ggsave(file.path(FIG_DIR, "fig_gene_prevalence_bar.pdf"),
+       fig_gene_overall, width = 6, height = 5)
+
+# ── Stratified ──
+bar_data_strat <- gene_freq %>%
+    filter(Gene %in% top_genes) %>%
+    pivot_longer(cols = c(pct_carrier, pct_noncarrier),
+                 names_to  = "group",
+                 values_to = "pct") %>%
+    mutate(
+        group = recode(group,
+                       pct_carrier    = "gBRCA1/2 Carrier",
+                       pct_noncarrier = "Non-carrier"),
+        Gene  = factor(Gene, levels = top_genes)
+    )
+
+fig_gene_strat <- ggplot(bar_data_strat,
+                         aes(x = Gene, y = pct, fill = group)) +
+    geom_col(position = "dodge", width = 0.7, alpha = 0.9) +
+    scale_fill_manual(
+        values = c("gBRCA1/2 Carrier" = "#C2185B",
+                   "Non-carrier"       = "#546E7A"),
+        name = NULL
+    ) +
+    scale_y_gene +
+    labs(title = "CHIP gene prevalence by carrier status",
+         x = NULL, y = "Prevalence (%)") +
+    theme_gene +
+    theme(legend.position = "bottom") +
+    theme(legend.position = "none")
+
+ggsave(file.path(FIG_DIR, "fig_gene_prevalence_bar_stratified_noleg.pdf"),
+       fig_gene_strat, width = 6, height = 5)
+
+
+bar_data_strat <- gene_freq %>%
+    filter(Gene %in% top_genes) %>%
+    pivot_longer(cols = c(pct_carrier, pct_noncarrier),
+                 names_to  = "group",
+                 values_to = "pct") %>%
+    mutate(
+        group = recode(group,
+                       pct_carrier    = "gBRCA1/2 Carrier",
+                       pct_noncarrier = "Non-carrier"),
+        Gene  = factor(Gene, levels = top_genes)
+    )
+
+fig_gene_strat <- ggplot(bar_data_strat,
+                         aes(x = Gene, y = pct, fill = group)) +
+    geom_col(position = "dodge", width = 0.7, alpha = 0.9) +
+    scale_fill_manual(
+        values = c("gBRCA1/2 Carrier" = "#C2185B",
+                   "Non-carrier"       = "#546E7A"),
+        name = NULL
+    ) +
+    scale_y_gene +
+    labs(title = "CHIP gene prevalence by carrier status",
+         x = NULL, y = "Prevalence (%)") +
+    theme_gene +
+    theme(legend.position = "bottom")
+
+ggsave(file.path(FIG_DIR, "fig_gene_prevalence_bar_stratified.pdf"),
+       fig_gene_strat, width = 6, height = 5)
+
 

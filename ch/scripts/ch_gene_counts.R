@@ -103,17 +103,10 @@ print(head(gene_fisher_reportable %>% dplyr::select(Gene, n_carrier, n_noncarrie
                                                     pct_carrier, pct_noncarrier,
                                                     OR_crude, fisher_p, fdr), 10))
 
-
 # ============================================================
 # FIGURES
 # ============================================================
-
-top_genes <- gene_freq %>%
-    slice_max(order_by = n_total, n = 15, with_ties = FALSE) %>%
-    arrange(desc(n_total)) %>%
-    pull(Gene)
-
-bar_data <- gene_freq %>%
+dot_data <- gene_freq %>%
     filter(Gene %in% top_genes) %>%
     pivot_longer(cols = c(pct_carrier, pct_noncarrier),
                  names_to  = "group",
@@ -122,22 +115,67 @@ bar_data <- gene_freq %>%
         group = recode(group,
                        pct_carrier    = "gBRCA1/2 Carrier",
                        pct_noncarrier = "Non-carrier"),
-        Gene  = factor(Gene, levels = rev(top_genes))
+        Gene  = factor(Gene, levels = top_genes)  # highest total on left
     )
 
-fig1 <- ggplot(bar_data, aes(x = Gene, y = pct, fill = group)) +
-    geom_col(position = "dodge", width = 0.7, alpha = 0.9) +
-    coord_flip() +
-    scale_fill_manual(values = c("gBRCA1/2 Carrier" = "#4C72B0",
-                                 "Non-carrier"       = "#9FC4E7")) +
+# add overall prevalence per gene as a third layer
+dot_overall <- gene_freq %>%
+    filter(Gene %in% top_genes) %>%
+    mutate(
+        pct   = (n_carrier + n_noncarrier) /
+            (n_carrier_total + n_noncarrier_total) * 100,
+        group = "Overall",
+        Gene  = factor(Gene, levels = top_genes)
+    )
+
+fig1 <- ggplot() +
+    # vertical reference lines per gene
+    geom_vline(data = dot_data %>% filter(group == "gBRCA1/2 Carrier"),
+               aes(xintercept = as.numeric(Gene)),
+               color = "grey88", linewidth = 0.4) +
+    # group dots
+    geom_point(data = dot_data,
+               aes(x = Gene, y = pct, color = group, shape = group),
+               size = 3, alpha = 0.9) +
+    # overall dot on top
+    geom_point(data = dot_overall,
+               aes(x = Gene, y = pct, color = group, shape = group),
+               size = 3, alpha = 0.9) +
+    scale_color_manual(
+        values = c("gBRCA1/2 Carrier" = "#C2185B",
+                   "Non-carrier"       = "#546E7A",
+                   "Overall"           = "black"),
+        name = NULL
+    ) +
+    scale_shape_manual(
+        values = c("gBRCA1/2 Carrier" = 16,
+                   "Non-carrier"       = 16,
+                   "Overall"           = 18),  # diamond for overall, matches QC fig
+        name = NULL
+    ) +
+    scale_y_continuous(
+        labels = function(x) paste0(x, "%"),
+        limits = c(0, NA),
+        expand = expansion(mult = c(0.02, 0.1))
+    ) +
     labs(
         title    = "CHIP gene prevalence by carrier status",
-        subtitle = "Top 15 genes by total mutation count",
+        subtitle = sprintf("gBRCA1/2 Carrier n = %d | Non-carrier n = %d | Overall n = %d",
+                           n_carrier_total, n_noncarrier_total,
+                           n_carrier_total + n_noncarrier_total),
         x        = NULL,
-        y        = "Prevalence (%)",
-        fill     = NULL
+        y        = "Carrier frequency"
     ) +
-    theme_ch
+    theme_ch +
+    theme(
+        axis.text.x      = element_text(angle = 45, hjust = 1, size = 10),
+        panel.grid.major.y = element_line(color = "grey92", linewidth = 0.3),
+        panel.grid.major.x = element_blank(),
+        legend.position  = "bottom"
+    )
 
-ggsave(file.path(FIG_DIR, "fig_gene_prevalence_bar.pdf"), fig1, width = 7, height = 6)
-
+ggsave(file.path(FIG_DIR, "fig_gene_prevalence_dot.pdf"),
+       fig1, width = 8, height = 5)
+ggsave(file.path(FIG_DIR, "fig_gene_prevalence_dot.png"),
+       fig1, width = 8, height = 5, dpi = 300)
+cat("Saved: fig_gene_prevalence_dot\n")
