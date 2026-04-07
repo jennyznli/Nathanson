@@ -83,7 +83,7 @@ extract_or_robust <- function(fit, term, data) {
 }
 
 # ============================================================
-# M1: WEIGHTED QUASI-BINOMIAL — LINEAR AGE (primary model)
+# M1: WEIGHTED QUASI-BINOMIAL — LINEAR AGE
 # ============================================================
 fit_m1_12 <- glm(as.formula(paste("CHIP_Binary ~ BRCA12_Case +", base_covs_linear)),
                  data = cov, weights = weights, family = quasibinomial())
@@ -241,4 +241,56 @@ saveRDS(list(
     m4_int     = list(b12 = fit_int_12, b1 = fit_int_1, b2 = fit_int_2),
     data = cov
 ), file.path("ch", "data", "ch_binary_model_fits.rds"))
+
+# ============================================================
+# FOREST PLOT
+# ============================================================
+# ── Data: pull directly from primary model results ──
+forest_df <- results_binary %>%
+    filter(spec == "M2_conditional") %>%
+    mutate(
+        label = factor(model, levels = rev(c("BRCA1/2", "BRCA1", "BRCA2"))),
+        p_fmt = case_when(
+            p < 0.001 ~ "p<0.001",
+            TRUE      ~ sprintf("p=%.3f", p)
+        ),
+        annotation = sprintf("%.2f (%.2f, %.2f), %s", OR, CI_lo, CI_hi, p_fmt)
+    )
+
+x_max    <-  4     # right edge of the plot panel
+x_label  <- 5     # where the annotation text starts (in log10 space, beyond x_max)
+
+fig_forest <- ggplot(forest_df,
+                     aes(x = OR, y = label, xmin = CI_lo, xmax = CI_hi)) +
+    geom_vline(xintercept = 1, linetype = "dashed",
+               color = "grey50", linewidth = 0.5) +
+    geom_errorbarh(height = 0.15, linewidth = 0.7, color = "#2C3E50") +
+    geom_point(size = 3.5, color = "#C2185B") +
+    # annotation text sitting outside the panel to the right
+    geom_text(aes(x = x_label, label = annotation),
+              hjust = 0, size = 3.3, color = "grey30") +
+    scale_x_log10(
+        breaks = c(0.5, 1, 2, 4),
+        labels = c("0.5", "1", "2", "4"),
+        limits = c(0.4, x_label)          # extend limit to make room
+    ) +
+    coord_cartesian(clip = "off") +        # allow text to render beyond panel edge
+    labs(
+        title = "Association between germline BRCA1/2 status and CHIP",
+        x     = "Log odds ratio",
+        y     = NULL
+    ) +
+    theme_minimal(base_size = 12) +
+    theme(
+        plot.title         = element_text(face = "bold", hjust = 0.5, size = 12),
+        plot.margin        = margin(5, 160, 5, 5),   # right margin room for labels
+        panel.grid.minor   = element_blank(),
+        panel.grid.major.y = element_blank(),
+        panel.grid.major.x = element_line(color = "grey92", linewidth = 0.3),
+        axis.text.y        = element_text(size = 11, face = "bold"),
+        axis.text.x        = element_text(size = 10)
+    )
+
+ggsave(file.path(FIG_DIR, "fig_association_forest.pdf"), fig_forest, width = 8, height = 1.75)
+
 
