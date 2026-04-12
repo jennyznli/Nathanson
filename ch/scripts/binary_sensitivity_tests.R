@@ -43,6 +43,8 @@ cov_base <- cov_base %>%
         CHIP_Count  = sapply(person_id, function(id) sum(vars$Sample.ID == id))
     )
 
+write_xlsx(cov_base, file.path("ch", "data", "chip_cov_minad4.xlsx"))
+
 # ============================================================
 # RUN LOOPS
 # ============================================================
@@ -148,7 +150,6 @@ ggsave(
 # ============================================================
 # FREEZE 2.0 vs. 3.0
 # ============================================================
-# Female-only cohort — filter and drop Sequenced_gender
 cov_b1 <- cov_all_s12 %>% filter(Batch == "1")
 cov_b2 <- cov_all_s12 %>% filter(Batch == "2")
 dim(cov_b1)
@@ -161,13 +162,13 @@ run_three_genes <- function(data, include_sex) {
 
     fits <- list(
         list(formula = paste("CHIP_Binary ~ BRCA12_Case + Sample_age + I(Sample_age^2)", sex_cov,
-                             "+ PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + Smoke_History + Batch"),
+                             "+ PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + Smoke_History"),
              case_col = "BRCA12_Case", label = "BRCA1/2"),
         list(formula = paste("CHIP_Binary ~ BRCA1_Case + Sample_age + I(Sample_age^2)", sex_cov,
-                             "+ PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + Smoke_History + Batch"),
+                             "+ PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + Smoke_History"),
              case_col = "BRCA1_Case",  label = "BRCA1"),
         list(formula = paste("CHIP_Binary ~ BRCA2_Case + Sample_age + I(Sample_age^2)", sex_cov,
-                             "+ PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + Smoke_History + Batch"),
+                             "+ PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + Smoke_History"),
              case_col = "BRCA2_Case",  label = "BRCA2")
     )
 
@@ -187,20 +188,21 @@ run_three_genes <- function(data, include_sex) {
 # Run both cohorts
 final_df <- bind_rows(
     run_three_genes(cov_b1, include_sex = TRUE) %>% mutate(cohort = "Freeze 2.0"),
-    run_three_genes(cov_b2,  include_sex = FALSE) %>% mutate(cohort = "Freeze 3.0")
+    run_three_genes(cov_b2,  include_sex = FALSE) %>% mutate(cohort = "Freeze 3.0"),
+    run_three_genes(cov_all_s12,  include_sex = FALSE) %>% mutate(cohort = "All")
 ) %>%
     mutate(
         model      = factor(model, levels = c("BRCA1/2", "BRCA1", "BRCA2")),
-        cohort     = factor(cohort, levels = c("Freeze 2.0", "Freeze 3.0")),
+        cohort     = factor(cohort, levels = c("Freeze 2.0", "Freeze 3.0", "All")),
         p_fmt      = ifelse(p < 0.001, "p<0.001", sprintf("p=%.3f", p)),
         annotation = sprintf("%.2f (%.2f, %.2f), %s", OR, CI_lo, CI_hi, p_fmt),
         # y axis: gene + cohort for each row
         label      = factor(
             paste0(model, " (", cohort, ")"),
             levels = rev(paste0(
-                rep(c("BRCA1/2", "BRCA1", "BRCA2"), each = 2),
+                rep(c("BRCA1/2", "BRCA1", "BRCA2"), each = 3),
                 " (",
-                rep(c("Freeze 2.0", "Freeze 3.0"), 3),
+                rep(c("Freeze 2.0", "Freeze 3.0", "All"), 3),
                 ")"
             ))
         )
@@ -215,8 +217,123 @@ fig_freeze <- ggplot(final_df,
     geom_point(size = 4) +
     geom_text(aes(x = 6, label = annotation),
               hjust = 0, size = 3.0, color = "grey30") +
+    scale_x_log10(
+        breaks = c(0.5, 1, 2, 4),
+        labels = c("0.5", "1", "2", "4"),
+        limits = c(0.4, 10)
+    ) +
+    coord_cartesian(clip = "off") +
+    labs(
+        x        = "Odds ratio (log scale)",
+        y        = NULL
+    ) +
+    theme_minimal(base_size = 13) +
+    theme(
+        plot.title         = element_text(face = "bold", hjust = 0, size = 13),
+        plot.subtitle      = element_text(color = "grey40", hjust = 0, size = 10),
+        plot.margin        = margin(5, 220, 5, 5),
+        panel.grid.minor   = element_blank(),
+        panel.grid.major.y = element_blank(),
+        panel.grid.major.x = element_line(color = "grey92", linewidth = 0.3),
+        axis.text.y        = element_text(size = 10),
+        axis.text.x        = element_text(size = 10),
+        legend.position    = "bottom"
+    )
+
+ggsave(
+    file.path("ch", "figures", "fig_freeze_comparison_minad4.pdf"),
+    fig_freeze, width = 9, height = 4.5
+)
+
+
+# ============================================================
+# MINAD
+# ============================================================
+vars3 <- read_excel(file.path("ch", "data", "ch_seq_wl_art_minad3_vars.xlsx")) %>%
+    filter(Sample.ID %in% cov_base$person_id)
+vars4 <- read_excel(file.path("ch", "data", "ch_seq_wl_art_minad4_vars.xlsx")) %>%
+    filter(Sample.ID %in% cov_base$person_id)
+vars5 <- read_excel(file.path("ch", "data", "ch_seq_wl_art_minad5_vars.xlsx")) %>%
+    filter(Sample.ID %in% cov_base$person_id)
+
+cov3 <- cov_base %>%
+    mutate(
+        CHIP_Binary = person_id %in% vars3$Sample.ID,
+        CHIP_Count  = sapply(person_id, function(id) sum(vars3$Sample.ID == id))
+    )
+
+cov4 <- cov_base %>%
+    mutate(
+        CHIP_Binary = person_id %in% vars4$Sample.ID,
+        CHIP_Count  = sapply(person_id, function(id) sum(vars4$Sample.ID == id))
+    )
+cov5 <- cov_base %>%
+    mutate(
+        CHIP_Binary = person_id %in% vars5$Sample.ID,
+        CHIP_Count  = sapply(person_id, function(id) sum(vars5$Sample.ID == id))
+    )
+
+run_three_genes <- function(data, include_sex) {
+    sex_cov <- if (include_sex) "+ Sequenced_gender" else ""
+
+    fits <- list(
+        list(formula = paste("CHIP_Binary ~ BRCA12_Case + Sample_age + I(Sample_age^2)", sex_cov,
+                             "+ PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + Smoke_History  + Batch"),
+             case_col = "BRCA12_Case", label = "BRCA1/2"),
+        list(formula = paste("CHIP_Binary ~ BRCA1_Case + Sample_age + I(Sample_age^2)", sex_cov,
+                             "+ PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + Smoke_History  + Batch"),
+             case_col = "BRCA1_Case",  label = "BRCA1"),
+        list(formula = paste("CHIP_Binary ~ BRCA2_Case + Sample_age + I(Sample_age^2)", sex_cov,
+                             "+ PC1 + PC2 + PC3 + PC4 + PC5 + PC6 + Smoke_History  + Batch"),
+             case_col = "BRCA2_Case",  label = "BRCA2")
+    )
+
+    bind_rows(lapply(fits, function(f) {
+        fit <- glm(as.formula(f$formula), data = data, family = quasibinomial())
+        coef_table <- summary(fit)$coefficients
+        data.frame(
+            model = f$label,
+            OR    = exp(coef_table[f$case_col, "Estimate"]),
+            CI_lo = exp(coef_table[f$case_col, "Estimate"] - 1.96 * coef_table[f$case_col, "Std. Error"]),
+            CI_hi = exp(coef_table[f$case_col, "Estimate"] + 1.96 * coef_table[f$case_col, "Std. Error"]),
+            p     = coef_table[f$case_col, "Pr(>|t|)"]
+        )
+    }))
+}
+
+final_df <- bind_rows(
+    run_three_genes(cov3, include_sex = TRUE) %>% mutate(cohort = "minAD3"),
+    run_three_genes(cov4,  include_sex = FALSE) %>% mutate(cohort = "minAD4"),
+    run_three_genes(cov5,  include_sex = FALSE) %>% mutate(cohort = "minAD5")
+) %>%
+    mutate(
+        model      = factor(model, levels = c("BRCA1/2", "BRCA1", "BRCA2")),
+        cohort     = factor(cohort, levels = c("minAD3", "minAD4", "minAD5")),
+        p_fmt      = ifelse(p < 0.001, "p<0.001", sprintf("p=%.3f", p)),
+        annotation = sprintf("%.2f (%.2f, %.2f), %s", OR, CI_lo, CI_hi, p_fmt),
+        # y axis: gene + cohort for each row
+        label      = factor(
+            paste0(model, " (", cohort, ")"),
+            levels = rev(paste0(
+                rep(c("BRCA1/2", "BRCA1", "BRCA2"), each = 3),
+                " (",
+                rep(c("minAD3", "minAD4", "minAD5"), 3),
+                ")"
+            ))
+        )
+    )
+
+fig_minad <- ggplot(final_df,
+                  aes(x = OR, y = label, xmin = CI_lo, xmax = CI_hi,
+                      color = cohort)) +
+    geom_vline(xintercept = 1, linetype = "dashed",
+               color = "grey50", linewidth = 0.5) +
+    geom_errorbarh(height = 0.15, linewidth = 0.7) +
+    geom_point(size = 4) +
+    geom_text(aes(x = 6, label = annotation),
+              hjust = 0, size = 3.0, color = "grey30") +
     # scale_color_manual(
-    #     values = c("Freeze 2.0" = "darkgray", "Female" = "#C2185B"),
+    #     values = c("All" = "darkgray", "Female" = "#C2185B"),
     #     name   = "Cohort"
     # ) +
     scale_x_log10(
@@ -243,9 +360,10 @@ fig_freeze <- ggplot(final_df,
     )
 
 ggsave(
-    file.path("ch", "figures", "fig_freeze_comparison_minad4.pdf"),
-    fig_sex, width = 9, height = 3.5
+    file.path("ch", "figures", "fig_minad_comparison.pdf"),
+    fig_minad, width = 9, height = 4.5
 )
+
 
 
 # ============================================================
