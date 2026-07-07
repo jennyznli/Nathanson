@@ -1,5 +1,6 @@
 # ========================
-# SIMPLEXO - F3 vs. F4
+# SIMPLEXO F4
+# CASE CONTROL SELECTION
 # ========================
 library(here)
 setwd(here("simplexo"))
@@ -8,103 +9,77 @@ source(here("R/config.R"))
 pmbb4 <- here("PMBB", "4.0")
 
 # covariates
-cov    <- fread(file.path(pmbb4, "PMBB-Release-2026-4.0_phenotype_covariates.txt"),           header = TRUE)
-person <- fread(file.path(pmbb4, "PMBB-Release-2026-4.0_phenotype_person.txt"),               header = TRUE)
+cov <- fread(file.path(pmbb4, "PMBB-Release-2026-4.0_phenotype_covariates.txt"), header = TRUE)
+person <- fread(file.path(pmbb4, "PMBB-Release-2026-4.0_phenotype_person.txt"), header = TRUE)
 
 # ICD
-obs    <- fread(file.path(pmbb4, "PMBB-Release-2026-4.0_phenotype_observation.txt"),          header = TRUE)
-cond   <- fread(file.path(pmbb4, "PMBB-Release-2026-4.0_phenotype_condition_occurrence.txt"), header = TRUE)
+obs <- fread(file.path(pmbb4, "PMBB-Release-2026-4.0_phenotype_observation.txt"), header = TRUE)
+cond <- fread(file.path(pmbb4, "PMBB-Release-2026-4.0_phenotype_condition_occurrence.txt"), header = TRUE)
 
-# pmcr
-brca   <- fread(file.path(pmbb4, "PMBB-Release-2026-4.0_phenotype_cancer_brca.txt"),          header = TRUE)
+# PMCR
+pmcr_all <- fread(file.path(pmbb4, "PMBB-Release-2026-4.0_phenotype_cancer_pmcr.txt"), header = TRUE)
+brca <- fread(file.path(pmbb4, "PMBB-Release-2026-4.0_phenotype_cancer_brca.txt"), header = TRUE)
+hx <- fread(file.path(pmbb4, "PMBB-Release-2026-4.0_phenotype_family_hx.txt"), header = TRUE)
 
 # progeny
-progeny_case <- read_excel(here("simplexo", "ss", "br_pts_for_exwas_10022025.xlsx"))
-
-# mapping
+progeny_unmerged <- read_excel(here("simplexo", "ss", "br_pts_for_exwas_10022025.xlsx"))
 flags <- read.csv(here("PMBB", "3.0", "rgcname_pmbbid_metadata_flags.csv"))
 up <- read.csv(here("simplexo", "data", "simplexo_up_map.csv"))
+
+# id lists
+exome_ids <- read.table(here("PMBB", "4.0", "PMBB-Release-2026-4.0_genetic_exome.sample_list.txt"), header = FALSE)$V1
+imputed_ids <- read.csv(here("PMBB", "4.0", "PMBB-Release-2026-4.0_genetic_imputed.sample_list.txt"), header = FALSE)$V1
+
+# ========================
+# AVAILABLE SEQUENCING
+# ========================
+length(exome_ids)
+# 70925
+length(imputed_ids)
+# 70493
+
+seq_ids <- intersect(exome_ids, imputed_ids)
+length(seq_ids)
+# 70408
 
 # ========================
 # PROGENY - PREPROCESS
 # ========================
-dim(progeny_case)
-# 5046
+progeny_clean <- progeny_unmerged %>%
+    inner_join(up, by = "SampNum") %>%
+    filter(Diagnosis != "Normal Benign Tissue" | is.na(Diagnosis)) %>%
+    filter(Gender == "F")
 
-progeny_case <- progeny_case %>% filter(Gender == "F") %>%
-    merge_duplicates("SampNum") %>%
-    inner_join(up, by = "SampNum")
-dim(progeny_case)
-# 1520
+progeny <- progeny_clean %>%
+    merge_duplicates("SampNum")
+dim(progeny)
+# 1517
 
-progeny_ids <- sort(progeny_pmbb$PMBB_ID)
+progeny_ids <- sort(progeny$person_id)
 
 # ============================================================
 # PMCR - PREPROCESS
 # ============================================================
-pmcr4 <- fread(file.path(pmbb4, "PMBB-Release-2026-4.0_phenotype_cancer_pmcr.txt")) %>%
+pmcr_unmerged <- pmcr_all %>%
     filter(SeerSiteRecode2023ExpandedGroup == "Breast") %>%
     left_join(brca, by = "person_id") %>%
     left_join(cov,  by = "person_id") %>%
     filter(sequenced_gender == "Female")
-dim(pmcr4)
-# 3520
 
-pmcr3 <- fread(here("PMBB", "3.0", "PMBB-Release-2024-3.1_phenotype_cancer_PMCR")) %>%
-    filter(SeerSiteRecode2023ExpandedGroup == "Breast") %>%
-    left_join(brca, by = "person_id") %>%
-    left_join(cov,  by = "person_id") %>%
-    filter(sequenced_gender == "Female")
-dim(pmcr3)
-# 2936
-
-prop.table(table(pmcr3$ReportingHospital))
-# CCH        HUP        LGH        PAH       PMPH       PPMC
-# 0.03717599 0.76909959 0.03069577 0.13028649 0.01773533 0.01500682
-
-prop.table(table(pmcr4$ReportingHospital))
-# CCH        HUP        LGH        PAH       PMPH       PPMC
-# 0.03779483 0.76499005 0.02728048 0.13384484 0.01648196 0.01960784
-
-# merge duplicate tumors
-pmcr3 <- pmcr3 %>% merge_duplicates("person_id")
-pmcr4 <- pmcr4 %>% merge_duplicates("person_id")
-dim(pmcr3)
-# 2553
-dim(pmcr4)
+pmcr <- pmcr_unmerged %>%
+    merge_duplicates("person_id") %>%
+    left_join(person %>% select("person_id", "birth_datetime"), by = "person_id")
+dim(pmcr)
 # 3090
 
-# extract IDs
-pmcr3_ids <- unique(as.character(pmcr3$person_id))
-pmcr4_ids <- unique(as.character(pmcr4$person_id))
+pmcr_ids <- sort(pmcr$person_id)
 
 # ========================
 # ICD SELECTION
 # ========================
-source(here("R", "sample_selection_f3.R"))
-breast_results_f3 <- select_samples_f3(
-    sample_name = "simplexo",
-    icd_codes = c("^C50", "^Z85.3", # ICD10 - malignant
-                  "^D05", "^Z86.000", # ICD10 - DCIS
-                  "^174", "^V10.3", "^233.0"), #ICD9 - both
-    gender_filter = "Female",
-    crep_filter = NULL,
-    min_instances = 3,
-    min_timespan = NULL,
-    age_filter = NULL,
-    exclude = FALSE,
-    pmbb_dir = here("PMBB"),
-    data_dir = here("simplexo", "data"),
-    log_dir = here("simplexo", "log")
-)
-f3_df <- breast_results_f3$filtered_patients
-f3_ids <- breast_results_f3$filtered_patients$person_id
-dim(f3_df)
-# 3448
-
 source(here("R", "sample_selection_f4.R"))
 breast_results_f4 <- select_samples_f4(
-    sample_name = "simplexo",
+    sample_name = "simplexo4",
     icd_codes = c("^C50", "^Z85.3", # ICD10 - malignant
                   "^D05", "^Z86.000", # ICD10 - DCIS
                   "^174", "^V10.3", "^233.0"), #ICD9 - both
@@ -118,225 +93,101 @@ breast_results_f4 <- select_samples_f4(
     data_dir = here("simplexo", "data"),
     log_dir = here("simplexo", "log")
 )
-f4_df <- breast_results_f4$filtered_patients
-f4_ids <- breast_results_f4$filtered_patients$person_id
-dim(f4_df)
-# 45822
-
-# ============================================================
-# UPSET PLOT
-# ============================================================
-library(UpSetR)
-
-
-id_sets <- list(
-    PMCR3 = unique(as.character(pmcr3_ids)),
-    PMCR4 = unique(as.character(pmcr4_ids)),
-    ICD3    = unique(as.character(f3_ids)),
-    ICD4    = unique(as.character(f4_ids))
-)
-
-png(file.path(here("simplexo", "figures", "upset_f3_f4.png")),
-    width = 10, height = 6, units = "in", res = 300)
-
-upset(
-    fromList(id_sets),
-    sets           = c("PMCR3", "PMCR4", "ICD3", "ICD4"),
-    keep.order     = TRUE,
-    order.by       = "freq",
-    text.scale     = 1.4,
-    mainbar.y.label = "Patients in intersection",
-    sets.x.label    = "Patients per set"
-)
-
-dev.off()
-
-id_sets <- list(
-    PMCR3 = unique(as.character(pmcr3_ids)),
-    PMCR4 = unique(as.character(pmcr4_ids)),
-    ICD3    = unique(as.character(f3_ids)),
-    ICD4    = unique(as.character(f4_ids)),
-    Progeny = unique(as.character(progeny_ids))
-)
-
-png(file.path(here("simplexo", "figures", "upset_f3_f4_progeny.png")),
-    width = 10, height = 6, units = "in", res = 300)
-
-upset(
-    fromList(id_sets),
-    sets           = c("PMCR3", "PMCR4", "ICD3", "ICD4", "Progeny"),
-    keep.order     = TRUE,
-    order.by       = "freq",
-    text.scale     = 1.4,
-    mainbar.y.label = "Patients in intersection",
-    sets.x.label    = "Patients per set"
-)
-
-dev.off()
-
-
-id_sets <- list(
-    PMCR4 = unique(as.character(pmcr4_ids)),
-    ICD4    = unique(as.character(f4_ids)),
-    Progeny = unique(as.character(progeny_ids))
-)
-
-png(file.path(here("simplexo", "figures", "upset_f4.png")),
-    width = 7, height = 6, units = "in", res = 300)
-
-upset(
-    fromList(id_sets),
-    sets           = c("PMCR4", "ICD4", "Progeny"),
-    keep.order     = TRUE,
-    order.by       = "freq",
-    text.scale     = 1.4,
-    mainbar.y.label = "Patients in intersection",
-    sets.x.label    = "Patients per set"
-)
-
-dev.off()
-
-# ============================================================
-# EXAMINE - ICD MISSED BY PMCR
-# ============================================================
-# hypothesis - these will be personal history dominated?
-
-icd_only <- membership %>% filter(ICD3 & ICD4 & !PMCR3 & !PMCR4) %>% pull(person_id)
-
-f4_not_pmcr    <- setdiff(f4_ids, pmcr_ids)
-f4_not_pmcr_df <- f4_df %>% filter(person_id %in% f4_not_pmcr)   # FIX: was f4_not_registry
-
-# batch distribution of the extras vs the full f4 cohort
-prop.table(table(f4_not_pmcr_df$batch))
-prop.table(table(f4_df$batch))
-
-# ============================================================
-# EXAMINE - PMCR MISSED BY ICD
-# ============================================================
-icd_ids <- union(f3_ids, f4_ids)
-pmcr4 <- pmcr4 %>% mutate(caught = person_id %in% icd_ids)
-
-pmcr_missed <- setdiff(pmcr_ids, icd_ids)
-pmcr_missed_df <- pmcr4 %>% filter(person_id %in% pmcr_missed)
-dim(pmcr_missed_df)
-#> 34
-
-# ---- where are the missed cases reported? ----
-table(pmcr_missed_df$ReportingHospital)
-#>  CCH  HUP  LGH  PAH PMPH
-#>    3   37   20    9    7
-
-# ---- miss RATE per hospital (missed / total registry at that site) ----
-# rate matters, not raw count: HUP dominates counts simply by volume.
-pmcr4 %>%
-    count(ReportingHospital, caught) %>%
-    pivot_wider(names_from = caught, values_from = n, values_fill = 0) %>%
-    rename(missed = `FALSE`, caught = `TRUE`) %>%
-    mutate(miss_rate = missed / (missed + caught)) %>%
-    arrange(desc(miss_rate))
-
-# ---- how many qualifying ICD codes do the missed cases actually have? ----
-# min_instances = 3, so a registry case is dropped for one of two reasons:
-#   0 codes      -> genuinely ICD-invisible (outside care / path-only / sex filter)
-#   1-2 codes    -> present but below the 3-instance threshold
-all_patients <- breast_results_f4$all_patients
-pmcr4_icd <- pmcr4 %>%
-    left_join(all_patients, by = "person_id") %>%
-    mutate(num_unique_codes = tidyr::replace_na(num_unique_codes, 0))
-
-# whole registry cohort, by code bucket
-pmcr4_icd %>%
-    mutate(bucket = cut(num_unique_codes, c(-Inf, 0, 1, 2, Inf),
-                        labels = c("0", "1", "2", "3+"))) %>%
-    count(bucket)
-#> 0     34
-#> 1     37
-#> 2    111
-#> 3+  2943
-
-# missed cases only, by code bucket
-pmcr4_icd %>%
-    filter(person_id %in% pmcr_missed) %>%
-    mutate(bucket = cut(num_unique_codes, c(-Inf, 0, 1, 2, Inf),
-                        labels = c("0", "1", "2", "3+"))) %>%
-    count(bucket)
-#> 0     34   <- no qualifying code at all
-#> 1      2
-#> 2      4
-#> 3+    29   <- HAVE 3+ codes but still missed -> investigate (sex? code source?)
-
-
-# ============================================================
-# 7. WHAT THE f3 -> f4 METHODOLOGY CHANGE DID
-# ============================================================
-gained_f3_to_f4 <- setdiff(f4_ids, f3_ids)   #> gained 1138 (likely history codes)
-lost_f3_to_f4   <- setdiff(f3_ids, f4_ids)   #> lost 4
-
-gained_df <- f4_df %>%
-    filter(person_id %in% gained_f3_to_f4) %>%
-    filter(!(batch %in% c("3")))
-
-# ---- restrict to freezes 1 & 2 to compare on a common population ----
-# NOTE: f3_df uses `Batch` (capital), f4_df uses `batch` (lowercase).
-f3_df_f12 <- f3_df %>% filter(Batch %in% c("1", "2"))
-f4_df_f12 <- f4_df %>% filter(batch %in% c("1", "2"))
-dim(f3_df_f12)   #> 3448
-dim(f4_df_f12)   #> 3953  (still differs, likely the expanded ICD code set)
-
-# who f4 picks up that f3 didn't, within freezes 1 & 2
-diff_f4_vs_f3 <- anti_join(f4_df_f12, f3_df_f12, by = "person_id")
-
-# ============================================================
-# 8. ICD (f4) vs REGISTRY difference sets
-# ============================================================
-diff_f4_vs_pmcr <- anti_join(f4_df, pmcr4, by = "person_id")   # FIX: was pmcr_breast (undefined)
-
-
-
-
-# ========================
-# COMPARE ALL SOURCES
-# ========================
-# ICD selection
-dim(breast_icd_df)
+icd <- breast_results_f4$filtered_patients %>%
+    left_join(person %>% select(person_id, birth_datetime), by = "person_id")
+icd_ids <- breast_results_f4$filtered_patients$person_id
+dim(icd)
 # 4582
 
-# both have
-sum(brca$person_id %in% breast_icd)
-# 3481
+# ============================================================
+# TEMP CASE LIST
+# ============================================================
+case_ids <- sort(unique(c(icd_ids, progeny_ids, pmcr_ids)))
+length(case_ids)
+# 5149
 
-# ones the ICD selection has that the PMBB sheet doesn't
-icd_only <- setdiff(breast_icd, brca$person_id)
-length(icd_only)
-# 1527
-icd_only_df <- breast_icd_df[!(breast_icd_df$person_id %in% brca$person_id), ]
-table(icd_only_df$batch)
-# 1   2   3
-# 766 580 181
+write.csv(case_ids, file.path(here("simplexo", "data", "simplexo4_case_ids_temp.csv")))
 
-# ones the PMBB sheet has that the ICD selection doesn't
-pmbb_only <- setdiff(brca$person_id, breast_icd)
-length(pmbb_only)
-# 69
-pmbb_only_df <- brca[!(brca$person_id %in% breast_icd), ]
-pmbb_only_df <- pmbb_only_df %>% left_join(cov, by = "person_id")
-# 1  2  3
-# 20 51  5
-# only 5 from the most recent freeze?
+# ============================================================
+# GET AGES
+# ============================================================
+### PMCR
+pmcr$CaDxAge_PMCR <- as.numeric(difftime(
+    pmcr$FirstDxDate,
+    pmcr$birth_datetime,
+    units = "days"
+)) / 365.25
+pmcr_ages <- pmcr %>% select(person_id, CaDxAge_PMCR)
 
-# > table(pmbb_only_df$ReportingHospital)
-#
-# CCH  HUP  LGH  PAH PMPH
-# 3   37   20    9    7
+### PROGENY
+# Function to extract earliest age from semicolon-separated string
+get_earliest_age <- function(age_str) {
+    if (is.na(age_str) || is.null(age_str) || age_str == "" || age_str == "NA") {
+        return(NA)
+    }
 
-# > table(brca$ReportingHospital)
-#
-# CCH  HUP  LGH  PAH PMPH PPMC
-# 135 2720   96  477   60   69
-# so may be more non HUP?
+    age_str <- as.character(age_str)
+    age_parts <- strsplit(age_str, ";")[[1]]
+    ages <- suppressWarnings(as.numeric(age_parts))
+    valid_ages <- ages[!is.na(ages)]
+
+    if (length(valid_ages) == 0) {
+        warning(paste("No valid ages found in:", age_str))
+        return(NA)
+    }
+
+    if (any(valid_ages < 0)) {
+        warning(paste("Negative age found in:", age_str))
+    }
+
+    return(min(valid_ages))
+}
+
+progeny$CaDxAge_Progeny <- sapply(progeny$CaDxAge, get_earliest_age)
+progeny$CaDxAge_Progeny[is.infinite(progeny$CaDxAge_Progeny)] <- NA
+progeny_ages <- progeny %>% select(person_id, CaDxAge_Progeny)
+
+### ICD CODES
+icd$CaDxAge_ICD <- as.numeric(difftime(
+    icd$first_date,
+    icd$birth_datetime,
+    units = "days"
+)) / 365.25
+icd_ages <- icd %>% select(person_id, CaDxAge_ICD)
 
 # ========================
-# MALIGNANT NEOPLASM CODES (FOR EXCLUSION)
+# MERGE ALL DIAGNOSIS AGES
+# ========================
+case_seq_ids <- intersect(case_ids, seq_ids)
+length(case_seq_ids)
+# 5120
+
+base_df <- data.frame(person_id = case_seq_ids)
+age_df <- base_df %>%
+    left_join(progeny_ages, by = "person_id") %>%
+    left_join(pmcr_ages, by = "person_id") %>%
+    left_join(icd_ages, by = "person_id") %>%
+    mutate(
+        Age = coalesce(CaDxAge_Progeny, CaDxAge_PMCR, CaDxAge_ICD),
+        EarliestDiagnosis = pmin(CaDxAge_Progeny, CaDxAge_PMCR, CaDxAge_ICD, na.rm = TRUE),
+        EarliestDiagnosis = if_else(is.infinite(EarliestDiagnosis), NA_real_, EarliestDiagnosis)
+    )
+
+age_df_sel <- age_df %>%
+    select(person_id, Age) %>%
+    filter(!is.na(Age)) %>%
+    mutate(Age = round(Age, 2))
+cat("Final cases with age:", nrow(age_df_sel), "records\n")
+# 5117
+
+write.table(age_df_sel, here("simplexo", "data", "simplexo4_overall_case_age_df.txt"),
+            row.names = FALSE, quote = FALSE, sep = "\t")
+
+write.table(sort(age_df_sel$person_id), here("simplexo", "data", "simplexo4_overall_case_ids.txt"),
+            row.names = FALSE, col.names = FALSE, quote = FALSE)
+
+# ========================
+# MALIGNANT NEOPLASM CODES
 # ========================
 malig_neoplasms <- c(
     "^C(?!44)",           # Malignant neoplasms except skin cancer (C44)
@@ -351,23 +202,9 @@ malig_neoplasms <- c(
 # ========================
 # CONTROL SELECTION
 # ========================
-source(here("R", "control_selection_f3.R"))
-breast_controls_f3 <- select_controls_f3(
-    control_name = "simplexo",
-    exclude_codes = malig_neoplasms,
-    gender_filter = "Female",
-    age_filter = NULL,
-    crep_filter = FALSE,
-    pmbb_dir = here("PMBB"),
-    data_dir = here("simplexo", "data"),
-    log_dir = here("simplexo", "log")
-)
-f3c_df <- breast_controls_f3$excluded_icd_summary
-f3c_ids <- breast_controls_f3$final_controls$person_id
-
 source(here("R", "control_selection_f4.R"))
 breast_controls_f4 <- select_controls_f4(
-    control_name = "simplexo",
+    control_name = "simplexo4",
     exclude_codes = malig_neoplasms,
     gender_filter = "Female",
     age_filter = NULL,
@@ -376,53 +213,25 @@ breast_controls_f4 <- select_controls_f4(
     data_dir = here("simplexo", "data"),
     log_dir = here("simplexo", "log")
 )
-f4c_df <- breast_controls_f4$excluded_icd_summary
-f4c_ids <- breast_controls_f4$final_controls$person_id
 
-length(f3c_ids)
-# 18278
-length(f4c_ids)
-# 18720
+controls <- breast_controls_f4$final_controls %>%
+    filter(!(person_id %in% case_ids)) %>%
+    filter(!(person_id %in% pmcr_all$person_id)) %>%  # should not be in any PMCR since they are all cancer
+    filter(!(person_id %in% progeny$person_id)) %>%   # should not be in progeny but may be redundnt
+    filter(person_id %in% seq_ids) %>%
+    select(person_id, sample_age, sequenced_gender)
 
-f4c_only <- f4c_ids[!(f4c_ids %in% f3c_ids)]
-length(f4c_only)
-# 4185
+print(paste("Final control count:", nrow(controls)))
+# 18209
 
-f4c_only_df <- f4c_df[f4c_only, ]
-
-# ========================
-# FINALIZE CONTROLS
-# ========================
-
-# Exclude cases from controls
-controls <- breast_controls$final_controls %>%
-    filter(!(person_id %in% all_ids)) %>%
-    select(person_id, Sample_age, Sequenced_gender)
-
-print(paste("Final control count:", nrow(controls)))  # 18278
-
-write.table(controls$person_id,
-            here("simplexo", "data", "simplexo_overall_control_ids.txt"),
+write.table(controls$person_id, here("simplexo", "data", "simplexo4_overall_control_ids.txt"),
             quote = FALSE, row.names = FALSE, col.names = FALSE)
 
 # ========================================================================
 # FAMILY HISTORY
 # ========================================================================
-
-all_ids <- readLines(here("simplexo", "data", "simplexo_overall_case_ids.txt"))
-length(all_ids)
-# 4059
-
-###### PROGENY ######
-progeny_fh <- read_excel(
-    here("simplexo", "ss", "br_pts_for_exwas_10022025.xlsx")
-)[, c("SampNum", "Gender", "NumFDR", "NumFDR_BC", "NumSDR", "NumSDR_BC")]
-
-print(paste("Progeny family history entries:", nrow(progeny_fh)))  # 5046
-
-progeny_fh <- merge_duplicates(progeny_fh, "SampNum")
-
-print(paste("Unique Progeny family history cases:", nrow(progeny_fh)))  # 4273
+### PROGENY
+progeny_fh <- progeny[, c("person_id", "SampNum", "Gender", "NumFDR", "NumFDR_BC", "NumSDR", "NumSDR_BC")]
 
 # Convert 888 (unknown) to NA
 progeny_fh$NumFDR <- as.numeric(progeny_fh$NumFDR)
@@ -447,153 +256,111 @@ progeny_fh <- progeny_fh %>%
         )
     )
 
-# merge with PMBB
-progeny_pmbb_fh <- merge(progeny_fh, up, by = "SampNum") %>% filter(Gender == "F")
-dim(progeny_pmbb_fh)
+progeny_pmbb_fh <- progeny_fh %>%
+    filter(Family_History == 1) %>%
+    filter(person_id %in% case_seq_ids)
 
-# 1520 total progeny in pmbb
-progeny_pmbb_fh <- progeny_pmbb_fh %>% filter(Family_History == 1)
-dim(progeny_pmbb_fh)
-# 1100
-
-progeny_pmbb_fh <- progeny_pmbb_fh %>% filter(PMBB_ID %in% all_ids)
-dim(progeny_pmbb_fh)
+progeny_fh_ids <- unique(progeny_pmbb_fh$person_id)
+length(progeny_fh_ids)
 # 1096
-write.csv(progeny_pmbb_fh, here("simplexo", "data", "simplexo_progeny_family_history_df.csv"))
 
-###### PMCR ######
+### PMCR
+breast_hx <- hx %>%
+    filter(grepl("breast", MEDICAL_HX, ignore.case = TRUE)) %>%
+    filter(!(RELATION %in% c("null", "", "Negative History")))
 
-hx <- read.csv(here("simplexo", "ss", "pmbb_1093_familyhx.csv"))
+pmcr_fh_ids <- unique(breast_hx$person_id)
+length(pmcr_fh_ids)
+# 14525
 
-print(paste("Total family history records:", nrow(hx)))  # 41280
-print(paste("Unique individuals with family history:", length(unique(hx$PMBB_ID))))  # 4285, original number
+### ICD CODES
+family_history <- select_samples_f4(
+    sample_name = "simplexo4_fh",
+    icd_codes = c("^Z80.3", "^V16.3"),
+    gender_filter = "Female",
+    crep_filter = NULL,
+    min_instances = 1,
+    min_timespan = NULL,
+    age_filter = NULL,
+    exclude = FALSE,
+    pmbb_dir = here("PMBB"),
+    data_dir = here("simplexo", "data"),
+    log_dir = here("simplexo", "log")
+)
 
-# Filter for breast cancer family history
-breast_hx <- hx %>% filter(grepl("breast", MEDICAL_HX, ignore.case = TRUE))
-breast_hx <- breast_hx %>% filter(!(RELATION %in% c("null", "Negative History")))
-print(paste("Cases with breast cancer family history:", length(unique(breast_hx$PMBB_ID))))  # 1611
+icd_fh_ids <- unique(family_history$filtered_patients$person_id)
+length(icd_fh_ids)
+# 4357
 
-# Combine all family history IDs from Progeny and PMCR
-pmcr_hx_ids <- unique(breast_hx$PMBB_ID)
-hx_ids <- sort(unique(c(progeny_pmbb_fh$PMBB_ID, pmcr_hx_ids)))
-print(paste("Total unique family history IDs:", length(hx_ids)))  # 2448
+### COMBINE
+all_fh_ids <- unique(c(progeny_fh_ids, pmcr_fh_ids, icd_fh_ids))
+all_fh_ids <- sort(intersect(case_seq_ids, all_fh_ids))
+print(paste("Final family history case IDs:", length(all_fh_ids)))
+# 3226
 
-# Intersect with final case IDs (because initial list given to Colleen was w/ 3 instances)
-final_hx_ids <- sort(intersect(all_ids, hx_ids))
-print(paste("Final family history case IDs:", length(final_hx_ids)))  # 2382
-
-write.table(final_hx_ids,
-            here("simplexo", "data", "simplexo_fhx_case_ids.txt"),
+write.table(all_fh_ids, here("simplexo", "data", "simplexo4_fhx_case_ids.txt"),
             quote = FALSE, row.names = FALSE, col.names = FALSE)
-
-###### ICD CODES ######
-# family_history <- select_samples(
-#     sample_name = "simplexo_fh",
-#     icd_codes = c("^Z80.3", "^V16.3"),
-#     gender_filter = "Female",
-#     crep_filter = NULL,
-#     min_instances = 1,
-#     min_timespan = NULL,
-#     age_filter = NULL,
-#     exclude = FALSE,
-#     pmbb_dir = here("PMBB"),
-#     data_dir = here("simplexo", "data"),
-#     log_dir = here("simplexo", "log")
-# )
-# result in 0 cases...
 
 # ========================================================================
 # ER STATUS
 # ========================================================================
-##### PROGENY #####
-# take the unmerged version, filter out the Not Done, Not Reported, NA, Not Reported
-progeny_pmbb_unmerged <- merge(progeny_case, up, by = "SampNum") %>% filter(Gender == "F")
-print(paste("Female Progeny cases:", nrow(progeny_pmbb_unmerged)))  # 1841
+### PROGENY
+progeny_er <- progeny_clean %>%
+    filter(ERstatus %in% c("Positive", "Negative")) %>%
+    merge_duplicates("person_id")
+cat("After merging duplicates:", nrow(progeny_er), "\n")
+# 918
 
-# Filter to valid ER status
-progeny_er <- progeny_pmbb_unmerged %>%
-    filter(ERstatus %in% c("Positive", "Negative"))
-cat("Progeny with ER status:", nrow(progeny_er), "\n") # 1023
+progeny_erp <- progeny_er %>% filter(ERstatus == "Positive")
+progeny_ern <- progeny_er %>% filter(ERstatus == "Negative")
+cat("Progeny ER+:", nrow(progeny_erp), "\n")
+# 593
+cat("Progeny ER-:", nrow(progeny_ern), "\n")
+# 304
 
-# Merge duplicates
-progeny_er_merged <- merge_duplicates(progeny_er, "SampNum")
-cat("After merging duplicates:", nrow(progeny_er_merged), "\n") # 919
+### PMCR
+pmcr_er <- pmcr_unmerged %>%
+    filter(EstrogenReceptorSummary %in% c("Positive", "Negative")) %>%
+    merge_duplicates("person_id")
+cat("After merging duplicates:", nrow(pmcr_er), "\n")
+# 2727
 
-# Remove conflicting status (both positive and negative)
-conflicting_progeny <- progeny_er_merged %>%
-    filter(ERstatus %in% c("Positive;Negative", "Negative;Positive"))
-cat("Progeny with conflicting ER status:", nrow(conflicting_progeny), "\n") # 21
+pmcr_erp <- pmcr_er %>% filter(EstrogenReceptorSummary == "Positive")
+pmcr_ern <- pmcr_er %>% filter(EstrogenReceptorSummary == "Negative")
+cat("PMCR ER+:", nrow(pmcr_erp), "\n")
+# 2076
+cat("PMCR ER-:", nrow(pmcr_ern), "\n")
+# 620
 
-progeny_er_clean <- progeny_er_merged %>%
-    filter(!(ERstatus %in% c("Positive;Negative", "Negative;Positive")))
+###### ICD CODES ######
+# nothing...
 
-progeny_er_pos <- progeny_er_clean %>% filter(ERstatus == "Positive")
-progeny_er_neg <- progeny_er_clean %>% filter(ERstatus == "Negative")
-cat("Progeny ER+:", nrow(progeny_er_pos), "\n") # 593
-cat("Progeny ER-:", nrow(progeny_er_neg), "\n") # 305
+###  COMBINE
+all_erp_ids <- unique(c(pmcr_erp$person_id, progeny_erp$person_id))
+all_ern_ids <- unique(c(pmcr_ern$person_id, progeny_ern$person_id))
 
-##### PMCR #####
-er <- read.csv(here("simplexo", "ss", "pmbb_1093_brca_er_20251024.csv"))
-print(paste("Total ER status records:", nrow(er)))  # 4563
-print(paste("Unique individuals:", length(unique(er$PMBB_ID))))  # 4285
+#  conflicts between sources
+er_conflicts <- intersect(all_erp_ids, all_ern_ids)
+cat("\nConflicts between sources:", length(er_conflicts), "\n")
+# 16
 
-# Filter to valid ER status
-er <- er %>% filter(EstrogenReceptorSummarry %in% c("Positive", "Negative"))
-er_merged <- merge_duplicates(er, "PMBB_ID")
-cat("After merging duplicates:", nrow(er_merged), "\n")
-# 1849
+# remove conflicts and make sure they have sequencing
+all_erp_ids <- sort(intersect(setdiff(all_erp_ids, er_conflicts), case_seq_ids))
+all_ern_ids <- sort(intersect(setdiff(all_ern_ids, er_conflicts), case_seq_ids))
+cat("ER+ cases:", length(all_erp_ids), "\n") #2290
+cat("ER- cases:", length(all_ern_ids), "\n") #789
 
-# Remove conflicting status
-conflicting_pmcr <- er_merged %>%
-    filter(EstrogenReceptorSummarry %in% c("Positive;Negative", "Negative;Positive"))
-cat("PMCR with conflicting ER status:", nrow(conflicting_pmcr), "\n") # 15
-
-er_clean <- er_merged %>%
-    filter(!(EstrogenReceptorSummarry %in% c("Positive;Negative", "Negative;Positive")))
-
-er_pos <- er_clean %>% filter(EstrogenReceptorSummarry == "Positive")
-er_neg <- er_clean %>% filter(EstrogenReceptorSummarry == "Negative")
-cat("PMCR ER+:", nrow(er_pos), "\n") # 1468
-cat("PMCR ER-:", nrow(er_neg), "\n") # 366
-
-##### COMBINE #####
-pos_ids_combined <- unique(c(er_pos$PMBB_ID, progeny_er_pos$PMBB_ID))
-neg_ids_combined <- unique(c(er_neg$PMBB_ID, progeny_er_neg$PMBB_ID))
-
-# Check for conflicts between sources
-conflicts <- intersect(pos_ids_combined, neg_ids_combined)
-cat("\nConflicts between sources:", length(conflicts), "\n") # 5
-
-if (length(conflicts) > 0) {
-    cat("WARNING: Some people have conflicting ER status between Progeny and PMCR\n")
-    cat("Excluding these", length(conflicts), "individuals from both lists\n")
-    pos_ids_combined <- setdiff(pos_ids_combined, conflicts)
-    neg_ids_combined <- setdiff(neg_ids_combined, conflicts)
-}
-
-# Intersect with overall case list
-pos_ids <- sort(intersect(pos_ids_combined, all_ids))
-neg_ids <- sort(intersect(neg_ids_combined, all_ids))
-
-cat("\nFinal counts:\n")
-cat("ER+ cases:", length(pos_ids), "\n") #1871
-cat("ER- cases:", length(neg_ids), "\n") #615
-cat("Overlap (in both lists):", length(intersect(pos_ids, neg_ids)), "\n")
-
-write.table(pos_ids,
-            here("simplexo", "data", "simplexo_er_pos_case_ids.txt"),
+write.table(all_erp_ids, here("simplexo", "data", "simplexo4_er_pos_case_ids.txt"),
             quote = FALSE, row.names = FALSE, col.names = FALSE)
-write.table(neg_ids,
-            here("simplexo", "data", "simplexo_er_neg_case_ids.txt"),
+write.table(all_ern_ids, here("simplexo", "data", "simplexo4_er_neg_case_ids.txt"),
             quote = FALSE, row.names = FALSE, col.names = FALSE)
 
 # ========================================================================
 # INVASIVE ONLY (NO IN SITU)
 # ========================================================================
-
-##### ICD CODES #####
-inv_only <- select_samples(
-    sample_name = "simplexo_malig",
+### ICD CODES
+inv_only <- select_samples_f4(
+    sample_name = "simplexo4_malig",
     icd_codes = c("^C50", "^Z85.4", "^174", "^V10.3"),
     gender_filter = "Female",
     crep_filter = NULL,
@@ -606,8 +373,12 @@ inv_only <- select_samples(
     log_dir = here("simplexo", "log")
 )
 
-##### PROGENY #####
-progeny_pmbb_flag <- progeny_pmbb_unmerged %>%
+icd_malig_ids <- unique(inv_only$filtered_patients$person_id)
+length(icd_malig_ids)
+# 4598
+
+###  PROGENY
+progeny_clean <- progeny_clean %>%
     mutate(
         is_insitu_dx = str_detect(
             Diagnosis,
@@ -623,44 +394,38 @@ progeny_pmbb_flag <- progeny_pmbb_unmerged %>%
         is_insitu = replace_na(is_insitu, FALSE)
     )
 
-# Exclude in situ cases and benign...
-progeny_invasive_records <- progeny_pmbb_flag %>%
+progeny_malig <- progeny_clean %>%
     filter(!is_insitu) %>%
-    filter(!(Diagnosis %in% c("Normal Benign Tissue", "99.Not Reported", "Not Reported"))) %>%
-    filter(Gender == "F")
+    merge_duplicates("SampNum")
 
-cat("Progeny invasive records (before merge):", nrow(progeny_invasive_records), "\n") # 1529
-progeny_invasive <- merge_duplicates(progeny_invasive_records, "SampNum")
-cat("Unique Progeny patients with invasive:", nrow(progeny_invasive), "\n") # 1320
+progeny_malig_ids <- unique(progeny_malig$person_id)
+length(progeny_malig_ids)
+# 1340
 
-##### COMBINE #####
-icd_ids <- inv_only$filtered_patients$person_id
-inv_only_ids <- unique(c(progeny_invasive$PMBB_ID, icd_ids))
-final_inv_ids <- sort(intersect(inv_only_ids, all_ids))
-cat("Final patients w/ invasive:", length(final_inv_ids), "\n") # 3791
+### PMCR
+pmcr_malig <- pmcr_unmerged %>%
+    filter(!(grepl("situ", HistologicType, ignore.case = TRUE))) %>%
+    merge_duplicates("person_id")
 
-write.table(final_inv_ids,
-            here("simplexo", "data", "simplexo_malig_case_ids.txt"),
+pmcr_malig_ids <- unique(pmcr_malig$person_id)
+length(pmcr_malig_ids)
+# 2968
+
+### COMBINE
+all_malig_ids <- sort(intersect(unique(c(icd_malig_ids, progeny_malig_ids, pmcr_malig_ids)), case_seq_ids))
+cat("Final patients w/ invasive:", length(all_malig_ids), "\n") # 4785
+
+write.table(all_malig_ids, here("simplexo", "data", "simplexo4_malig_case_ids.txt"),
             quote = FALSE, row.names = FALSE, col.names = FALSE)
 
 # ========================================================================
 # UNDER 50
 # ========================================================================
-ages <- read.table(here("simplexo", "data", "simplexo_overall_case_ages_merged.txt"),
-                   header = TRUE)
+young <- age_df_sel %>% filter(Age <= 50)
+young_ids <- unique(young$person_id)
+length(young_ids)
+# 2200
 
-ages <- ages %>%
-    select(PMBB_ID, Age) %>%
-    filter(!is.na(Age)) %>%
-    mutate(Age = round(Age, 2))
-
-print(paste("Cases with age information:", nrow(ages)))
-
-young <- ages %>% filter(Age <= 50) %>% filter(PMBB_ID %in% all_ids)
-
-print(paste("Cases age <= 50:", length(unique(young$PMBB_ID))))  # 1900
-
-write.table(sort(unique(young$PMBB_ID)),
-            here("simplexo", "data", "simplexo_50_case_ids.txt"),
+write.table(young_ids, here("simplexo", "data", "simplexo4_50_case_ids.txt"),
             quote = FALSE, row.names = FALSE, col.names = FALSE)
 
