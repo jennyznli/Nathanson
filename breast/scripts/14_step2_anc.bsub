@@ -1,0 +1,128 @@
+#!/bin/bash
+#BSUB -J "anc_step2[1-176]" 
+#BSUB -o ../log/anc_step2.%J_%I.out
+#BSUB -e ../log/anc_step2.%J_%I.err
+#BSUB -n 4
+#BSUB -M 64GB
+#BSUB -R "rusage[mem=16GB]"
+#BSUB -W 2:00
+
+module load regenie/3.4.1
+
+# define ancestries and chromosome count
+ancestries=("AFR" "MEN" "EUR" "SAS" "EAS" "AMR" "OCN" "MIX")  # 8 ancestries
+chromosomes=("1" "2" "3" "4" "5" "6" "7" "8" "9" "10" "11" "12" "13" "14" "15" "16" "17" "18" "19" "20" "21" "22")
+total_chrs=22  # Exclude X chromosome for standard GWAS
+
+anc_idx=$(( (LSB_JOBINDEX - 1) / total_chrs ))
+chr_idx=$(( (LSB_JOBINDEX - 1) % total_chrs ))
+ANC="${ancestries[$anc_idx]}"
+CHR="${chromosomes[$chr_idx]}"
+
+echo "Processing Ancestry: $ANC, Chromosome: $CHR"
+
+# directory setup
+HDIR="/project/knathans_tecac/jenny/breast/analysis"
+WDIR="$HDIR/$ANC/step2"
+COV_DIR="$HDIR/$ANC/cov"
+STEP1_DIR="$HDIR/$ANC/step1"
+mkdir -p "$WDIR"
+cd "$WDIR"
+
+# file paths
+COVAR_FILE="${COV_DIR}/${ANC}_covariates.txt"
+PHENO_FILE="${COV_DIR}/${ANC}_phenotype.txt"
+PRED_FILE="${STEP1_DIR}/${ANC}_step1_pred.list"
+CHR_FILE="${WDIR}/${ANC}_step2_chr${CHR}"
+EXC_FILE="${HDIR}/ALL/step2_chr/removed_mind_ids.txt"
+
+echo "Genotype: ${CHR_FILE}.pgen/.psam/.pvar"
+echo "Phenotype: $PHENO_FILE"
+echo "Covariates: $COVAR_FILE"
+echo "Predictions: $PRED_FILE"
+
+# check required files
+required_files=("${CHR_FILE}.pgen" "${CHR_FILE}.pvar" "${CHR_FILE}.psam" "$COVAR_FILE" "$PHENO_FILE" "$PRED_FILE")
+for file in "${required_files[@]}"; do
+    if [[ ! -f "$file" ]]; then
+        echo "ERROR: Required file not found: $file"
+        exit 1
+    fi
+done
+
+# check if this ancestry/chromosome combination should be skipped
+sample_count=$(tail -n +2 "${CHR_FILE}.psam" | wc -l)
+variant_count=$(tail -n +2 "${CHR_FILE}.pvar" | wc -l)
+
+echo "Data summary:"
+echo "  Samples: $sample_count"
+echo "  Variants: $variant_count"
+
+if [[ $sample_count -lt 100 ]]; then
+    echo "WARNING: Low sample count ($sample_count) for $ANC chromosome $CHR"
+    echo "Skipping analysis"
+    exit 0
+fi
+
+if [[ $variant_count -lt 1000 ]]; then
+    echo "WARNING: Low variant count ($variant_count) for $ANC chromosome $CHR"
+    echo "Skipping analysis"
+    exit 0
+fi
+
+echo ""
+echo "====== RUNNING REGENIE STEP 2 ======"
+
+regenie --step 2 \
+  --pgen "${CHR_FILE}" \
+  --phenoFile "${PHENO_FILE}" \
+  --covarFile "${COVAR_FILE}" \
+  --remove "${EXC_FILE}" \
+  --pred "${PRED_FILE}" \
+  --bsize 400 \
+  --threads 4 \
+  --bt \
+  --minMAC 30 \
+  --minINFO 0.2 \
+  --firth --approx \
+  --strict \
+  --test additive \
+  --out "${ANC}_step2_chr${CHR}"
+
+if [[ $? -eq 0 ]]; then
+    # Count associations
+    if [[ -f "${ANC}_step2_chr${CHR}_Y1.regenie" ]]; then
+        total_variants=$(tail -n +2 "${ANC}_step2_chr${CHR}_Y1.regenie" | wc -l)
+        echo "  Total variants tested: $total_variants"
+        
+        # Check for significant associations (p < 5e-8)
+        sig_variants=$(awk 'NR>1 && $13 < 5e-8' "${ANC}_step2_chr${CHR}_Y1.regenie" | wc -l)
+        echo "  Genome-wide significant variants (p < 5e-8): $sig_variants"
+        
+        # Check output file size
+        file_size=$(du -h "${ANC}_step2_chr${CHR}_Y1.regenie" | cut -f1)
+        echo "  Output file size: $file_size"
+    else
+        echo "WARNING: Expected output file not found: ${ANC}_step2_chr${CHR}_Y1.regenie"
+    fi
+else
+    echo "ERROR: REGENIE Step 2 failed for $ANC chromosome $CHR"
+    exit 1
+fi
+
+echo ""
+echo "====== FINAL SUMMARY ======"
+echo "Ancestry: $ANC"
+echo "Chromosome: $CHR"
+echo "Input samples: $sample_count"
+echo "Input variants: $variant_count"
+echo "Output files: ${ANC}_step2_chr${CHR}_Y1.regenie"
+echo "End time: $(date)"
+
+# SYNTAX TO SUBMIT JOB
+# ---------------------------
+# Test single job:
+# bsub -J "anc_step2[1]" < anc_step2.bsub
+#
+# Run all ancestries and chromosomes:
+# bsub < anc_step2.bsub

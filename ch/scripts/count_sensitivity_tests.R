@@ -27,6 +27,7 @@ cov_f <- cov %>% filter(Sequenced_gender == "Female")
 # ============================================================
 # TEST DISPERSON - DETERMINE MODEL
 # ============================================================
+
 # ── 1. basic count summary ────────────────────────────────────
 cat("Mean:", mean(cov$CHIP_Count), "\n")
 # 0.07
@@ -50,10 +51,15 @@ fit_pois <- glm(CHIP_Count ~ BRCA12_Case + Sample_age + Sample_age2 +
                     PC1 + PC2 + PC3 + PC4 + PC5 + PC6,
                 data = cov, family = poisson())
 
+sum(residuals(fit_pois, "pearson")^2) / df.residual(fit_pois)
+# 1.18
+
 fit_nb <- glm.nb(CHIP_Count ~ BRCA12_Case + Sample_age + Sample_age2 +
                      Batch + Smoke_History + Sequenced_gender +
                      PC1 + PC2 + PC3 + PC4 + PC5 + PC6,
                  data = cov)
+
+
 
 # formal overdispersion test on Poisson fit
 dispersiontest(fit_pois)
@@ -73,22 +79,23 @@ pchisq(2 * (logLik(fit_nb) - logLik(fit_pois)), df = 1, lower.tail = FALSE)
 # 'log Lik.' 1.806845e-07 (df=14)
 
 # ============================================================
-# RUN LOOPS
+# RUN LOOPS - POISSON
 # ============================================================
-
 source(here("ch", "scripts", "count_sensitivity_models.R"))
-res_all_s12 <- run_chip_count(
-    cov_base      = cov,
-    cohort_label  = "all_s12",
-    females_only = FALSE
-)
+res <- run_chip_qp(cov_base = cov, minad_thresholds = 4)
+write_xlsx(res, file.path("ch", "data", "chip_count_all_s12_sensitivity.xlsx"))
 
-res_f_s12 <- run_chip_count(
-    cov_base      = cov_f,
-    cohort_label  = "female_s12",
-    females_only = TRUE
-)
+# res_all_s12 <- run_chip_count(
+#     cov_base      = cov,
+#     cohort_label  = "all_s12",
+#     females_only = FALSE
+# )
 
-write_xlsx(res_all_s12, file.path("ch", "data", "chip_count_all_s12_sensitivity.xlsx"))
+# res_f_s12 <- run_chip_count(
+#     cov_base      = cov_f,
+#     cohort_label  = "female_s12",
+#     females_only = TRUE
+# )
+
 write_xlsx(res_f_s12, file.path("ch", "data", "chip_count_female_s12_sensitivity.xlsx"))
 

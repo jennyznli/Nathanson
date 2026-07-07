@@ -23,3 +23,5 @@ Thumbs.db
 
 .Rproj.user
 ch/scripts_final/
+.Rhistory
+.RData

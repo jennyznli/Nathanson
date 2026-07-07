@@ -1,0 +1,120 @@
+#!/bin/bash
+#BSUB -J "merge_regenie[1-8]"
+#BSUB -o ../log/merge_regenie.%J_%I.out
+#BSUB -e ../log/merge_regenie.%J_%I.err
+#BSUB -n 2
+#BSUB -M 32GB
+#BSUB -R "rusage[mem=8GB]"
+#BSUB -W 1:00
+
+# define ancestries
+ancestries=("AFR" "MEN" "EUR" "SAS" "EAS" "AMR" "OCN" "MIX")  # 8 ancestries
+
+# Get ancestry for this job
+ANC="${ancestries[$((LSB_JOBINDEX - 1))]}"
+
+echo "Processing chromosome merging for Ancestry: $ANC"
+
+# Set up environment
+WDIR="/project/knathans_tecac/jenny/breast"
+CHR_DIR="$WDIR/analysis/$ANC/step2"
+MERGED_DIR="$WDIR/analysis/$ANC/merged"
+mkdir -p "$MERGED_DIR"
+
+cd "$WDIR"
+
+# Output merged file
+merged_file="${MERGED_DIR}/breast_${ANC}_genome.regenie"
+
+echo "====== MERGING CHROMOSOME FILES FOR $ANC ======"
+echo "Start time: $(date)"
+
+# Check if chromosome directory exists
+if [[ ! -d "$CHR_DIR" ]]; then
+    echo "ERROR: Chromosome directory not found: $CHR_DIR"
+    exit 1
+fi
+
+# Count available chromosome files and create file list
+file_count=0
+chr_files=()
+for chr in {1..22}; do
+    chr_file_gz="${CHR_DIR}/${ANC}_step2_chr${chr}_Y1.regenie.gz"
+    chr_file="${CHR_DIR}/${ANC}_step2_chr${chr}_Y1.regenie"
+    
+    if [[ -f "$chr_file_gz" ]]; then
+        chr_files+=("$chr_file_gz")
+        ((file_count++))
+    elif [[ -f "$chr_file" ]]; then
+        chr_files+=("$chr_file")
+        ((file_count++))
+    fi
+done
+
+if [[ $file_count -eq 0 ]]; then
+    echo "ERROR: No chromosome files found for $ANC in $CHR_DIR"
+    exit 1
+fi
+
+echo "Found $file_count chromosome files for $ANC"
+
+# Remove existing merged file if it exists
+if [[ -f "$merged_file" ]]; then
+    rm "$merged_file"
+fi
+
+# Initialize header flag
+header_written=false
+
+# Merge files
+for chr_file in "${chr_files[@]}"; do
+    chr_num=$(basename "$chr_file" | grep -o 'chr[0-9]*' | grep -o '[0-9]*')
+    echo "Processing chromosome $chr_num..."
+    
+    if [[ "$chr_file" == *.gz ]]; then
+        # Handle gzipped files
+        if [[ "$header_written" == false ]]; then
+            # Write header from first file
+            zcat "$chr_file" | head -1 >> "$merged_file"
+            header_written=true
+        fi
+        # Append data (skip header)
+        zcat "$chr_file" | tail -n +2 >> "$merged_file"
+    else
+        # Handle regular files
+        if [[ "$header_written" == false ]]; then
+            # Write header from first file
+            head -1 "$chr_file" >> "$merged_file"
+            header_written=true
+        fi
+        # Append data (skip header)
+        tail -n +2 "$chr_file" >> "$merged_file"
+    fi
+done
+
+# Check if merge was successful
+if [[ -f "$merged_file" ]]; then
+    file_size=$(du -h "$merged_file" | cut -f1)
+    line_count=$(wc -l < "$merged_file")
+    echo ""
+    echo "====== MERGE COMPLETE FOR $ANC ======"
+    echo "Created merged file: $merged_file ($file_size, $line_count lines)"
+    echo "SUCCESS: Chromosome files merged for $ANC"
+else
+    echo "ERROR: Failed to create merged file for $ANC"
+    exit 1
+fi
+
+echo "End time: $(date)"
+
+# SYNTAX TO SUBMIT JOB
+# ---------------------------
+# Test single ancestry:
+# bsub -J "merge_regenie[1]" < merge_results.bsub
+# 
+# Run all ancestries:
+# bsub < merge_regenie_results.bsub
+#
+# OUTPUT FILES CREATED:
+# $WDIR/analysis/$ANC/merged/
+# └── breast_${ANC}_genome_wide.regenie

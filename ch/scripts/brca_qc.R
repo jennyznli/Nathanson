@@ -94,8 +94,8 @@ process_brca_data <- function(data, gene_name, dataset_label) {
 
     # Step 2: Read depth and VAF filter
     step2 <- step1 %>%
-        filter(Sample.AltFrac > 0.3, Sample.AltFrac < 0.7,
-               Sample.Depth > 20, Sample.AltDepth > 5)
+        filter(Sample.AltFrac > 0.18, Sample.AltFrac < 0.80,
+               Sample.Depth > 14, Sample.AltDepth > 5)
 
     log_cat("Step 2 (+ Depth/VAF Filter): ",
             nrow(step2), " variants, ",

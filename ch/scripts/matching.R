@@ -15,9 +15,10 @@ source(here("ch", "scripts", "brca_qc2.R"))
 # READ DATA
 # ========================
 # case lists
-b1_case <- read.csv(file.path("ch", "data", "pmbb_brca1_case.csv"))$x
-b2_case <- read.csv(file.path("ch", "data", "pmbb_brca2_case.csv"))$x
-b12_case <- unique(c(b1_case, b2_case))
+b1_case <- read.csv(file.path("ch", "data", "pmbb_brca1_case_ids.csv"))$x
+b2_case <- read.csv(file.path("ch", "data", "pmbb_brca2_case_ids.csv"))$x
+b12_case <- read.csv(file.path("ch", "data", "pmbb_brca12_case_ids.csv"))$x
+b12_both_case <- read.csv(file.path("ch", "data", "pmbb_brca12_both_case_ids.csv"))$x
 
 # progeny - BRCA12
 progeny <- read_excel(here("ch", "ss", "brca_carriers_ch_freq_w_seen_in_crep_20251020.xlsx"), sheet = "Data_from_master_table")
@@ -185,6 +186,25 @@ cov1 <- cov %>%
 table(cov1$Smoke_History, useNA = "ifany")
 # 0     1  <NA>
 # 28657 25798  2715
+
+# ========================
+# PREP DF FOR KARA
+# ========================
+cov_b12 <- cov %>%
+    mutate(
+        BRCA12_Case = ifelse(person_id %in% b12_case, 1, 0),
+        BRCA1_Case = ifelse(person_id %in% b1_case, 1, 0),
+        BRCA2_Case = ifelse(person_id %in% b2_case, 1, 0),
+        BRCA1_BRCA2_Case = ifelse(person_id %in% b12_both_case, 1, 0)
+        )
+
+kara_df <- cov_b12 %>% filter(BRCA12_Case == 1)
+
+setdiff(final_b12_ids, cov_b12$person_id)
+# "PMBB5536637205397" "PMBB9273199034204" "PMBB9677752449510" - these don't appear in PMBB cov..
+
+write.csv(kara_df, file.path("ch", "data", "pmbb_brca12_cov_df.csv"), row.names = FALSE)
+# table(kara_df$CREP_HighRisk_Flag)
 
 # ========================
 # CREATE CANCER STRATA

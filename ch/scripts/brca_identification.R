@@ -232,6 +232,7 @@ length(union(f23_b2_ids, f23_b1_ids))
 length(intersect(f23_b2_ids, f23_b1_ids))
 # 9
 
+
 # ========================
 # MY ANNOTATIONS
 # ========================
@@ -291,6 +292,13 @@ length(final_b12_both_ids)
 write.csv(final_b1_ids, file.path("ch", "data", "pmbb_brca1_case_ids.csv"), row.names = FALSE)
 write.csv(final_b2_ids, file.path("ch", "data", "pmbb_brca2_case_ids.csv"), row.names = FALSE)
 write.csv(final_b12_ids, file.path("ch", "data", "pmbb_brca12_case_ids.csv"), row.names = FALSE)
+
+# ========================
+# COMBINE W CREP FLAGS
+# ========================
+read_csv(final_b12_ids, file.path("ch", "data", "pmbb_brca12_case_ids.csv"), row.names = FALSE)
+
+
 
 # ========================
 # COMPARISON WITH OTHER CALLING

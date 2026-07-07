@@ -1,0 +1,109 @@
+#!/bin/bash
+#BSUB -J snptest_prep
+#BSUB -o ../log/snptest_prep.%J.out
+#BSUB -e ../log/snptest_prep.%J.err
+#BSUB -n 1
+#BSUB -M 4GB
+#BSUB -R "rusage[mem=4GB]"
+#BSUB -W 01:00
+
+# SNPTEST SAMPLE FILE PREPARATION
+
+# directory setup
+HDIR="/project/knathans_tecac/jenny/breast/analysis/ALL"
+WDIR="$HDIR/cov"
+cd "$WDIR"
+
+# input files
+COVAR="/static/PMBB/PMBB-Release-2024-3.0/Phenotypes/3.0/PMBB-Release-2024-3.0_covariates.txt"
+INPUT_FILE="${HDIR}/step1/common_snps_breast_qc"
+PCA_FILE="${WDIR}/common_snps_breast_qc.eigenvec"
+IDS="${HDIR}/cov/ids_miss.txt"
+
+awk '
+NR==FNR {
+    order[++n] = $1    # Store order from IDS file
+    idx[$1] = n        # Map ID to position
+    next
+}
+$2 in idx {
+    data[idx[$2]] = $0 # Store PCA rows by sample ID (column 2)
+}
+END {
+    for(i=1; i<=n; i++) {
+        if(order[i] in idx) {
+            print data[idx[order[i]]]
+        }
+    }
+}' "$IDS" "$PCA_FILE" > pca_miss.txt
+
+echo "Creating SNPTEST sample file..."
+
+# Create the SNPTEST sample file with proper header format
+cat > "${WDIR}/snptest2.sample" << 'EOF'
+ID_1 ID_2 missing batch age PC1 PC2 PC3 PC4 PC5 PC6 PC7 PC8 PC9 PC10 phenotype
+0 0 0 D C C C C C C C C C C C B
+EOF
+
+# Now create the data rows using awk
+awk '
+BEGIN { OFS=" " }
+
+# Read covariate file first (batch in col 5, age in col 3, sex in col 6)
+NR==FNR && NR > 1 {
+    if (NF >= 6) {
+        batch[$1] = $5    # batch from column 5
+        age[$1] = $3      # age from column 3
+        sex[$1] = $6      # sex from column 6
+    }
+    next
+}
+
+# Read PCA eigenvec file (skip header)
+FNR==1 { next }
+
+# Process PCA data and merge with covariates and phenotype
+{
+    fam_id = 0
+    sample_id = $2  # Individual ID from PCA file
+    missing = 0
+
+    # Get batch, age, and sex from covariate data
+    batch_val = (sample_id in batch) ? batch[sample_id] : "NA"
+    age_val = (sample_id in age) ? age[sample_id] : "NA"
+    sex_val = (sample_id in sex) ? sex[sample_id] : "NA"
+    
+    # Get PCs (columns 3-12 in eigenvec file)
+    pc1 = $3; pc2 = $4; pc3 = $5; pc4 = $6; pc5 = $7
+    pc6 = $8; pc7 = $9; pc8 = $10; pc9 = $11; pc10 = $12
+    
+    # Store sample info for phenotype matching
+    samples[sample_id] = fam_id " " sample_id " " missing " " sex_val " " batch_val " " age_val " " pc1 " " pc2 " " pc3 " " pc4 " " pc5 " " pc6 " " pc7 " " pc8 " " pc9 " " pc10
+}
+
+END {
+    # Read FAM file to get phenotypes
+    while ((getline line < "'"${INPUT_FILE}.fam"'") > 0) {
+        split(line, fam_fields)
+        fam_id = fam_fields[1]
+        iid = fam_fields[2]
+        pheno_code = fam_fields[6]
+        
+        # Convert PLINK phenotype coding to SNPTEST binary format
+        if (pheno_code == 1) {
+            phenotype = "0"  # control: 1 -> 0
+        } else if (pheno_code == 2) {
+            phenotype = "1"  # case: 2 -> 1
+        } else {
+            phenotype = "NA"       # missing or other -> NA
+        }
+        
+        # Output sample if it exists in PCA data
+        if (iid in samples) {
+            print samples[iid], phenotype
+        }
+    }
+    close("'"${INPUT_FILE}.fam"'")
+}
+' "$COVAR" "$PCA_FILE" >> "${WDIR}/snptest2.sample"
+

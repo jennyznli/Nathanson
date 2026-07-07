@@ -1,0 +1,198 @@
+#!/bin/bash
+#BSUB -J "anc_filter[1-176]" 
+#BSUB -o ../log/anc_filter.%J_%I.out
+#BSUB -e ../log/anc_filter.%J_%I.err
+#BSUB -n 4
+#BSUB -M 32GB
+#BSUB -R "rusage[mem=8GB]"
+#BSUB -W 1:00
+
+module load R
+
+# define ancestries and chromosome count
+ancestries=("AFR" "MEN" "EUR" "SAS" "EAS" "AMR" "OCN" "MIX")  # 8 ancestries
+chromosomes=("1" "2" "3" "4" "5" "6" "7" "8" "9" "10" "11" "12" "13" "14" "15" "16" "17" "18" "19" "20" "21" "22")
+total_chrs=22
+
+# Calculate which ancestry and chromosome to process
+anc_idx=$(( (LSB_JOBINDEX - 1) / total_chrs ))
+chr_idx=$(( (LSB_JOBINDEX - 1) % total_chrs ))
+ANC="${ancestries[$anc_idx]}"
+CHR="${chromosomes[$chr_idx]}"
+
+echo "Processing significant hits for Ancestry: $ANC, Chromosome: $CHR"
+
+# Set up environment
+WDIR="/project/knathans_tecac/jenny/breast"
+CHR_DIR="$WDIR/analysis/$ANC/step2"
+ANALYSIS_DIR="$WDIR/analysis/$ANC/analysis"
+mkdir -p "$ANALYSIS_DIR"
+cd "$WDIR"
+
+# File paths
+chr_input="${CHR_DIR}/${ANC}_step2_chr${CHR}_Y1.regenie.gz"
+chr_input_unzipped="${CHR_DIR}/${ANC}_step2_chr${CHR}_Y1.regenie"
+
+# Output files for different significance thresholds
+output_genomewide="${ANALYSIS_DIR}/${ANC}_chr${CHR}_genomewide_5e8.txt"
+output_suggestive="${ANALYSIS_DIR}/${ANC}_chr${CHR}_suggestive_1e6.txt"
+output_nominal="${ANALYSIS_DIR}/${ANC}_chr${CHR}_nominal_1e5.txt"
+output_failed="${ANALYSIS_DIR}/${ANC}_chr${CHR}_failed_tests.txt"
+
+# Check if input files exist (try both gzipped and unzipped)
+if [[ -f "$chr_input" ]]; then
+    echo "Found gzipped REGENIE file"
+    input_file="$chr_input"
+elif [[ -f "$chr_input_unzipped" ]]; then
+    echo "Found unzipped REGENIE file"
+    input_file="$chr_input_unzipped"
+else
+    echo "ERROR: REGENIE file not found for $ANC chromosome $CHR"
+    echo "Looked for: $chr_input"
+    echo "       and: $chr_input_unzipped"
+    exit 1
+fi
+
+# Check if REGENIE file has results
+if [[ "$input_file" == *.gz ]]; then
+    line_count=$(zcat "$input_file" | wc -l)
+else
+    line_count=$(wc -l < "$input_file")
+fi
+
+if [[ $line_count -lt 2 ]]; then
+    echo "WARNING: REGENIE file appears empty or only has header for $ANC chromosome $CHR"
+    echo "Skipping filtering for this chromosome"
+    exit 0
+fi
+
+echo "REGENIE file has $((line_count - 1)) variants to filter"
+
+echo ""
+echo "====== FILTERING SIGNIFICANT HITS ======"
+echo "Start time: $(date)"
+
+# Function to filter and count hits
+filter_hits() {
+    local threshold=$1
+    local output_file=$2
+    local threshold_name=$3
+    
+    echo "Filtering for $threshold_name threshold (LOG10P >= $threshold)..."
+    
+    if [[ "$input_file" == *.gz ]]; then
+        # For gzipped files
+        zcat "$input_file" | awk -v thresh="$threshold" '
+        BEGIN { OFS="\t" }
+        NR==1 { print; next }  # Print header
+        $13 != "NA" && $13 >= thresh { print }  # LOG10P is column 13, exclude NA values
+        ' > "$output_file"
+    else
+        # For unzipped files
+        awk -v thresh="$threshold" '
+        BEGIN { OFS="\t" }
+        NR==1 { print; next }  # Print header
+        $13 != "NA" && $13 >= thresh { print }  # LOG10P is column 13, exclude NA values
+        ' "$input_file" > "$output_file"
+    fi
+    
+    # Count significant hits (excluding header)
+    hit_count=$(tail -n +2 "$output_file" | wc -l)
+    echo "  Found $hit_count hits for $threshold_name threshold"
+    
+    # Remove file if no hits found (only header remains)
+    if [[ $hit_count -eq 0 ]]; then
+        rm "$output_file"
+        echo "  No hits found - removed empty file"
+    else
+        file_size=$(du -h "$output_file" | cut -f1)
+        echo "  Output saved to: $output_file ($file_size)"
+    fi
+}
+
+# Function to filter failed tests
+filter_failed_tests() {
+    local output_file=$1
+    
+    echo "Filtering for failed tests (LOG10P = NA)..."
+    
+    if [[ "$input_file" == *.gz ]]; then
+        # For gzipped files
+        zcat "$input_file" | awk '
+        BEGIN { OFS="\t" }
+        NR==1 { print; next }  # Print header
+        $13 == "NA" { print }  # LOG10P is column 13, include only NA values
+        ' > "$output_file"
+    else
+        # For unzipped files
+        awk '
+        BEGIN { OFS="\t" }
+        NR==1 { print; next }  # Print header
+        $13 == "NA" { print }  # LOG10P is column 13, include only NA values
+        ' "$input_file" > "$output_file"
+    fi
+    
+    # Count failed tests (excluding header)
+    failed_count=$(tail -n +2 "$output_file" | wc -l)
+    echo "  Found $failed_count failed tests"
+    
+    # Remove file if no failed tests found (only header remains)
+    if [[ $failed_count -eq 0 ]]; then
+        rm "$output_file"
+        echo "  No failed tests found - removed empty file"
+    else
+        file_size=$(du -h "$output_file" | cut -f1)
+        echo "  Output saved to: $output_file ($file_size)"
+    fi
+}
+
+# Apply different significance thresholds
+# Genome-wide significant: 5e-8 (LOG10P >= 7.30103)
+filter_hits "7.30103" "$output_genomewide" "genome-wide significant (5e-8)"
+
+# Suggestive: 1e-6 (LOG10P >= 6)
+filter_hits "6" "$output_suggestive" "suggestive (1e-6)"
+
+# Nominal: 1e-5 (LOG10P >= 5)
+filter_hits "5" "$output_nominal" "nominal (1e-5)"
+
+# Filter failed tests
+filter_failed_tests "$output_failed"
+
+echo ""
+echo "====== FILTERING COMPLETE FOR $ANC CHR$CHR ======"
+
+# Summary of created files
+created_files=()
+for file in "$output_genomewide" "$output_suggestive" "$output_nominal" "$output_failed"; do
+    if [[ -f "$file" ]]; then
+        created_files+=("$file")
+    fi
+done
+
+if [[ ${#created_files[@]} -gt 0 ]]; then
+    echo "Created filtered files:"
+    for file in "${created_files[@]}"; do
+        file_size=$(du -h "$file" | cut -f1)
+        hit_count=$(tail -n +2 "$file" | wc -l)
+        if [[ "$file" == *"failed_tests"* ]]; then
+            echo "  $file ($file_size, $hit_count failed tests)"
+        else
+            echo "  $file ($file_size, $hit_count hits)"
+        fi
+    done
+else
+    echo "No significant hits or failed tests found"
+fi
+
+echo "SUCCESS: Filtering completed for $ANC chromosome $CHR"
+echo "End time: $(date)"
+
+# SYNTAX TO SUBMIT JOB
+# ---------------------------
+# Test single job:
+# bsub -J "anc_filter[1]" < anc_output_filter.bsub
+# 
+# Run all ancestries and chromosomes:
+# bsub < anc_output_filter.bsub
+#

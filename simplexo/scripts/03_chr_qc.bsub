@@ -1,0 +1,42 @@
+#!/bin/bash
+#BSUB -J "chr_qc[1-22]"
+#BSUB -o ../log/chr_qc%I.o
+#BSUB -e ../log/chr_qc%I.e
+#BSUB -n 1
+#BSUB -R "rusage[mem=8GB]"
+
+module load plink/1.9-20210416
+
+CHR=${LSB_JOBINDEX}
+GROUP=${1:?Usage: $0 <GROUP>}
+
+# directory setup 
+WDIR="/project/knathans_tecac/jenny/simplexo2/analysis"
+CHR_DIR="$WDIR/${GROUP}/step2_chr"
+mkdir -p $CHR_DIR
+cd $CHR_DIR
+
+samples="$WDIR/ids/imp_3rd_pids.txt"
+input_prefix="/home/jennyzli/PMBB-3.0/Exome/pVCF/GL_by_chromosome/PMBB-Release-2024-3.0_genetic_exome_chr${CHR}_GL"
+
+# snp level qc 
+plink2 --bfile "${input_prefix}" \
+    --snps-only \
+    --keep "$samples" \
+    --make-bed \
+    --mac 30 \
+    --geno 0.05 \
+    --extract-if-info "R2 >= 0.2" \
+    --out "step2_chr${CHR}_snp"
+
+# sample level qc
+plink2 --bfile "step2_chr${CHR}_snp" \
+     --mind 0.05 \
+     --make-bed \
+     --out "step2_chr${CHR}_ind"
+
+rm step2_chr${CHR}_ind.bim step2_chr${CHR}_ind.fam step2_chr${CHR}_ind.bed
+
+# ---------------------------
+# bsub -J chr_qc[1] < 03_chr_qc.bsub ALL
+# bsub -J "chr_qc[1]" bash qc.sh EUR

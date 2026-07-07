@@ -1,0 +1,115 @@
+#!/bin/bash
+#BSUB -J "anc_plot[1-176]" 
+#BSUB -o ../log/anc_plot.%J_%I.out
+#BSUB -e ../log/anc_plot.%J_%I.err
+#BSUB -n 4
+#BSUB -M 32GB
+#BSUB -R "rusage[mem=8GB]"
+#BSUB -W 1:00
+
+module load R
+
+# define ancestries and chromosome count
+ancestries=("AFR" "MEN" "EUR" "SAS" "EAS" "AMR" "OCN" "MIX")  # 8 ancestries
+chromosomes=("1" "2" "3" "4" "5" "6" "7" "8" "9" "10" "11" "12" "13" "14" "15" "16" "17" "18" "19" "20" "21" "22")
+total_chrs=22
+
+# Calculate which ancestry and chromosome to process
+anc_idx=$(( (LSB_JOBINDEX - 1) / total_chrs ))
+chr_idx=$(( (LSB_JOBINDEX - 1) % total_chrs ))
+ANC="${ancestries[$anc_idx]}"
+CHR="${chromosomes[$chr_idx]}"
+
+echo "Processing plots for Ancestry: $ANC, Chromosome: $CHR"
+
+# Set up environment
+WDIR="/project/knathans_tecac/jenny/breast"
+CHR_DIR="$WDIR/analysis/$ANC/step2"
+RSCRIPT="$WDIR/scripts/chr_regenie_plot.R"
+PLOT_DIR="$WDIR/plots/$ANC"
+mkdir -p "$PLOT_DIR"
+cd "$WDIR"
+
+# File paths
+chr_input="${CHR_DIR}/${ANC}_step2_chr${CHR}_Y1.regenie.gz"
+chr_input_unzipped="${CHR_DIR}/${ANC}_step2_chr${CHR}_Y1.regenie"
+output_prefix="${PLOT_DIR}/breast_${ANC}_chr${CHR}"
+
+# Check if input files exist (try both gzipped and unzipped)
+if [[ -f "$chr_input" ]]; then
+    echo "Found gzipped REGENIE file"
+    input_file="$chr_input"
+elif [[ -f "$chr_input_unzipped" ]]; then
+    echo "Found unzipped REGENIE file"
+    input_file="$chr_input_unzipped"
+else
+    echo "ERROR: REGENIE file not found for $ANC chromosome $CHR"
+    echo "Looked for: $chr_input"
+    echo "       and: $chr_input_unzipped"
+    exit 1
+fi
+
+if [[ ! -f "$RSCRIPT" ]]; then
+    echo "ERROR: R script not found: $RSCRIPT"
+    exit 1
+fi
+
+# Check if REGENIE file has results
+if [[ "$input_file" == *.gz ]]; then
+    line_count=$(zcat "$input_file" | wc -l)
+else
+    line_count=$(wc -l < "$input_file")
+fi
+
+if [[ $line_count -lt 2 ]]; then
+    echo "WARNING: REGENIE file appears empty or only has header for $ANC chromosome $CHR"
+    echo "Skipping plotting for this chromosome"
+    exit 0
+fi
+
+echo "REGENIE file has $((line_count - 1)) variants to plot"
+
+echo ""
+echo "====== RUNNING R PLOTTING SCRIPT ======"
+echo "Start time: $(date)"
+
+# Run the R script
+Rscript "$RSCRIPT" "$input_file" "$output_prefix" "$ANC" "$CHR"
+
+if [[ $? -eq 0 ]]; then
+    echo ""
+    echo "====== PLOTTING COMPLETE FOR $ANC CHR$CHR ======"
+    
+    # Check which output files were created
+    expected_files=("${output_prefix}_manhattan.png" "${output_prefix}_qq.png" "${output_prefix}_manhattan.pdf" "${output_prefix}_qq.pdf")
+    created_files=()
+    
+    for file in "${expected_files[@]}"; do
+        if [[ -f "$file" ]]; then
+            created_files+=("$file")
+        fi
+    done
+    
+    if [[ ${#created_files[@]} -gt 0 ]]; then
+        echo "Created plot files:"
+        for file in "${created_files[@]}"; do
+            file_size=$(du -h "$file" | cut -f1)
+            echo "  $file ($file_size)"
+        done
+    else
+        echo "WARNING: No expected plot files were created"
+    fi
+    
+    echo "SUCCESS: Plotting completed for $ANC chromosome $CHR"
+else
+    echo "ERROR: R script failed for $ANC chromosome $CHR"
+    exit 1
+fi
+
+# SYNTAX TO SUBMIT JOB
+# ---------------------------
+# Test single job:
+# bsub -J "anc_plot[1]" < anc_plot.bsub
+# 
+# Run all ancestries and chromosomes:
+# bsub < anc_plot.bsub

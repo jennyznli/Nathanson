@@ -1,0 +1,97 @@
+#!/bin/bash
+#BSUB -J "genome_plot[1-8]"
+#BSUB -o ../log/genome_plot.%J_%I.out
+#BSUB -e ../log/genome_plot.%J_%I.err
+#BSUB -n 2
+#BSUB -M 32GB
+#BSUB -R "rusage[mem=8GB]"
+#BSUB -W 1:00
+
+module load R
+
+# define ancestries
+ancestries=("AFR" "MEN" "EUR" "SAS" "EAS" "AMR" "OCN" "MIX")  # 8 ancestries
+
+# Get ancestry for this job
+ANC="${ancestries[$((LSB_JOBINDEX - 1))]}"
+
+echo "Processing genome-wide plots for Ancestry: $ANC"
+
+# Set up environment
+WDIR="/project/knathans_tecac/jenny/breast"
+MERGED_DIR="$WDIR/analysis/$ANC/merged"
+RSCRIPT="$WDIR/scripts/genome_regenie_plot.R"
+PLOT_DIR="$WDIR/plots/$ANC"
+mkdir -p "$PLOT_DIR"
+
+cd "$WDIR"
+
+# Input merged file
+merged_file="${MERGED_DIR}/breast_${ANC}_genome_maf.regenie"
+
+# Output prefix
+output_prefix="${PLOT_DIR}/breast_${ANC}_genome_maf"
+
+echo "====== RUNNING GENOME-WIDE PLOTTING SCRIPT ======"
+echo "Start time: $(date)"
+
+# Check if R script exists
+if [[ ! -f "$RSCRIPT" ]]; then
+    echo "ERROR: R script not found: $RSCRIPT"
+    exit 1
+fi
+
+# Check if merged file exists
+if [[ ! -f "$merged_file" ]]; then
+    echo "ERROR: Merged file not found: $merged_file"
+    echo "Please run merge_regenie_results.bsub first"
+    exit 1
+fi
+
+# Get file info
+file_size=$(du -h "$merged_file" | cut -f1)
+line_count=$(wc -l < "$merged_file")
+echo "Input file: $merged_file ($file_size, $line_count lines)"
+
+# Run the R script
+Rscript "$RSCRIPT" "$merged_file" "$output_prefix"
+
+if [[ $? -eq 0 ]]; then
+    echo ""
+    echo "====== GENOME-WIDE PLOTTING COMPLETE FOR $ANC ======"
+    
+    # Check which output files were created
+    expected_files=("${output_prefix}_manhattan.png" "${output_prefix}_qq.png" "${output_prefix}_manhattan.pdf" "${output_prefix}_qq.pdf")
+    created_files=()
+    
+    for file in "${expected_files[@]}"; do
+        if [[ -f "$file" ]]; then
+            created_files+=("$file")
+        fi
+    done
+    
+    if [[ ${#created_files[@]} -gt 0 ]]; then
+        echo "Created genome-wide plot files:"
+        for file in "${created_files[@]}"; do
+            file_size=$(du -h "$file" | cut -f1)
+            echo "  $file ($file_size)"
+        done
+    else
+        echo "WARNING: No expected plot files were created"
+    fi
+    
+    echo "SUCCESS: Genome-wide plotting completed for $ANC"
+else
+    echo "ERROR: R script failed for $ANC"
+    exit 1
+fi
+
+echo "End time: $(date)"
+
+# SYNTAX TO SUBMIT JOB
+# ---------------------------
+# Test single ancestry:
+# bsub -J "genome_plot[1]" < genome_plot.bsub
+# 
+# Run all ancestries:
+# bsub < genome_wide_plot.bsub

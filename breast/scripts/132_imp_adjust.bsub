@@ -1,0 +1,157 @@
+#!/bin/bash
+#BSUB -J "overall_step2_psam[1-23]"
+#BSUB -o ../log/overall_step2_psam.%J_%I.out
+#BSUB -e ../log/overall_step2_psam.%J_%I.err
+#BSUB -n 2
+#BSUB -M 16GB              
+#BSUB -R "rusage[mem=8GB]"
+#BSUB -W 0:30
+
+chromosomes=("1" "2" "3" "4" "5" "6" "7" "8" "9" "10" "11" "12" "13" "14" "15" "16" "17" "18" "19" "20" "21" "22" "X")
+CHR="${chromosomes[$((LSB_JOBINDEX - 1))]}"
+
+echo "=== ADJUSTING PSAM FILE FOR CHROMOSOME $CHR ==="
+
+# directory setup
+WDIR="/project/knathans_tecac/jenny/breast/analysis"
+INPUT_DIR="$WDIR/ALL/step2_chr"
+OUTPUT_DIR="$WDIR/ALL/step2"
+mkdir -p "$OUTPUT_DIR"
+cd "$OUTPUT_DIR"
+
+# input/output setup
+input_prefix="${INPUT_DIR}/step2_chr${CHR}_indqc"
+output_prefix="${OUTPUT_DIR}/overall_step2_chr${CHR}"
+common_snps_fam="$WDIR/ALL/step1/common_snps_breast_qc.fam"
+
+echo "Input files: ${input_prefix}.{pgen,pvar,psam}"
+echo "Reference FAM file: $common_snps_fam"
+echo "Output prefix: $output_prefix"
+
+# Check if input files exist
+if [[ ! -f "${input_prefix}.pgen" ]]; then
+    echo "ERROR: Input PGEN file not found: ${input_prefix}.pgen"
+    exit 1
+fi
+
+if [[ ! -f "${input_prefix}.pvar" ]]; then
+    echo "ERROR: Input PVAR file not found: ${input_prefix}.pvar"
+    exit 1
+fi
+
+if [[ ! -f "${input_prefix}.psam" ]]; then
+    echo "ERROR: Input PSAM file not found: ${input_prefix}.psam"
+    exit 1
+fi
+
+if [[ ! -f "$common_snps_fam" ]]; then
+    echo "ERROR: Common SNPs FAM file not found: $common_snps_fam"
+    echo "Please run the overall PCA preparation script first"
+    exit 1
+fi
+
+# Get file sizes for logging
+initial_variants=$(tail -n +2 "${input_prefix}.pvar" | wc -l)
+initial_samples=$(tail -n +2 "${input_prefix}.psam" | wc -l)
+reference_samples=$(wc -l < "$common_snps_fam")
+
+echo ""
+echo "=== FILE INFORMATION ==="
+echo "Input variants: $initial_variants"
+echo "Input samples: $initial_samples"  
+echo "Reference samples: $reference_samples"
+
+# Copy pgen and pvar files (no changes needed)
+echo ""
+echo "=== COPYING GENOTYPE FILES ==="
+echo "Copying PGEN file..."
+cp "${input_prefix}.pgen" "${output_prefix}.pgen"
+
+echo "Copying PVAR file..."
+cp "${input_prefix}.pvar" "${output_prefix}.pvar"
+
+# Create lookup table from reference FAM file
+echo ""
+echo "=== CREATING LOOKUP TABLE ==="
+temp_fam_lookup="${OUTPUT_DIR}/temp_overall_chr${CHR}_fam_lookup.txt"
+awk '{print $1 "\t" $2 "\t" $5 "\t" $6}' "$common_snps_fam" > "$temp_fam_lookup"
+lookup_entries=$(wc -l < "$temp_fam_lookup")
+echo "Created lookup table with $lookup_entries entries"
+
+# Create new PSAM file with correct phenotype and sex coding
+echo "=== ADJUSTING PSAM FILE ==="
+custom_psam="${output_prefix}.psam"
+echo -e "#FID\tIID\tSEX\tPHENO1" > "$custom_psam"
+
+awk 'BEGIN {
+    OFS = "\t"
+    # Read FAM lookup into array
+    while ((getline line < "'"$temp_fam_lookup"'") > 0) {
+        split(line, fields, "\t")
+        fid = fields[1]
+        iid = fields[2]
+        sex = fields[3]
+        pheno = fields[4]
+        key = iid
+        lookup_fid[key] = fid
+        lookup_sex[key] = sex
+        lookup_pheno[key] = pheno
+    }
+    close("'"$temp_fam_lookup"'")
+}
+NR > 1 {  # Skip header line in input PSAM
+    iid = $1  # IID is in first column of your PSAM
+    key = iid
+    fid_val = (key in lookup_fid) ? lookup_fid[key] : "0"
+    sex_val = (key in lookup_sex) ? lookup_sex[key] : "0"
+    pheno_val = (key in lookup_pheno) ? lookup_pheno[key] : "0"
+    print fid_val, iid, sex_val, pheno_val
+}' "${input_prefix}.psam" >> "$custom_psam"
+
+echo "Phenotype distribution in output:"
+echo "  Cases (2): $cases_count"
+echo "  Controls (1): $controls_count"
+echo "  Missing: $missing_count"
+
+# Sample of output
+echo ""
+echo "Sample of adjusted PSAM file (first 5 lines):"
+head -6 "$custom_psam" | column -t
+
+if [[ $final_samples -eq $initial_samples ]]; then
+    echo ""
+    echo "✓ SUCCESS: PSAM file adjusted for chromosome $CHR"
+    echo "  Input samples: $initial_samples"
+    echo "  Output samples: $final_samples"
+    echo "  Output files: ${output_prefix}.{pgen,pvar,psam}"
+    
+    # Clean up temp files
+    rm -f "$temp_fam_lookup"
+    
+else
+    echo ""
+    echo "✗ ERROR: Sample count mismatch for chromosome $CHR"
+    echo "  Expected: $initial_samples"
+    echo "  Got: $final_samples"
+    exit 1
+fi
+
+echo ""
+echo "=== SUMMARY ==="
+echo "Chromosome: $CHR"
+echo "Input variants: $initial_variants"
+echo "Output variants: $initial_variants (unchanged)"
+echo "Input samples: $initial_samples"
+echo "Output samples: $final_samples"
+echo "Cases: $cases_count"
+echo "Controls: $controls_count"
+echo "Missing: $missing_count"
+echo "Completed at: $(date)"
+
+# SYNTAX TO SUBMIT JOB
+# ---------------------------
+# Test single chromosome:
+# bsub -J "overall_step2_psam[1]" < overall_step2_psam_fix.bsub
+#
+# Run all chromosomes:
+# bsub < overall_step2_psam_fix.bsub
