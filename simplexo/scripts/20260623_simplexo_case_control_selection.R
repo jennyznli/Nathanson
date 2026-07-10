@@ -23,6 +23,7 @@ hx <- fread(file.path(pmbb4, "PMBB-Release-2026-4.0_phenotype_family_hx.txt"), h
 
 # progeny
 progeny_unmerged <- read_excel(here("simplexo", "ss", "br_pts_for_exwas_10022025.xlsx"))
+
 flags <- read.csv(here("PMBB", "3.0", "rgcname_pmbbid_metadata_flags.csv"))
 up <- read.csv(here("simplexo", "data", "simplexo_up_map.csv"))
 
@@ -43,36 +44,72 @@ length(seq_ids)
 # 70408
 
 # ========================
-# PROGENY - PREPROCESS
+# PROGENY
 # ========================
+# filter out benign tissues, restrict to females
 progeny_clean <- progeny_unmerged %>%
     inner_join(up, by = "SampNum") %>%
     filter(Diagnosis != "Normal Benign Tissue" | is.na(Diagnosis)) %>%
-    filter(Gender == "F")
+    filter(Gender == "F") %>%
+    rename(person_id = PMBB_ID)
 
+# merge to individual level
 progeny <- progeny_clean %>%
     merge_duplicates("SampNum")
-dim(progeny)
+
+# function to extract earliest age from semicolon-separated string
+get_earliest_age <- function(age_str) {
+    if (is.na(age_str) || is.null(age_str) || age_str == "" || age_str == "NA") {
+        return(NA)
+    }
+    age_str <- as.character(age_str)
+    age_parts <- strsplit(age_str, ";")[[1]]
+    ages <- suppressWarnings(as.numeric(age_parts))
+    valid_ages <- ages[!is.na(ages)]
+    if (length(valid_ages) == 0) {
+        warning(paste("No valid ages found in:", age_str))
+        return(NA)
+    }
+    if (any(valid_ages < 0)) {
+        warning(paste("Negative age found in:", age_str))
+    }
+    return(min(valid_ages))
+}
+
+progeny$CaDxAge_Progeny <- sapply(progeny$CaDxAge, get_earliest_age)
+progeny$CaDxAge_Progeny[is.infinite(progeny$CaDxAge_Progeny)] <- NA
+progeny_ages <- progeny %>% select(person_id, CaDxAge_Progeny)
+
+progeny_ids <- sort(unique(progeny$person_id))
+length(progeny_ids)
 # 1517
 
-progeny_ids <- sort(progeny$person_id)
-
 # ============================================================
-# PMCR - PREPROCESS
+# PMCR
 # ============================================================
+# restrict to breast and females
 pmcr_unmerged <- pmcr_all %>%
     filter(SeerSiteRecode2023ExpandedGroup == "Breast") %>%
     left_join(brca, by = "person_id") %>%
     left_join(cov,  by = "person_id") %>%
     filter(sequenced_gender == "Female")
 
+# calc age of dx
 pmcr <- pmcr_unmerged %>%
     merge_duplicates("person_id") %>%
     left_join(person %>% select("person_id", "birth_datetime"), by = "person_id")
-dim(pmcr)
-# 3090
 
-pmcr_ids <- sort(pmcr$person_id)
+pmcr$CaDxAge_PMCR <- as.numeric(difftime(
+    pmcr$FirstDxDate,
+    pmcr$birth_datetime,
+    units = "days"
+)) / 365.25
+
+pmcr_ages <- pmcr %>% select(person_id, CaDxAge_PMCR)
+pmcr_ids <- sort(unique(pmcr$person_id))
+
+length(pmcr_ids)
+# 3090
 
 # ========================
 # ICD SELECTION
@@ -80,8 +117,8 @@ pmcr_ids <- sort(pmcr$person_id)
 source(here("R", "sample_selection_f4.R"))
 breast_results_f4 <- select_samples_f4(
     sample_name = "simplexo4",
-    icd_codes = c("^C50", "^Z85.3", # ICD10 - malignant
-                  "^D05", "^Z86.000", # ICD10 - DCIS
+    icd_codes = c("^C50", "^Z85.3",            # ICD10 - malignant
+                  "^D05", "^Z86.000",          # ICD10 - DCIS
                   "^174", "^V10.3", "^233.0"), #ICD9 - both
     gender_filter = "Female",
     crep_filter = NULL,
@@ -93,14 +130,24 @@ breast_results_f4 <- select_samples_f4(
     data_dir = here("simplexo", "data"),
     log_dir = here("simplexo", "log")
 )
+
+# add birth date for age of dx calc
 icd <- breast_results_f4$filtered_patients %>%
     left_join(person %>% select(person_id, birth_datetime), by = "person_id")
-icd_ids <- breast_results_f4$filtered_patients$person_id
-dim(icd)
+icd$CaDxAge_ICD <- as.numeric(difftime(
+    icd$first_date,
+    icd$birth_datetime,
+    units = "days"
+)) / 365.25
+icd_ages <- icd %>% select(person_id, CaDxAge_ICD)
+
+icd_ids <- sort(unique(breast_results_f4$filtered_patients$person_id))
+
+length(icd_ids)
 # 4582
 
 # ============================================================
-# TEMP CASE LIST
+# INITIAL CASE LIST
 # ============================================================
 case_ids <- sort(unique(c(icd_ids, progeny_ids, pmcr_ids)))
 length(case_ids)
@@ -109,55 +156,8 @@ length(case_ids)
 write.csv(case_ids, file.path(here("simplexo", "data", "simplexo4_case_ids_temp.csv")))
 
 # ============================================================
-# GET AGES
+# FIND AGE of DX
 # ============================================================
-### PMCR
-pmcr$CaDxAge_PMCR <- as.numeric(difftime(
-    pmcr$FirstDxDate,
-    pmcr$birth_datetime,
-    units = "days"
-)) / 365.25
-pmcr_ages <- pmcr %>% select(person_id, CaDxAge_PMCR)
-
-### PROGENY
-# Function to extract earliest age from semicolon-separated string
-get_earliest_age <- function(age_str) {
-    if (is.na(age_str) || is.null(age_str) || age_str == "" || age_str == "NA") {
-        return(NA)
-    }
-
-    age_str <- as.character(age_str)
-    age_parts <- strsplit(age_str, ";")[[1]]
-    ages <- suppressWarnings(as.numeric(age_parts))
-    valid_ages <- ages[!is.na(ages)]
-
-    if (length(valid_ages) == 0) {
-        warning(paste("No valid ages found in:", age_str))
-        return(NA)
-    }
-
-    if (any(valid_ages < 0)) {
-        warning(paste("Negative age found in:", age_str))
-    }
-
-    return(min(valid_ages))
-}
-
-progeny$CaDxAge_Progeny <- sapply(progeny$CaDxAge, get_earliest_age)
-progeny$CaDxAge_Progeny[is.infinite(progeny$CaDxAge_Progeny)] <- NA
-progeny_ages <- progeny %>% select(person_id, CaDxAge_Progeny)
-
-### ICD CODES
-icd$CaDxAge_ICD <- as.numeric(difftime(
-    icd$first_date,
-    icd$birth_datetime,
-    units = "days"
-)) / 365.25
-icd_ages <- icd %>% select(person_id, CaDxAge_ICD)
-
-# ========================
-# MERGE ALL DIAGNOSIS AGES
-# ========================
 case_seq_ids <- intersect(case_ids, seq_ids)
 length(case_seq_ids)
 # 5120
@@ -168,23 +168,62 @@ age_df <- base_df %>%
     left_join(pmcr_ages, by = "person_id") %>%
     left_join(icd_ages, by = "person_id") %>%
     mutate(
-        Age = coalesce(CaDxAge_Progeny, CaDxAge_PMCR, CaDxAge_ICD),
+        # priority order: progeny, pmcr, ICD
+        CaDxAge = coalesce(CaDxAge_Progeny, CaDxAge_PMCR, CaDxAge_ICD),
+        # earliest diagnosis
         EarliestDiagnosis = pmin(CaDxAge_Progeny, CaDxAge_PMCR, CaDxAge_ICD, na.rm = TRUE),
-        EarliestDiagnosis = if_else(is.infinite(EarliestDiagnosis), NA_real_, EarliestDiagnosis)
+        EarliestDiagnosis = if_else(is.infinite(EarliestDiagnosis), NA_real_, EarliestDiagnosis),
+        AgeDxDiscrepancyFlag = abs(CaDxAge - EarliestDiagnosis) > 2
     )
 
 age_df_sel <- age_df %>%
-    select(person_id, Age) %>%
-    filter(!is.na(Age)) %>%
-    mutate(Age = round(Age, 2))
-cat("Final cases with age:", nrow(age_df_sel), "records\n")
+    select(person_id, CaDxAge) %>%
+    filter(!is.na(CaDxAge)) %>%
+    mutate(Age = round(CaDxAge, 2))
+
+dim(age_df_sel)
 # 5117
+
+final_ids <- sort(unique(age_df_sel$person_id))
+final_df <- cov %>% filter(person_id %in% final_ids) %>%
+    left_join(age_df_sel, by = "person_id")
 
 write.table(age_df_sel, here("simplexo", "data", "simplexo4_overall_case_age_df.txt"),
             row.names = FALSE, quote = FALSE, sep = "\t")
 
-write.table(sort(age_df_sel$person_id), here("simplexo", "data", "simplexo4_overall_case_ids.txt"),
+write.table(final_df, here("simplexo", "data", "simplexo4_overall_cov_df.txt"),
+            row.names = FALSE, quote = FALSE, sep = "\t")
+
+write.table(final_ids, here("simplexo", "data", "simplexo4_overall_case_ids.txt"),
             row.names = FALSE, col.names = FALSE, quote = FALSE)
+
+# ========================
+# QUICK OVERVIEW
+# ========================
+table(final_df$batch)
+# 1    2    3
+# 2095 2393  629
+
+table(final_df$crep_highrisk_flag)
+# 0    1
+# 3549 1568
+
+table(final_df$sequenced_gender)
+# good
+
+summary(final_df$Age)
+sd(final_df$Age, na.rm = TRUE)
+
+table(final_df$AgeDxDiscrepancyFlag, useNA = "ifany")
+
+p_age_hist <- ggplot(final_df, aes(x = Age)) +
+    geom_histogram(bins = 20, color = "pink", fill = "pink", alpha = 0.7) +
+    labs(title = "Age of Diagnosis - Cases", x = "Age", y = "Count") +
+    theme_minimal()
+
+ggsave(here("simplexo", "figures", "simplexo4_case_age_histogram.png"),
+       plot = p_age_hist, width = 6, height = 4, dpi = 300)
+
 
 # ========================
 # MALIGNANT NEOPLASM CODES
@@ -203,6 +242,9 @@ malig_neoplasms <- c(
 # CONTROL SELECTION
 # ========================
 source(here("R", "control_selection_f4.R"))
+dim(cov)
+# 70925
+
 breast_controls_f4 <- select_controls_f4(
     control_name = "simplexo4",
     exclude_codes = malig_neoplasms,
@@ -220,12 +262,98 @@ controls <- breast_controls_f4$final_controls %>%
     filter(!(person_id %in% progeny$person_id)) %>%   # should not be in progeny but may be redundnt
     filter(person_id %in% seq_ids) %>%
     select(person_id, sample_age, sequenced_gender)
-
-print(paste("Final control count:", nrow(controls)))
+dim(controls)
 # 18209
 
-write.table(controls$person_id, here("simplexo", "data", "simplexo4_overall_control_ids.txt"),
+control_ids <- sort(unique(controls$person_id))
+
+write.table(control_ids, here("simplexo", "data", "simplexo4_overall_control_ids.txt"),
             quote = FALSE, row.names = FALSE, col.names = FALSE)
+
+write.table(controls, here("simplexo", "data", "simplexo4_overall_control_df.txt"),
+            quote = FALSE, row.names = FALSE, col.names = FALSE)
+
+# ========================
+# FINAL COVARIATEs
+# ========================
+all_ids <- unique(c(control_ids, final_ids))
+
+pmbb_ages <- cov %>%
+    select(person_id, sample_age)
+
+case_ages <- age_df_sel %>%
+    select(person_id, CaDxAge)
+
+# merge
+all_ages <- pmbb_ages %>%
+    filter(person_id %in% all_ids) %>%
+    left_join(case_ages, by = "person_id") %>%
+    # select dx age, then sample age
+    mutate(Age = coalesce(CaDxAge, sample_age)) %>%
+    select(person_id, Age)
+dim(all_ages)
+# 23326
+
+all_cov <- cov %>% filter(person_id %in% all_ids) %>%
+    left_join(all_ages, by = "person_id") %>%
+    mutate(Group = if_else(person_id %in% final_ids, "1", "0")) %>%
+    select(person_id, batch, Group, Age)
+case_control_ids <- sort(all_cov$person_id)
+length(case_control_ids)
+# 23326
+
+table(all_cov$Group)
+
+write.table(all_cov, here("simplexo", "data", "simplexo4_overall_case_control_cov_df.txt"),
+            row.names = FALSE, quote = FALSE, sep = "\t")
+
+write.table(case_control_ids, here("simplexo", "data", "simplexo4_overall_case_control_ids.txt"),
+            row.names = FALSE, quote = FALSE, sep = "\t")
+
+write.table(all_ages, here("simplexo", "data", "simplexo4_overall_case_control_age_df.txt"),
+            row.names = FALSE, quote = FALSE, sep = "\t")
+
+# ========================
+# DIAGNOSTIC PLOTS
+# ========================
+all_cov$batch <- as.factor(all_cov$batch)
+all_cov$sequenced_gender <- as.factor(all_cov$sequenced_gender)
+all_cov$crep_highrisk_flag <- as.factor(all_cov$crep_highrisk_flag)
+all_cov$Group <- factor(all_cov$Group, levels = c("Case", "Control"))
+
+### stacked bar plots
+group_totals <- all_cov %>% count(Group)
+
+p_stack <- ggplot(all_cov, aes(x = Group, fill = batch)) +
+    geom_bar(position = "stack", color = "darkgray") +
+    geom_text(stat = "count", aes(label = after_stat(count)), position = position_stack(vjust = 0.5), size = 3) +
+    geom_text(data = group_totals, aes(x = Group, y = n, label = n), inherit.aes = FALSE, vjust = -0.5) +
+    scale_fill_brewer(type = "qual", palette = "Set3") +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+    labs(title = paste("Case vs Control - Batch"), x = "Group", y = "Count", fill = all_cov$batch) +
+    theme_minimal()
+ggsave(here("simplexo", "figures", paste0("simplexo4_stacked_bar_batch.png")),
+       plot = p_stack, width = 4, height = 4, dpi = 300)
+
+p_stack <- ggplot(all_cov, aes(x = Group, fill = crep_highrisk_flag)) +
+    geom_bar(position = "stack", color = "darkgray") +
+    geom_text(stat = "count", aes(label = after_stat(count)), position = position_stack(vjust = 0.5), size = 3) +
+    geom_text(data = group_totals, aes(x = Group, y = n, label = n), inherit.aes = FALSE, vjust = -0.5) +
+    scale_fill_brewer(type = "qual", palette = "Set3") +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
+    labs(title = paste("Case vs Control - CREP"), x = "Group", y = "Count", fill = all_cov$crep_highrisk_flag) +
+    theme_minimal()
+ggsave(here("simplexo", "figures", paste0("simplexo4_stacked_bar_crep.png")),
+       plot = p_stack, width = 4, height = 4, dpi = 300)
+
+### histogram by age
+p_age_overlay <- ggplot(all_cov, aes(x = Age, fill = Group)) +
+    geom_histogram(bins = 30, alpha = 0.6, position = "identity", color = "darkgray") +
+    scale_fill_manual(values = c(Case = "purple", Control = "darkgray")) +
+    labs(title = "Age Distribution - Case vs Control", x = "Age", y = "Count") +
+    theme_minimal()
+ggsave(here("simplexo", "figures", "simplexo4_age_histogram_overlay.png"),
+       plot = p_age_overlay, width = 6, height = 4, dpi = 300)
 
 # ========================================================================
 # FAMILY HISTORY

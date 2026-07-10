@@ -20,7 +20,7 @@ brca <- fread(file.path(pmbb4, "PMBB-Release-2026-4.0_phenotype_cancer_brca.txt"
 hx <- fread(file.path(pmbb4, "PMBB-Release-2026-4.0_phenotype_family_hx.txt"), header = TRUE)
 
 # progeny
-progeny_umerged <- read_excel(here("simplexo", "ss", "br_pts_for_exwas_10022025.xlsx"))
+progeny_unmerged <- read_excel(here("simplexo", "ss", "br_pts_for_exwas_10022025.xlsx"))
 flags <- read.csv(here("PMBB", "3.0", "rgcname_pmbbid_metadata_flags.csv"))
 up <- read.csv(here("simplexo", "data", "simplexo_up_map.csv"))
 
@@ -39,10 +39,10 @@ length(seq_ids)
 # ========================
 # PROGENY - PREPROCESS
 # ========================
-dim(progeny_umerged)
+dim(progeny_unmerged)
 # 5046
 
-progeny_case <- progeny_umerged %>% filter(Gender == "F") %>%
+progeny_case <- progeny_unmerged %>% filter(Gender == "F") %>%
     merge_duplicates("SampNum") %>%
     inner_join(up, by = "SampNum")
 dim(progeny_case)
