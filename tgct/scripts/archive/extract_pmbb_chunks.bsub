@@ -1,0 +1,69 @@
+#!/bin/bash
+#BSUB -J "pmbb_extract[1-989]"
+#BSUB -o ../log/pmbb_extract.%J_%I.out
+#BSUB -e ../log/pmbb_extract.%J_%I.err
+#BSUB -n 1
+#BSUB -M 16000
+#BSUB -R "rusage[mem=16GB]"
+#BSUB -W 2:00
+
+### EXTRACT GRAFANC REFERENCE SNPS ###
+
+module load plink/1.9-20210416
+
+# Set up environment
+IMPUTED_DATA_DIR="/static/PMBB/PMBB-Release-2026-4.0/Imputed"
+WDIR="/project/knathans_tecac/TGCT_PRS_jenny"
+OUTPUT_DIR="$WDIR/pmbb4/chunk_bed"
+LOG_DIR="$OUTPUT_DIR/logs"
+cd $WDIR
+
+mkdir -p "$LOG_DIR"
+mkdir -p "$OUTPUT_DIR"
+
+# Input files 
+ancestry_ref="${WDIR}/snp-extract-list3"
+input_manifest="${IMPUTED_DATA_DIR}/metadata/imputed_variant_chunked_input_manifest.tsv"
+
+read chrid chunk start_pos stop_pos < <(awk -v i="$LSB_JOBINDEX" '$1 == i {print $2, $3, $4, $5}' "$input_manifest")
+
+input_prefix="${IMPUTED_DATA_DIR}/chunked_bed_files/PMBB-Release-2026-4.0_genetic_imputed.*_chr${chrid}_chunk${chunk}_${start_pos}_${stop_pos}"
+output="${OUTPUT_DIR}/pmbb4_${chrid}_chunk${chunk}"
+
+chrid_numeric=$(echo "$chrid" | sed 's/^chr//')
+initial_variants=$(wc -l < "${input_prefix}.bim")
+
+echo "Processing chunk ${chrid}_${chunk} (${start_pos}-${stop_pos})"
+
+temp_ancestry_snps="${OUTPUT_DIR}/grafanc_ids_${chrid}_chunk${chunk}.tmp"
+
+awk '
+NR==FNR && NR>1 {
+    positions[$1"_"$3]=1
+    next
+}
+($1"_"$4) in positions {print $2}
+' "$ancestry_ref" "${input_prefix}.bim" > "$temp_ancestry_snps"
+    
+if [[ ! -s "$temp_ancestry_snps" ]]; then
+    echo "WARNING: No ancestry SNPs found for chunk ${chrid}_${chunk}"
+    echo "Creating empty output files..."
+    
+    final_variants=0
+else
+    ancestry_snp_count=$(wc -l < "$temp_ancestry_snps")
+    
+    plink --bfile "$input_prefix" \
+          --extract "$temp_ancestry_snps" \
+          --make-bed \
+          --out "$output" 
+
+    final_variants=$(wc -l < "${output}.bim")
+fi
+
+# rm -f "$temp_ancestry_snps"
+
+echo -e "${chrid_numeric}\t${chunk}\t${start_pos}\t${stop_pos}\t${initial_variants}\t${final_variants}" > "${LOG_DIR}/pmbb4_${chrid}_chunk${chunk}.tsv"
+
+# ---------------------------
+# bsub -hl -J "grafanc_extract[1]" < 00_extract_chunks.bsub

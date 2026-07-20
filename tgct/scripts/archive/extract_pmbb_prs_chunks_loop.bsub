@@ -1,0 +1,44 @@
+#!/bin/bash
+#BSUB -J "pmbb_prs_extract_loop"
+#BSUB -o ../log/pmbb_prs_extract_loop.out
+#BSUB -e ../log/pmbb_prs_extract_loop.err
+#BSUB -n 1
+#BSUB -M 4000
+#BSUB -R "rusage[mem=4GB]"
+#BSUB -W 1:00
+
+### EXTRACT PRS SNPS FROM PMBB FREEZE 4 (only relevant chunks) ###
+
+module load plink/1.9-20210416
+
+IMPUTED_DATA_DIR="/static/PMBB/PMBB-Release-2026-4.0/Imputed"
+WDIR="/project/knathans_tecac/TGCT_PRS_jenny"
+OUTPUT_DIR="$WDIR/pmbb4/prs_chunk_bed"
+mkdir -p "$OUTPUT_DIR"
+cd $WDIR
+
+prs_snp_list="${WDIR}/prs-extract-list"
+relevant_chunks="${WDIR}/relevant_chunks.tsv"
+
+while read -r idx chrid chunk start_pos stop_pos; do
+    input_prefix="${IMPUTED_DATA_DIR}/chunked_bed_files/PMBB-Release-2026-4.0_genetic_imputed.${idx}_${chrid}_chunk${chunk}_${start_pos}_${stop_pos}"
+    output="${OUTPUT_DIR}/pmbb4_prs_${chrid}_chunk${chunk}"
+    temp_prs_snps="${OUTPUT_DIR}/prs_ids_${chrid}_chunk${chunk}.tmp"
+
+    echo "Processing chunk ${chrid}_${chunk} (${start_pos}-${stop_pos})"
+
+    grep -Ff "$prs_snp_list" "${input_prefix}.bim" | awk '{print $2}' > "$temp_prs_snps"
+
+    if [[ -s "$temp_prs_snps" ]]; then
+        plink --bfile "$input_prefix" \
+              --extract "$temp_prs_snps" \
+              --make-bed \
+              --out "$output"
+    else
+        echo "WARNING: no PRS SNPs found in chunk ${chrid}_${chunk} despite manifest overlap"
+    fi
+done < "$relevant_chunks"
+
+# ---------------------------
+# 1. bash find_relevant_pmbb_chunks.sh
+# 2. bsub < extract_pmbb_prs_chunks_loop.bsub
