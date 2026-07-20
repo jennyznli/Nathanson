@@ -1,0 +1,48 @@
+#!/bin/bash
+#BSUB -J "gl_qc[1-22]"
+#BSUB -o logs/chr_qc/chr%I.o
+#BSUB -e logs/chr_qc/chr%I.e
+#BSUB -n 1
+#BSUB -R "rusage[mem=64GB]"
+
+module load bcftools/1.20
+
+# Directory setup
+INPUT_DIR="/static/PMBB/PMBB-Release-2026-4.0/Exome/by_chromosome_GL"
+OUTPUT_DIR="vep_gl"
+
+mkdir -p $OUTPUT_DIR
+mkdir -p logs
+
+# Get chromosome number from job array index
+CHR=$LSB_JOBINDEX
+
+# Define file paths
+INPUT="${INPUT_DIR}/PMBB-Release-2026-4.0_genetic_exome.gl.chr${CHR}.vcf.gz"
+OUTPUT_TAGS="${OUTPUT_DIR}/chr${CHR}_gl.tags.bcf"
+OUTPUT_QC="${OUTPUT_DIR}/chr${CHR}_gl.tags.qc.bcf"
+
+echo "Processing chromosome ${CHR}"
+echo "Input: ${INPUT}"
+echo "Output: ${OUTPUT_QC}"
+
+# Step 1: Add tags
+echo "Adding tags..."
+bcftools +fill-tags ${INPUT} -W=csi -Ob -o ${OUTPUT_TAGS} \
+  -- -t VAF,AC,AC_Het,AC_Hom,AC_Hemi,AF,AN,NS,MAF,ExcHet,F_MISSING,HWE
+
+# Step 2: Apply variant QC filters
+echo "Applying QC filters..."
+bcftools filter -s ExcessHet -e 'INFO/ExcHet=0' -m + ${OUTPUT_TAGS} | \
+bcftools filter -s LowCallRate -e 'INFO/F_MISSING > 0.05' -m + | \
+bcftools filter -s LowSampleCount -e 'INFO/NS < 1000' -m + | \
+bcftools filter -s NoHQHet -e 'COUNT(FORMAT/GT="0/1" && FORMAT/DP>=10 && FORMAT/GQ>=20 && FORMAT/VAF>0.2)=0' -m + \
+  -W=csi -Ob -o ${OUTPUT_QC}
+
+echo "Chromosome ${CHR} complete"
+
+# ---------------------------
+# Submit with:
+# bsub < pmbb_qc.bsub
+# Or submit specific chromosomes:
+# bsub -J "gl_qc[1,5,10]" < gl_qc.bsub
