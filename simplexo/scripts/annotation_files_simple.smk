@@ -1,53 +1,53 @@
 #needs vep_vcf_parser2.py
 
 # =============================================================================
-# ANNOTATION FILES (annotation_files3.smk) -- MNP correction removed
+# ANNOTATION FILES (SIMPLE) -- annotation_files_simple.smk
 # =============================================================================
-# - Passing-sample subset → het_miss BCF + no-sample VCF; VEP that track for QC CSVs.
-# - rv-qc exclusions applied directly to the (uncorrected) het_miss BCF/VEP. include rare_variant_qc.smk.
+# Preliminary-run copy of annotation_files3.smk with rare-variant QC skipped
+# entirely (its freeze2-vs-freeze3 logic needs generalizing to N freezes now
+# that freeze4 exists -- see rare_variant_qc.smk / rare_variant_qc.py for the
+# real version, to be reintroduced later). No rare_variant_qc.smk include, no
+# exclusion step, no pathogenic_vus cross-check, no sample subsetting -- VEP
+# starts straight off site-qc.bcf and goes straight to the final annotation
+# pgen/vcf.
 # =============================================================================
-
-include: "rare_variant_qc.smk"
 
 CHROMOSOMES_AUTOSOMAL=list(range(1,23))
 
 wildcard_constraints:
     CHR='[0-9]+'
 
-rule annotation_files:
+rule annotation_files_simple:
     input:
         expand("data/preprocess/chr{CHR}.annotation.pgen",CHR=CHROMOSOMES_AUTOSOMAL),
         expand("data/preprocess/chr{CHR}.annotation.pvar",CHR=CHROMOSOMES_AUTOSOMAL),
         expand("data/preprocess/chr{CHR}.annotation.psam",CHR=CHROMOSOMES_AUTOSOMAL),
         expand("data/preprocess/chr{CHR}.annotation.no_sample.vep.vcf",CHR=CHROMOSOMES_AUTOSOMAL),
         expand("data/preprocess/chr{CHR}.annotation.no_sample.vep.report.csv",CHR=CHROMOSOMES_AUTOSOMAL),
-        expand("data/bcftools/chr{CHR}.site-qc.het_miss.no_sample.vep.report.csv",CHR=CHROMOSOMES_AUTOSOMAL),
         final_variant_stats=expand("data/qc/reports/chr{CHR}.final.variant_types.txt",CHR=CHROMOSOMES_AUTOSOMAL),
-        rare_qc_exclusions="data/qc/exclusions/rare_variant_exclusions.txt",
 
 # -----------------------------------------------------------------------------
-# 1. No sample subsetting (VEP starts immediately). Output: BCF + no-sample VCF.
+# 1. No sample subsetting (VEP starts immediately). Output: no-sample VCF,
+#    derived straight from site-qc.bcf -- downstream rules that need
+#    genotypes read site-qc.bcf directly, no intermediate copy needed.
 # -----------------------------------------------------------------------------
-rule bcftools_subset_passing_het_miss:
+rule bcftools_no_sample_vcf:
     input:
-        bcf="data/bcftools/chr{CHR}.site-qc.bcf",
+        bcf="data/bcftools/chr{CHR}.site-qc.bcf"
     output:
-        bcf="data/bcftools/chr{CHR}.site-qc.het_miss.bcf",
-        vcf="data/bcftools/chr{CHR}.site-qc.het_miss.no_sample.vcf"
+        vcf="data/bcftools/chr{CHR}.site-qc.no_sample.vcf"
     shell:
-        """
-        bcftools view -a -Ob -W=csi -o {output.bcf} {input.bcf}
-        bcftools view -G -Ov -o {output.vcf} {output.bcf}
-        """
+        "bcftools view -G -Ov -o {output.vcf} {input.bcf}"
 
 # -----------------------------------------------------------------------------
-# 2. First VEP annotation (used directly as final annotation VEP in NO-MNP mode).
+# 2. VEP annotation -- written directly to its final preprocess path (no
+#    rare-variant-QC exclusion step to stage/copy through anymore).
 # -----------------------------------------------------------------------------
 rule first_variant_annotation:
     input:
-        "data/bcftools/chr{CHR}.site-qc.het_miss.no_sample.vcf"
+        "data/bcftools/chr{CHR}.site-qc.no_sample.vcf"
     output:
-        "data/bcftools/chr{CHR}.site-qc.het_miss.no_sample.vep.vcf"
+        "data/preprocess/chr{CHR}.annotation.no_sample.vep.vcf"
     threads: 16
     resources:
         mem_mb=48000
@@ -82,41 +82,9 @@ rule first_variant_annotation:
         --plugin MaveDB,file=/opt/vep/.vep/mavedb/MaveDB_variants.tsv.gz
         """
 
-rule parse_first_variant_annotation:
-    input:
-        "data/bcftools/chr{CHR}.site-qc.het_miss.no_sample.vep.vcf"
-    output:
-        "data/bcftools/chr{CHR}.site-qc.het_miss.no_sample.vep.report.csv"
-    shell:
-        """
-        source $(conda info --base)/etc/profile.d/conda.sh
-        conda activate vep_parser
-        python vep_vcf_parser2.py -i {input} -o {output} -m no_sample
-        """
-
-
-#MNP pipeline removed: no adjust_mnp_vep/parse_adjust_mnp_vep/adjust_mnp_gt.
-#preprocess_pathogenic_vus and count_variant_types_final now read directly
-#from the uncorrected het_miss BCF/VEP outputs instead of the MNP-merged ones.
-
-rule preprocess_pathogenic_vus:
-    input:
-        expand("data/bcftools/chr{CHR}.site-qc.het_miss.no_sample.vep.report.csv",CHR=CHROMOSOMES_AUTOSOMAL)
-    output:
-        "data/preprocess/pathogenic_vus.csv"
-    shell:
-        """
-        echo '"ID","Gene","Variant.LoF_level","HGVSc","HGVSp"' > {output}
-        for vep_file in {input}; do
-            if [ -f "$vep_file" ]; then
-                awk -F',' '($9 == "\\"1\\"" || $9 == "\\"2\\"") {{print $6 "," $7 "," $9 "," $13 "," $14}}' "$vep_file" >> {output}
-            fi
-        done
-        """
-
 rule count_variant_types_final:
     input:
-        bcf="data/bcftools/chr{CHR}.site-qc.het_miss.bcf"
+        bcf="data/bcftools/chr{CHR}.site-qc.bcf"
     output:
         "data/qc/reports/chr{CHR}.final.variant_types.txt"
     shell:
@@ -129,38 +97,28 @@ rule count_variant_types_final:
         echo "OTHER $(bcftools view -v other -H {input.bcf} | wc -l)" >> {output}
         """
 
-# Drop variants flagged by rare_variant_qc (per-chr TSV) before annotation PGEN / counts.
-rule bcftools_exclude_rare_variant_qc_flags:
-    input:
-        bcf="data/bcftools/chr{CHR}.site-qc.het_miss.bcf",
-        vep="data/bcftools/chr{CHR}.site-qc.het_miss.no_sample.vep.vcf",
-        ids="data/qc/exclusions/rare_variant_exclusions.txt"
-    output:
-        bcf="data/bcftools/chr{CHR}.site-qc.het_miss.rv-qc.bcf",
-        vep="data/preprocess/chr{CHR}.annotation.no_sample.vep.vcf",
-    shell:
-        """
-        bcftools view -e 'ID=@{input.ids}' -Ob -W=csi -o {output.bcf} {input.bcf}
-        bcftools view -e 'ID=@{input.ids}' -Ov -o {output.vep} {input.vep}
-        """
-
+# -----------------------------------------------------------------------------
+# 3. plink2 pgen conversion -- directly from site-qc.bcf, no rare-variant-QC
+#    exclusion applied (skipped for this preliminary run).
+# -----------------------------------------------------------------------------
 rule plink2_annotation_pgen:
     input:
-        bcf="data/bcftools/chr{CHR}.site-qc.het_miss.rv-qc.bcf",
+        bcf="data/bcftools/chr{CHR}.site-qc.bcf",
         sex_file="data/plink/chrX.sex_update.txt"
     output:
         pgen="data/preprocess/chr{CHR}.annotation.pgen",
         pvar="data/preprocess/chr{CHR}.annotation.pvar",
         psam="data/preprocess/chr{CHR}.annotation.psam"
     params:
-        output_prefix="data/preprocess/chr{CHR}.annotation" 
+        output_prefix="data/preprocess/chr{CHR}.annotation"
+    threads: 16
     shell:
         """
-        plink2 --bcf {input.bcf} --update-sex {input.sex_file} --double-id --vcf-half-call reference --make-pgen --out {params.output_prefix}
+        plink2 --threads {threads} --bcf {input.bcf} --update-sex {input.sex_file} --double-id --vcf-half-call reference --make-pgen --out {params.output_prefix}
         """
 
 # -----------------------------------------------------------------------------
-# 5. Parse final annotation VEP to report CSV.
+# 4. Parse final annotation VEP to report CSV.
 # -----------------------------------------------------------------------------
 rule parse_annotation_no_sample_vep:
     input:

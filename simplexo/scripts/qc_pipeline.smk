@@ -58,7 +58,7 @@ rule generate_qc_report:
         variant_afreq=expand("data/plink/chr{CHR}.site-qc.var-qc.afreq",CHR=CHROMOSOMES_AUTOSOMAL),
         variant_vmiss=expand("data/plink/chr{CHR}.site-qc.var-qc.vmiss",CHR=CHROMOSOMES_AUTOSOMAL),
         variant_hardy=expand("data/plink/chr{CHR}.site-qc.var-qc.hardy",CHR=CHROMOSOMES_AUTOSOMAL),
-        postmnp_stats=expand("data/qc/reports/chr{CHR}.postmnp.variant_types.txt",CHR=CHROMOSOMES_AUTOSOMAL),
+        final_variant_stats=expand("data/qc/reports/chr{CHR}.final.variant_types.txt",CHR=CHROMOSOMES_AUTOSOMAL),
         # MNP validation metrics are optional in exwas_qc_report2.Rmd (loaded if file exists).
     output:
         dated=f"exwas_qc_report.{DATE}.html",

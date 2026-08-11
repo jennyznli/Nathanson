@@ -13,6 +13,7 @@ params:
   input_dir: "output"
   output_dir: "reports"
   pheno_file: "input/PROJECT.regenie.pheno.txt"
+  pheno_col: "STATUS"
   single_variant_pattern: "PROJECT.chr{CHR}.step2_single_variant_STATUS.regenie"
   gene_based_pattern: "PROJECT.chr{CHR}.step2_gene_based_STATUS.regenie"
   report_title: "REGENIE Exome-Wide Association Analysis Report"
@@ -160,10 +161,14 @@ cat("Total gene-based tests loaded:", nrow(gene_based), "\n")
 ```{r summary-stats, echo=FALSE, message=FALSE, warning=FALSE}
 # Load phenotype file for actual case/control numbers
 if(file.exists(params$pheno_file)) {
-  pheno <- read_delim(params$pheno_file, delim = " ", col_names = TRUE, 
+  pheno <- read_delim(params$pheno_file, delim = " ", col_names = TRUE,
                       trim_ws = TRUE, show_col_types = FALSE)
 } else {
   stop("Phenotype file not found: ", params$pheno_file)
+}
+if(!params$pheno_col %in% names(pheno)) {
+  stop("Phenotype column '", params$pheno_col, "' not found in ", params$pheno_file,
+       " (available columns: ", paste(names(pheno), collapse = ", "), ")")
 }
 
 # Build proper summary table with scalar values
@@ -173,8 +178,8 @@ summary_df <- data.frame(
              "Genes Tested (Burden Test)"),
   Count = c(
     length(unique(pheno$IID)),
-    sum(pheno$STATUS == 1, na.rm = TRUE),
-    sum(pheno$STATUS == 0, na.rm = TRUE),
+    sum(pheno[[params$pheno_col]] == 1, na.rm = TRUE),
+    sum(pheno[[params$pheno_col]] == 0, na.rm = TRUE),
     nrow(single_variant),
     length(unique(gene_based$GENE))
   )
@@ -437,6 +442,9 @@ print(volcano_plot)
 ```
 
 ### CHEK2 Gene Analysis
+
+**Note:** CHEK2 **missense** sites are excluded from all masks upstream (`mask_gene_consequence_exclude.txt`, applied in `preprocess_regenie.py` via `--gene-consequence-exclude`), so they will not appear below. Excluded sites are written to `<output_prefix>.gene_consequence_excluded.csv`.
+
 ```{r chek2-analysis,echo=FALSE,message=FALSE,warning=FALSE,results='asis'}
 # Extract CHEK2 results specifically
 chek2_results <- gene_based %>%

@@ -3,7 +3,7 @@
 # CASE CONTROL SELECTION
 # ========================
 library(here)
-setwd(here("simplexo"))
+setwd(here())
 source(here("R/config.R"))
 
 pmbb4 <- here("PMBB", "4.0")
@@ -30,6 +30,11 @@ up <- read.csv(here("simplexo", "data", "simplexo_up_map.csv"))
 # id lists
 exome_ids <- read.table(here("PMBB", "4.0", "PMBB-Release-2026-4.0_genetic_exome.sample_list.txt"), header = FALSE)$V1
 imputed_ids <- read.csv(here("PMBB", "4.0", "PMBB-Release-2026-4.0_genetic_imputed.sample_list.txt"), header = FALSE)$V1
+
+exome_no_pcs <- read.table(here("PMBB", "4.0", "PMBB-Release-2026-4.0_genetic_exome.no1KG.eigenvectors.tsv"), header = TRUE)
+exome_with_pcs <- read.table(here("PMBB", "4.0", "PMBB-Release-2026-4.0_genetic_exome.with1KG.eigenvectors.tsv"), header = TRUE)
+imp_no_pcs <- read.table(here("PMBB", "4.0", "PMBB-Release-2026-4.0_genetic_imputed.with1KG.eigenvectors.tsv"), header = TRUE)
+imp_with_pcs <- read.table(here("PMBB", "4.0", "PMBB-Release-2026-4.0_genetic_imputed.no1KG.eigenvectors.tsv"), header = TRUE)
 
 # ========================
 # AVAILABLE SEQUENCING
@@ -146,274 +151,6 @@ icd_ids <- sort(unique(breast_results_f4$filtered_patients$person_id))
 length(icd_ids)
 # 4582
 
-# ========================================================================
-# EARLIEST AGE BY CODE TYPE, within the merged ICD selection
-# ========================================================================
-# for everyone already in icd_ids (the combined-code selection), classify
-# each of their individual matching occurrences as diagnosis-code vs
-# history-code, then compute per-person earliest age separately by type:
-#   - earliest age from a diagnosis code only
-#   - earliest age from a personal-history code only
-#   - earliest age overall (min across both -- same as CaDxAge_ICD)
-# to see whether "age of dx" derived from a history code runs
-# systematically younger/older than one derived from a true diagnosis code.
-diagnosis_codes <- c("^C50", "^D05", "^174", "^233.0")  # ICD10 malignant/DCIS + ICD9 malignant/CIS
-history_codes   <- c("^Z85.3", "^Z86.000", "^V10.3")    # ICD10 + ICD9 personal history of
-
-occurrences <- breast_results_f4$matching_occurrences %>%
-    filter(person_id %in% icd_ids) %>%
-    mutate(
-        is_diagnosis = grepl(paste(diagnosis_codes, collapse = "|"), source_value, perl = TRUE, ignore.case = TRUE),
-        is_history   = grepl(paste(history_codes, collapse = "|"), source_value, perl = TRUE, ignore.case = TRUE)
-    )
-
-earliest_by_type <- occurrences %>%
-    group_by(person_id) %>%
-    summarise(
-        earliest_diagnosis_date = if (any(is_diagnosis)) min(event_date[is_diagnosis], na.rm = TRUE) else as.Date(NA),
-        earliest_history_date   = if (any(is_history))   min(event_date[is_history],   na.rm = TRUE) else as.Date(NA),
-        earliest_overall_date   = min(event_date, na.rm = TRUE),
-        .groups = "drop"
-    ) %>%
-    left_join(person %>% select(person_id, birth_datetime), by = "person_id") %>%
-    mutate(
-        Age_Diagnosis = as.numeric(difftime(earliest_diagnosis_date, birth_datetime, units = "days")) / 365.25,
-        Age_History   = as.numeric(difftime(earliest_history_date,   birth_datetime, units = "days")) / 365.25,
-        Age_Overall   = as.numeric(difftime(earliest_overall_date,   birth_datetime, units = "days")) / 365.25
-    )
-
-write.table(earliest_by_type, here("simplexo", "data", "simplexo4_earliest_age_by_codetype_df.txt"),
-            row.names = FALSE, quote = FALSE, sep = "\t")
-
-age_long <- earliest_by_type %>%
-    select(person_id, Age_Diagnosis, Age_History, Age_Overall) %>%
-    pivot_longer(cols = starts_with("Age_"), names_to = "Category", values_to = "Age") %>%
-    filter(!is.na(Age)) %>%
-    mutate(Category = recode(Category,
-                              Age_Diagnosis = "Earliest Diagnosis Code",
-                              Age_History   = "Earliest History Code",
-                              Age_Overall   = "Earliest Overall"))
-
-age_long %>%
-    group_by(Category) %>%
-    summarise(n = n(), mean_age = mean(Age), median_age = median(Age)) %>%
-    print()
-
-p_earliest_compare <- ggplot(age_long, aes(x = Age, fill = Category)) +
-    geom_histogram(position = "identity", bins = 20, alpha = 0.4, color = "black") +
-    scale_fill_manual(values = c(
-        "Earliest Diagnosis Code" = "steelblue",
-        "Earliest History Code"   = "pink",
-        "Earliest Overall"        = "seagreen"
-    )) +
-    labs(title = "Earliest Age by ICD Code Type (within merged ICD selection)",
-         x = "Age", y = "Count", fill = "Code Type") +
-    theme_minimal()
-
-ggsave(here("simplexo", "figures", "simplexo4_earliest_age_by_codetype_histogram.png"),
-       plot = p_earliest_compare, width = 8, height = 4, dpi = 300)
-
-# # ------------------------------------------------------------------------
-# # diagnosis-only patients (never had a history code) vs. everyone with a
-# # history code (overall) -- Age_Diagnosis vs Age_History distributions
-# # ------------------------------------------------------------------------
-# patient_code_flags <- occurrences %>%
-#     group_by(person_id) %>%
-#     summarise(
-#         any_diagnosis = any(is_diagnosis),
-#         any_history   = any(is_history),
-#         .groups = "drop"
-#     )
-#
-# diagnosis_only_ids <- patient_code_flags %>%
-#     filter(any_diagnosis & !any_history) %>%
-#     pull(person_id)
-#
-# cat("Patients with diagnosis codes only (never a history code):", length(diagnosis_only_ids), "\n")
-# cat("As % of all ICD-identified patients:",
-#     round(100 * length(diagnosis_only_ids) / length(icd_ids), 1), "%\n")
-#
-# history_pop_ids <- patient_code_flags %>%
-#     filter(any_history) %>%
-#     pull(person_id)
-#
-# cat("Patients with any history code:", length(history_pop_ids), "\n")
-#
-# diagnosis_only_vs_history_df <- bind_rows(
-#     earliest_by_type %>%
-#         filter(person_id %in% diagnosis_only_ids) %>%
-#         transmute(person_id, Age = Age_Diagnosis, Category = "Diagnosis Only"),
-#     earliest_by_type %>%
-#         filter(person_id %in% history_pop_ids) %>%
-#         transmute(person_id, Age = Age_History, Category = "History (Overall)")
-# ) %>%
-#     filter(!is.na(Age))
-#
-# diagnosis_only_vs_history_df %>%
-#     group_by(Category) %>%
-#     summarise(n = n(), mean_age = mean(Age), median_age = median(Age)) %>%
-#     print()
-#
-# p_diag_only_vs_history <- ggplot(diagnosis_only_vs_history_df, aes(x = Age, fill = Category)) +
-#     geom_histogram(position = "identity", bins = 20, alpha = 0.5, color = "black") +
-#     scale_fill_manual(values = c(
-#         "Diagnosis Only"     = "steelblue",
-#         "History (Overall)"  = "pink"
-#     )) +
-#     labs(title = "Diagnosis-Only Patients vs. Overall History-Code Age",
-#          x = "Age", y = "Count", fill = "Code Type") +
-#     theme_minimal()
-#
-# ggsave(here("simplexo", "figures", "simplexo4_diagnosis_only_vs_history_histogram.png"),
-#        plot = p_diag_only_vs_history, width = 8, height = 4, dpi = 300)
-
-# ------------------------------------------------------------------------
-# history-only patients (never had a diagnosis code) vs. everyone with a
-# diagnosis code (overall) -- Age_History vs Age_Diagnosis distributions
-# ------------------------------------------------------------------------
-history_only_ids <- patient_code_flags %>%
-    filter(any_history & !any_diagnosis) %>%
-    pull(person_id)
-
-cat("Patients with history codes only (never a diagnosis code):", length(history_only_ids), "\n")
-cat("As % of all ICD-identified patients:",
-    round(100 * length(history_only_ids) / length(icd_ids), 1), "%\n")
-# 74, 1%
-
-diagnosis_pop_ids <- patient_code_flags %>%
-    filter(any_diagnosis) %>%
-    pull(person_id)
-
-cat("Patients with any diagnosis code:", length(diagnosis_pop_ids), "\n")
-# 4508
-
-history_only_vs_diagnosis_df <- bind_rows(
-    earliest_by_type %>%
-        filter(person_id %in% history_only_ids) %>%
-        transmute(person_id, Age = Age_History, Category = "History Only"),
-    earliest_by_type %>%
-        filter(person_id %in% diagnosis_pop_ids) %>%
-        transmute(person_id, Age = Age_Diagnosis, Category = "Diagnosis (Overall)")
-) %>%
-    filter(!is.na(Age))
-
-history_only_vs_diagnosis_df %>%
-    group_by(Category) %>%
-    summarise(n = n(), mean_age = mean(Age), median_age = median(Age)) %>%
-    print()
-# Category                n mean_age median_age
-# <chr>               <int>    <dbl>      <dbl>
-# 1 Diagnosis (Overall)  4508     55.4       55.1
-# 2 History Only           74     54.5       51.2
-
-p_hist_only_vs_diagnosis <- ggplot(history_only_vs_diagnosis_df, aes(x = Age, fill = Category)) +
-    geom_histogram(position = "identity", bins = 30, alpha = 0.5, color = "black") +
-    scale_fill_manual(values = c(
-        "History Only"          = "pink",
-        "Diagnosis (Overall)"   = "steelblue"
-    )) +
-    labs(title = "History-Only Patients vs. Overall Diagnosis-Code Age",
-         x = "Age", y = "Count", fill = "Code Type") +
-    theme_minimal()
-
-ggsave(here("simplexo", "figures", "simplexo4_history_only_vs_diagnosis_histogram.png"),
-       plot = p_hist_only_vs_diagnosis, width = 8, height = 5, dpi = 300)
-
-# ------------------------------------------------------------------------
-# patients with BOTH a diagnosis code and a history code -- within this
-# subgroup, compare their own Age_Diagnosis vs. Age_History (paired by
-# person) to see whether the two code types disagree on age even when
-# both are present for the same patient
-# ------------------------------------------------------------------------
-both_ids <- patient_code_flags %>%
-    filter(any_diagnosis & any_history) %>%
-    pull(person_id)
-
-cat("Patients with BOTH a diagnosis code and a history code:", length(both_ids), "\n")
-cat("As % of all ICD-identified patients:",
-    round(100 * length(both_ids) / length(icd_ids), 1), "%\n")
-
-both_ages_df <- earliest_by_type %>%
-    filter(person_id %in% both_ids) %>%
-    select(person_id, Age_Diagnosis, Age_History, Age_Overall) %>%
-    mutate(
-        Age_Diff = Age_History - Age_Diagnosis,
-        # which code type actually supplied the final/overall (earliest) age
-        Final_Age_Source = case_when(
-            Age_Diagnosis < Age_History ~ "Diagnosis",
-            Age_Diagnosis > Age_History ~ "History",
-            TRUE ~ "Tie"
-        )
-    )
-
-cat("Median Age_Diagnosis (both group):", median(both_ages_df$Age_Diagnosis, na.rm = TRUE), "\n")
-# 54.9
-cat("Median Age_History (both group):", median(both_ages_df$Age_History, na.rm = TRUE), "\n")
-# 56.9
-cat("Median Age_Overall (both group):", median(both_ages_df$Age_Overall, na.rm = TRUE), "\n")
-# 54.7
-cat("Median difference (History - Diagnosis):", median(both_ages_df$Age_Diff, na.rm = TRUE), "\n")
-# 0.61
-
-# how m
-# how many/what proportion of the "both" group has their final (earliest
-# overall) age coming from the history code vs. the diagnosis code
-both_ages_df %>%
-    count(Final_Age_Source) %>%
-    mutate(pct = round(100 * n / sum(n), 1)) %>%
-    print()
-# Final_Age_Source     n   pct
-# <chr>            <int> <dbl>
-# 1 Diagnosis         3600  88.2
-# 2 History            327   8
-# 3 Tie                153   3.8
-
-both_long <- both_ages_df %>%
-    select(person_id, Age_Diagnosis, Age_History, Age_Overall) %>%
-    pivot_longer(cols = c(Age_Diagnosis, Age_History, Age_Overall), names_to = "Category", values_to = "Age") %>%
-    mutate(Category = recode(Category,
-                              Age_Diagnosis = "Diagnosis Code",
-                              Age_History   = "History Code",
-                              Age_Overall   = "Final (Earliest of Both)"))
-
-both_long %>%
-    group_by(Category) %>%
-    summarise(n = n(), mean_age = mean(Age), median_age = median(Age)) %>%
-    print()
-
-# Category                     n mean_age median_age
-# <chr>                    <int>    <dbl>      <dbl>
-# 1 Diagnosis Code            4080     55.2       55.0
-# 2 Final (Earliest of Both)  4080     54.9       54.7
-# 3 History Code              4080     56.9       56.9
-
-# pairwise plots instead of one 3-way overlay (triple overlay was hard
-# to distinguish) -- Diagnosis vs History, Diagnosis vs Final, History vs Final
-both_colors <- c(
-    "Diagnosis Code"            = "steelblue",
-    "History Code"              = "pink",
-    "Final (Earliest of Both)"  = "seagreen"
-)
-
-pairwise_hist <- function(df, cat1, cat2) {
-    ggplot(df %>% filter(Category %in% c(cat1, cat2)), aes(x = Age, fill = Category)) +
-        geom_histogram(position = "identity", bins = 20, alpha = 0.5, color = "black") +
-        scale_fill_manual(values = both_colors) +
-        labs(title = paste0(cat1, " vs. ", cat2),
-             x = "Age", y = "Count", fill = "Code Type") +
-        theme_minimal()
-}
-
-p_both_diag_vs_hist <- pairwise_hist(both_long, "Diagnosis Code", "History Code")
-p_both_diag_vs_final <- pairwise_hist(both_long, "Diagnosis Code", "Final (Earliest of Both)")
-p_both_hist_vs_final <- pairwise_hist(both_long, "History Code", "Final (Earliest of Both)")
-
-ggsave(here("simplexo", "figures", "simplexo4_both_diag_vs_history_histogram.png"),
-       plot = p_both_diag_vs_hist, width = 8, height = 5, dpi = 300)
-ggsave(here("simplexo", "figures", "simplexo4_both_diag_vs_final_histogram.png"),
-       plot = p_both_diag_vs_final, width = 8, height = 5, dpi = 300)
-ggsave(here("simplexo", "figures", "simplexo4_both_history_vs_final_histogram.png"),
-       plot = p_both_hist_vs_final, width = 8, height = 5, dpi = 300)
 
 # ============================================================
 # INITIAL CASE LIST
@@ -467,7 +204,7 @@ write.table(final_ids, here("simplexo", "data", "simplexo4_overall_case_ids.txt"
             row.names = FALSE, col.names = FALSE, quote = FALSE)
 
 # ========================
-# QUICK OVERVIEW
+# QUICK CHECK
 # ========================
 table(final_df$batch)
 # 1    2    3
@@ -477,22 +214,10 @@ table(final_df$crep_highrisk_flag)
 # 0    1
 # 3549 1568
 
-table(final_df$sequenced_gender)
-# good
-
 summary(final_df$Age)
 sd(final_df$Age, na.rm = TRUE)
 
 table(final_df$AgeDxDiscrepancyFlag, useNA = "ifany")
-
-p_age_hist <- ggplot(final_df, aes(x = Age)) +
-    geom_histogram(bins = 20, color = "pink", fill = "pink", alpha = 0.7) +
-    labs(title = "Age of Diagnosis - Cases", x = "Age", y = "Count") +
-    theme_minimal()
-
-ggsave(here("simplexo", "figures", "simplexo4_case_age_histogram.png"),
-       plot = p_age_hist, width = 6, height = 4, dpi = 300)
-
 
 # ========================
 # MALIGNANT NEOPLASM CODES
@@ -536,9 +261,6 @@ dim(controls)
 
 control_ids <- sort(unique(controls$person_id))
 
-write.table(control_ids, here("simplexo", "data", "simplexo4_overall_control_ids.txt"),
-            quote = FALSE, row.names = FALSE, col.names = FALSE)
-
 write.table(controls, here("simplexo", "data", "simplexo4_overall_control_df.txt"),
             quote = FALSE, row.names = FALSE, col.names = FALSE)
 
@@ -566,32 +288,147 @@ dim(all_ages)
 all_cov <- cov %>% filter(person_id %in% all_ids) %>%
     left_join(all_ages, by = "person_id") %>%
     mutate(Group = if_else(person_id %in% final_ids, "1", "0")) %>%
-    select(person_id, batch, Group, Age)
+    select(person_id, batch, Group, Age) %>%
+    filter(!is.na(Age))
 case_control_ids <- sort(all_cov$person_id)
 length(case_control_ids)
-# 23326
+# 23323
 
 table(all_cov$Group)
+final_case_control_ids <- unique(all_cov$person_id)
 
-write.table(all_cov, here("simplexo", "data", "simplexo4_overall_case_control_cov_df.txt"),
+## FINAL IDS
+final_case_ids <- sort(intersect(final_ids, case_control_ids))
+final_control_ids <- sort(intersect(control_ids, case_control_ids))
+length(final_case_ids)
+length(final_control_ids)
+# 5117
+# 18206
+
+## PIDs
+case_control_pids <- as.data.frame(case_control_ids)
+case_control_pids$x <- case_control_pids$case_control_ids
+
+final_case_pids <- as.data.frame(final_case_ids)
+final_case_pids$x <- final_case_pids$case_ids
+
+final_control_pids <- as.data.frame(final_control_ids)
+final_control_pids$x <- final_control_pids$control_ids
+
+write.table(all_cov, here("simplexo", "cov", "simplexo4_overall_case_control_cov_df.txt"),
             row.names = FALSE, quote = FALSE, sep = "\t")
 
-write.table(case_control_ids, here("simplexo", "data", "simplexo4_overall_case_control_ids.txt"),
+write.table(case_control_ids, here("simplexo", "cov", "simplexo4_overall_case_control_ids.txt"),
+            row.names = FALSE, col.names = FALSE, quote = FALSE, sep = "\t")
+
+write.table(case_control_pids, here("simplexo", "cov", "simplexo4_overall_case_control_pids.txt"),
+            row.names = FALSE, col.names = FALSE, quote = FALSE, sep = "\t")
+
+write.table(final_case_ids, here("simplexo", "cov", "simplexo4_overall_case_ids.txt"),
+            row.names = FALSE, col.names = FALSE, quote = FALSE, sep = "\t")
+
+write.table(final_case_pids, here("simplexo", "cov", "simplexo4_overall_case_pids.txt"),
+            row.names = FALSE, col.names = FALSE, quote = FALSE, sep = "\t")
+
+write.table(final_control_ids, here("simplexo", "cov", "simplexo4_overall_control_ids.txt"),
+            row.names = FALSE, col.names = FALSE, quote = FALSE, sep = "\t")
+
+write.table(final_control_pids, here("simplexo", "cov", "simplexo4_overall_control_pids.txt"),
+            row.names = FALSE, col.names = FALSE, quote = FALSE, sep = "\t")
+
+write.table(all_cov, here("simplexo", "cov", "simplexo4_overall_case_control_age_df.txt"),
             row.names = FALSE, quote = FALSE, sep = "\t")
 
-write.table(all_ages, here("simplexo", "data", "simplexo4_overall_case_control_age_df.txt"),
-            row.names = FALSE, quote = FALSE, sep = "\t")
+### sex files
+sex_file <- cov %>%
+    mutate(
+        FID = person_id,
+        IID = person_id,
+        SEX = case_when(
+            sequenced_gender == "Male"   ~ 1,
+            sequenced_gender == "Female" ~ 2,
+            TRUE ~ NA_real_
+        )
+    ) %>%
+    select(FID, IID, SEX)
+
+write.table(sex_file, file.path(here("simplexo", "cov", "sex.txt")),
+            quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
+
+# ========================
+# COVARIATE FILES
+# ========================
+### exome no 1kg
+exome_no_cov <- all_cov %>%
+    mutate(
+        FID = person_id,
+        IID = person_id
+    ) %>%
+    select(-Group) %>%
+    left_join(exome_no_pcs, by = c("FID" = "person_id")) %>%
+    select(FID, IID, Age, batch, num_range("exome_PC", 1:6))
+
+write.table(exome_no_cov, file.path(here("simplexo", "cov", "simplexo4_all_no1kg_exome6_covariates.txt")),
+            quote = FALSE, sep = "\t", row.names = FALSE, col.names = TRUE)
+
+### update file
+update <- sex_file %>% mutate(
+    a = FID,
+    b = FID
+) %>% select(FID, IID, a, b)
+write.table(update, file.path(here("simplexo", "cov", "array_update_ids.txt")),
+            quote = FALSE, sep = "\t", row.names = FALSE, col.names = FALSE)
+
+
+### exome 1kg
+exome_with_cov <- all_cov %>%
+    mutate(
+        FID = person_id,
+        IID = person_id
+    ) %>%
+    select(-Group) %>%
+    left_join(exome_with_pcs, by = c("FID" = "person_id")) %>%
+    select(FID, IID, Age, batch, num_range("exome_PC", 1:6))
+
+write.table(exome_with_cov, file.path(here("simplexo", "cov", "simplexo4_all_with1kg_exome6_covariates.txt")),
+            quote = FALSE, sep = "\t", row.names = FALSE, col.names = TRUE)
+
+### imputed no 1kg
+imp_no_cov <- all_cov %>%
+    mutate(
+        FID = person_id,
+        IID = person_id
+    ) %>%
+    select(-Group) %>%
+    left_join(imp_no_pcs, by = c("FID" = "person_id")) %>%
+    select(FID, IID, Age, batch, num_range("imputed_PC", 1:6))
+
+write.table(exome_no_cov, file.path(here("simplexo", "cov", "simplexo4_all_no1kg_imp6_covariates.txt")),
+            quote = FALSE, sep = "\t", row.names = FALSE, col.names = TRUE)
+
+### imputed no 1kg
+imp_no_cov <- all_cov %>%
+    mutate(
+        FID = person_id,
+        IID = person_id
+    ) %>%
+    select(-Group) %>%
+    left_join(imp_with_pcs, by = c("FID" = "person_id")) %>%
+    select(FID, IID, Age, batch, num_range("imputed_PC", 1:6))
+
+write.table(exome_no_cov, file.path(here("simplexo", "cov", "simplexo4_all_no1kg_imp6_covariates.txt")),
+            quote = FALSE, sep = "\t", row.names = FALSE, col.names = TRUE)
+
 
 # ========================
 # DIAGNOSTIC PLOTS
 # ========================
 all_cov$batch <- as.factor(all_cov$batch)
-all_cov$sequenced_gender <- as.factor(all_cov$sequenced_gender)
-all_cov$crep_highrisk_flag <- as.factor(all_cov$crep_highrisk_flag)
-all_cov$Group <- factor(all_cov$Group, levels = c("Case", "Control"))
+all_cov$Group <- as.factor(all_cov$Group)
 
 ### stacked bar plots
 group_totals <- all_cov %>% count(Group)
+group_totals
 
 p_stack <- ggplot(all_cov, aes(x = Group, fill = batch)) +
     geom_bar(position = "stack", color = "darkgray") +
@@ -604,21 +441,10 @@ p_stack <- ggplot(all_cov, aes(x = Group, fill = batch)) +
 ggsave(here("simplexo", "figures", paste0("simplexo4_stacked_bar_batch.png")),
        plot = p_stack, width = 4, height = 4, dpi = 300)
 
-p_stack <- ggplot(all_cov, aes(x = Group, fill = crep_highrisk_flag)) +
-    geom_bar(position = "stack", color = "darkgray") +
-    geom_text(stat = "count", aes(label = after_stat(count)), position = position_stack(vjust = 0.5), size = 3) +
-    geom_text(data = group_totals, aes(x = Group, y = n, label = n), inherit.aes = FALSE, vjust = -0.5) +
-    scale_fill_brewer(type = "qual", palette = "Set3") +
-    scale_y_continuous(expand = expansion(mult = c(0, 0.1))) +
-    labs(title = paste("Case vs Control - CREP"), x = "Group", y = "Count", fill = all_cov$crep_highrisk_flag) +
-    theme_minimal()
-ggsave(here("simplexo", "figures", paste0("simplexo4_stacked_bar_crep.png")),
-       plot = p_stack, width = 4, height = 4, dpi = 300)
-
 ### histogram by age
 p_age_overlay <- ggplot(all_cov, aes(x = Age, fill = Group)) +
     geom_histogram(bins = 30, alpha = 0.6, position = "identity", color = "darkgray") +
-    scale_fill_manual(values = c(Case = "purple", Control = "darkgray")) +
+    scale_fill_manual(values = c("1" = "purple", "0" = "darkgray")) +
     labs(title = "Age Distribution - Case vs Control", x = "Age", y = "Count") +
     theme_minimal()
 ggsave(here("simplexo", "figures", "simplexo4_age_histogram_overlay.png"),
@@ -829,4 +655,41 @@ length(young_ids)
 
 write.table(young_ids, here("simplexo", "data", "simplexo4_50_case_ids.txt"),
             quote = FALSE, row.names = FALSE, col.names = FALSE)
+
+
+# ========================================================================
+# MULTIPLE PHENO FILE
+# ========================================================================
+make_binary_pheno <- function(person_id, case_ids, control_ids) {
+    case_when(
+        person_id %in% case_ids    ~ 1,
+        person_id %in% control_ids ~ 0,
+        TRUE                       ~ NA_real_
+    )
+}
+
+pheno <- all_cov %>%
+    mutate(
+        FID            = person_id,
+        IID            = person_id,
+        Overall        = make_binary_pheno(person_id, final_ids,     control_ids),
+        Under50        = make_binary_pheno(person_id, young_ids,     control_ids),
+        FamilyHistory  = make_binary_pheno(person_id, all_fh_ids,    control_ids),
+        Malignant      = make_binary_pheno(person_id, all_malig_ids, control_ids),
+        ERPos          = make_binary_pheno(person_id, all_erp_ids,   control_ids),
+        ERNeg          = make_binary_pheno(person_id, all_ern_ids,   control_ids)
+    ) %>%
+    # FID/IID + phenotype columns only -- preprocess_regenie.py --pheno-file treats every
+    # non-FID/IID column as a phenotype to test, so batch/Age/Group/person_id must not ride along
+    select(FID, IID, Overall, Under50, FamilyHistory, Malignant, ERPos, ERNeg)
+
+(colSums(is.na(pheno)))
+# FID           IID       Overall       Under50 FamilyHistory     Malignant         ERPos         ERNeg
+# 0             0             0          2917          1894           334          2827          4328
+
+
+write.table(pheno, here("simplexo", "data", "simplexo4_pheno.txt"),
+            quote = FALSE, row.names = FALSE, col.names = TRUE, sep = "\t")
+
+write_xlsx(pheno, here("simplexo", "data", "simplexo4_pheno.xlsx"))
 
