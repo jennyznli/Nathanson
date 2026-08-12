@@ -62,6 +62,26 @@ compareQuantileToMedianCov <- function( dat, median, quantile )
 
   return( list(B, B.se) )
 }
+
+# Replication only: ancestry PCs (EV1-10)
+compareQuantileToMedianPMBB <- function( dat, median, quantile )
+{
+    dat <- dat[ dat$quantile %in% c(median, quantile),]
+
+    if( dim(dat)[1] == 0 )
+    {
+        stop("dat is empty after subsetting, check your median/quantile definitions")
+    }
+
+    dat$PHENO.q <- 0
+    dat$PHENO.q[ dat$quantile %in% quantile ] <- 1
+
+    fit <- glm( data = dat, PHENO ~ PHENO.q + site + EV1+EV2+EV3+EV4+EV5+EV6+EV7+EV8+EV9+EV10, family = "binomial")
+    B <- summary(fit)$coefficients[2,1]
+    B.se <- summary(fit)$coefficients[2,2]
+
+    return( list(B, B.se) )
+}
 # ------------------------------------------------------------------ #
 
 r.df <- data.frame(range.lo = seq(from = 1, to = 96, by = 5),
@@ -123,10 +143,15 @@ prs$SCORESUM_ADJ <- adj$SCORESUM
 prs <- prs %>% left_join(ss, by = c("IID" = "Final_ID2"))
 
 # ------------------- replication  ------------------------------------ #
-# rep_prs <- prs %>% filter(GenoSource2 == "Replication")
+rep_prs <- prs %>% filter(GenoSource2 == "Replication")
+# 66 in final cohort
+
+rep_case <- unique(ss$ReplicationID)
 
 rep_anc <- rep_anc %>% left_join(prs, by = c("ID_2" = "IID"))
 rep_anc$PHENO <- as.numeric(rep_anc$phenotype)
+# rep_anc$PHENO <- ifelse(rep_anc$Final_ID %in% rep_case, 1, 0)
+
 rep_anc$SCORESUM <- as.numeric(rep_anc$SCORESUM)
 rep_anc$SCORESUM_ADJ <- as.numeric(rep_anc$SCORESUM_ADJ)
 rep_anc$site <- substr(rep_anc$ID_2,1,2)
@@ -152,7 +177,8 @@ print(p2)
 ggsave(here("tgct", "figures", "tgct_replication_dose_response_adj.png"), plot = p2, width = 7, height = 5)
 
 # ------------------- PMBB  ------------------------------------ #
-pmbb_prs <- prs %>% filter(GenoSource2 == "PMBB")
+pmbb_prs <- prs %>% filter(GenoSource2 == "PMBB") %>%
+    left_join(cov, by = c("IID" = "person_id"))
 
 # ------------------- pooled  ------------------------------------ #
 pooled <- prs %>%
