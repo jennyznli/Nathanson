@@ -13,13 +13,16 @@ output:
 date: "`r Sys.Date()`"
 params:
   project_name: "PROJECT"
-  # Directory holding {project_name}.chr{CHR}.step2_*.regenie, {project_name}.report.*.tsv,
-  # and {project_name}.mask_variant_stats.tsv (SIMPLEXO regenie.smk: RUN_DIR/output)
+  # Directory holding {project_name}.chr{CHR}.step2_*.regenie, {project_name}.report_{pheno_col}.*.tsv,
+  # and {project_name}.mask_variant_stats_{pheno_col}.tsv (SIMPLEXO regenie.smk: RUN_DIR/output)
   data_dir: "output"
   # Directory for the rendered HTML + exported CSVs
   output_dir: "reports"
-  # REGENIE pheno file (FID IID STATUS ...)
+  # REGENIE pheno file (FID IID <phenotype columns> ...)
   pheno_file: "input/PROJECT.regenie.pheno.txt"
+  # Phenotype column in pheno_file this report is for; also selects
+  # {project_name}.report_{pheno_col}.*.tsv and {project_name}.mask_variant_stats_{pheno_col}.tsv
+  pheno_col: "STATUS"
   # Stem between ".chrN." and ".regenie" for Step 2 outputs.
   step2_single_variant_mid: "step2_single_variant_STATUS"
   step2_gene_based_mid: "step2_gene_based_STATUS"
@@ -219,7 +222,7 @@ if (file.exists(synonymous_file)) {
 
 # Full mask stats may be ~700k rows (all mask sites). Never load whole file — subset by ID later.
 .mask_stats_candidates <- c(
-  paste0(params$data_dir, "/", params$project_name, ".mask_variant_stats.tsv")
+  paste0(params$data_dir, "/", params$project_name, ".mask_variant_stats_", params$pheno_col, ".tsv")
 )
 .mask_stats_path <- .mask_stats_candidates[file.exists(.mask_stats_candidates)][1]
 if (is.na(.mask_stats_path)) .mask_stats_path <- ""
@@ -321,7 +324,7 @@ if (nzchar(.mask_stats_path)) {
 }
 
 # Prebuilt slim tables from build_regenie_report_tables.py — required
-.report_prefix <- paste0(params$data_dir, "/", params$project_name, ".report")
+.report_prefix <- paste0(params$data_dir, "/", params$project_name, ".report_", params$pheno_col)
 .pre_top_fp <- paste0(.report_prefix, ".top_genes_ADD.tsv")
 .pre_skat_fp <- paste0(.report_prefix, ".top_genes_SKAT.tsv")
 .pre_contrib_fp <- paste0(.report_prefix, ".variant_contrib.tsv")
@@ -467,8 +470,8 @@ summary_df <- data.frame(
              "Unique genes tested (ADD only)"),
   Count = c(
     length(unique(pheno$IID)),
-    sum(pheno$STATUS == 1),
-    sum(pheno$STATUS == 0),
+    sum(pheno[[params$pheno_col]] == 1),
+    sum(pheno[[params$pheno_col]] == 0),
     nrow(single_variant),
     length(unique(gene_based_all$GENE)),
     length(unique(gene_based_add$GENE))
@@ -663,7 +666,7 @@ Deviation from the diagonal at the tail reflects excess signal. **λ** is the me
 </div>
 ```
 
-Exports: **`r paste0(params$project_name, "_gene_based_results_alltests_", format(Sys.Date(), "%Y%m%d"), ".csv")`** (archive), **`r paste0(params$project_name, "_gene_based_results_ADDonly_", format(Sys.Date(), "%Y%m%d"), ".csv")`** (directional burden), **`r paste0(params$project_name, "_gene_based_results_SKAT_SKATO_", format(Sys.Date(), "%Y%m%d"), ".csv")`** (non-directional; no BETA/OR), and **`r paste0(params$project_name, "_gene_based_meta_input_", format(Sys.Date(), "%Y%m%d"), ".csv")`**. FDR is within family (ADD vs SKAT+SKATO).
+Exports: **`r paste0(params$project_name, "_", params$pheno_col, "_gene_based_results_alltests_", format(Sys.Date(), "%Y%m%d"), ".csv")`** (archive), **`r paste0(params$project_name, "_", params$pheno_col, "_gene_based_results_ADDonly_", format(Sys.Date(), "%Y%m%d"), ".csv")`** (directional burden), **`r paste0(params$project_name, "_", params$pheno_col, "_gene_based_results_SKAT_SKATO_", format(Sys.Date(), "%Y%m%d"), ".csv")`** (non-directional; no BETA/OR), and **`r paste0(params$project_name, "_", params$pheno_col, "_gene_based_meta_input_", format(Sys.Date(), "%Y%m%d"), ".csv")`**. FDR is within family (ADD vs SKAT+SKATO).
 
 ### Burden (ADD) — summary by mask
 
@@ -713,8 +716,12 @@ Prefer prebuilt tables from `build_regenie_report_tables.py` (`<data_dir>/{proje
 HTML_THRESH <- c("0.01", "0.001", "singleton")
 CSV_THRESH <- c("0.01", "0.001", "0.0001", "singleton", "All variants")
 
-.qq_gene_add <- function(mask, threshs = HTML_THRESH) {
-  # One QQ per AAF bin for this mask (ADD only), faceted — λ GC labeled on each panel
+.qq_gene_add <- function(mask, threshs = HTML_THRESH, cap = NULL) {
+  # One QQ per AAF bin for this mask (ADD only), faceted — λ GC labeled on each panel.
+  # cap: optional -log10(p) axis limit. Strong real hits (e.g. BRCA1/BRCA2) can sit at
+  # -log10(p) ~100+, which stretches coord_equal() so far that the well-calibrated bulk of
+  # genes near the origin becomes unreadable. Points beyond `cap` are clipped off the plot
+  # (not removed from the data/lambda) so the null-behaving bulk stays legible.
   dat <- gene_based_add %>%
     filter(MASK == mask, THRESH %in% threshs, is.finite(PVAL), PVAL > 0, PVAL <= 1) %>%
     mutate(THRESH = factor(THRESH, levels = threshs))
@@ -756,9 +763,16 @@ CSV_THRESH <- c("0.01", "0.001", "0.0001", "singleton", "All variants")
     ungroup()
   lim <- max(qq$neglog10_exp, qq$neglog10_obs, na.rm = TRUE)
   lim <- max(lim, 1)
+  is_capped <- !is.null(cap) && is.finite(cap) && cap < lim
+  if (is_capped) {
+    n_clipped <- sum(qq$neglog10_obs > cap, na.rm = TRUE)
+    lim <- cap
+  }
+  title_suffix <- if (is_capped) sprintf(" (zoomed, capped at %d — %d point%s above cap not shown)",
+                                          cap, n_clipped, if (n_clipped == 1L) "" else "s") else ""
   cat(sprintf(
-    "\n**ADD burden QQ: %s** (one panel per AAF bin; λ = genomic inflation from median χ²)\n\n",
-    mask
+    "\n**ADD burden QQ: %s%s** (one panel per AAF bin; λ = genomic inflation from median χ²)\n\n",
+    mask, title_suffix
   ))
   print(
     ggplot(qq, aes(x = neglog10_exp, y = neglog10_obs)) +
@@ -769,7 +783,7 @@ CSV_THRESH <- c("0.01", "0.001", "0.0001", "singleton", "All variants")
       labs(
         x = expression(Expected ~ -log[10](p)),
         y = expression(Observed ~ -log[10](p)),
-        title = paste0("Gene-based ADD QQ — ", mask)
+        title = paste0("Gene-based ADD QQ — ", mask, title_suffix)
       ) +
       theme(
         legend.position = "none",
@@ -1049,6 +1063,12 @@ render_contrib <- function(mask, thresh, n = 10L) {
 
 ```{r qq-m1-add, echo=FALSE, message=FALSE, warning=FALSE, fig.width=12.5, fig.height=4.8, results='asis'}
 .qq_gene_add("M1")
+```
+
+```{r qq-m1-add-zoom, echo=FALSE, message=FALSE, warning=FALSE, fig.width=12.5, fig.height=4.8, results='asis'}
+# Zoomed companion: BRCA1/BRCA2-caliber hits can sit at -log10(p) > 100 and stretch the axis
+# above so far the well-calibrated bulk becomes unreadable. Same data/lambda, just clipped view.
+.qq_gene_add("M1", cap = 20)
 ```
 
 ```{r variant-contrib-m1, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
@@ -1488,14 +1508,14 @@ if (!dir.exists(params$output_dir)) dir.create(params$output_dir, recursive = TR
 .out_fp <- function(fname) file.path(params$output_dir, fname)
 
 date_stamp <- format(Sys.Date(), "%Y%m%d")
-single_file <- .out_fp(paste0(params$project_name, "_single_variant_results_", date_stamp, ".csv"))
+single_file <- .out_fp(paste0(params$project_name, "_", params$pheno_col, "_single_variant_results_", date_stamp, ".csv"))
 write_csv(single_variant, single_file)
 cat("**All single variant results saved to:** `", single_file, "`\n\n")
 
-gene_file_all <- .out_fp(paste0(params$project_name, "_gene_based_results_alltests_", date_stamp, ".csv"))
-gene_file_add <- .out_fp(paste0(params$project_name, "_gene_based_results_ADDonly_", date_stamp, ".csv"))
-gene_file_skat <- .out_fp(paste0(params$project_name, "_gene_based_results_SKAT_SKATO_", date_stamp, ".csv"))
-gene_meta_fp <- .out_fp(paste0(params$project_name, "_gene_based_meta_input_", date_stamp, ".csv"))
+gene_file_all <- .out_fp(paste0(params$project_name, "_", params$pheno_col, "_gene_based_results_alltests_", date_stamp, ".csv"))
+gene_file_add <- .out_fp(paste0(params$project_name, "_", params$pheno_col, "_gene_based_results_ADDonly_", date_stamp, ".csv"))
+gene_file_skat <- .out_fp(paste0(params$project_name, "_", params$pheno_col, "_gene_based_results_SKAT_SKATO_", date_stamp, ".csv"))
+gene_meta_fp <- .out_fp(paste0(params$project_name, "_", params$pheno_col, "_gene_based_meta_input_", date_stamp, ".csv"))
 write_csv(gene_based_all, gene_file_all)
 write_csv(gene_based_add, gene_file_add)
 
@@ -1521,23 +1541,23 @@ cat("- **Meta input:** `", gene_meta_fp, "`\n\n")
 
 write_csv(
   dplyr::filter(gene_based_all, GENE == "CHEK2", MASK == "M1"),
-  .out_fp(paste0(params$project_name, "_CHEK2_M1_alltests_", date_stamp, ".csv"))
+  .out_fp(paste0(params$project_name, "_", params$pheno_col, "_CHEK2_M1_alltests_", date_stamp, ".csv"))
 )
 write_csv(
   dplyr::filter(gene_based_add, GENE == "CHEK2", MASK == "M1"),
-  .out_fp(paste0(params$project_name, "_CHEK2_M1_ADDonly_", date_stamp, ".csv"))
+  .out_fp(paste0(params$project_name, "_", params$pheno_col, "_CHEK2_M1_ADDonly_", date_stamp, ".csv"))
 )
-cat("**CHEK2 M1 quick extracts:** `", params$project_name, "_CHEK2_M1_alltests_", date_stamp, ".csv` and `", params$project_name, "_CHEK2_M1_ADDonly_", date_stamp, ".csv`\n\n")
+cat("**CHEK2 M1 quick extracts:** `", params$project_name, "_", params$pheno_col, "_CHEK2_M1_alltests_", date_stamp, ".csv` and `", params$project_name, "_", params$pheno_col, "_CHEK2_M1_ADDonly_", date_stamp, ".csv`\n\n")
 
 top_gene_signals <- gene_based_add %>%
   filter(PVAL_ADJ < 0.05) %>%
   arrange(PVAL, GENE, MASK, THRESH)
-top_signals_fp <- .out_fp(paste0(params$project_name, "_top_gene_signals_ADDonly_", date_stamp, ".csv"))
+top_signals_fp <- .out_fp(paste0(params$project_name, "_", params$pheno_col, "_top_gene_signals_ADDonly_", date_stamp, ".csv"))
 write_csv(top_gene_signals, top_signals_fp)
 cat("**Top ADD gene signals (FDR < 0.05):** `", top_signals_fp, "`\n\n")
 
 if(nrow(significant_variants) > 0) {
-    sig_single_file <- .out_fp(paste0(params$project_name, "_significant_single_variants_", date_stamp, ".csv"))
+    sig_single_file <- .out_fp(paste0(params$project_name, "_", params$pheno_col, "_significant_single_variants_", date_stamp, ".csv"))
     write_csv(significant_variants_export, sig_single_file)
     cat("**Exome-wide singles:** `", sig_single_file, "`\n\n", sep = "")
 } else {
@@ -1545,7 +1565,7 @@ if(nrow(significant_variants) > 0) {
 }
 
 if(exists("suggestive_genes") && nrow(suggestive_genes) > 0) {
-    sig_gene_file <- .out_fp(paste0(params$project_name, "_suggestive_gene_associations_ADDonly_", date_stamp, ".csv"))
+    sig_gene_file <- .out_fp(paste0(params$project_name, "_", params$pheno_col, "_suggestive_gene_associations_ADDonly_", date_stamp, ".csv"))
     write_csv(suggestive_genes, sig_gene_file)
     cat("**Suggestive ADD-only (exploratory) saved to:** `", sig_gene_file, "`\n\n")
 } else {
@@ -1571,7 +1591,7 @@ if (!is.null(report_top_genes) && nrow(report_top_genes) > 0) {
   topgene_csv <- if (length(topgene_csv_list)) bind_rows(topgene_csv_list) %>% relocate(MASK, THRESH) else tibble()
 }
 if (nrow(topgene_csv) > 0) {
-  topgene_fp <- .out_fp(paste0(params$project_name, "_top_genes_ADDonly_", date_stamp, ".csv"))
+  topgene_fp <- .out_fp(paste0(params$project_name, "_", params$pheno_col, "_top_genes_ADDonly_", date_stamp, ".csv"))
   write_csv(topgene_csv, topgene_fp)
   cat("**Top 20 genes per mask×bin (ADD):** `", topgene_fp, "`\n\n", sep = "")
 }
@@ -1593,7 +1613,7 @@ if (!is.null(report_contrib) && nrow(report_contrib) > 0) {
   contrib_all <- if (length(contrib_list)) bind_rows(contrib_list) %>% relocate(MASK, THRESH) else tibble()
 }
 if (nrow(contrib_all) > 0) {
-  contrib_fp <- .out_fp(paste0(params$project_name, "_variant_contributions_topgenes_", date_stamp, ".csv"))
+  contrib_fp <- .out_fp(paste0(params$project_name, "_", params$pheno_col, "_variant_contributions_topgenes_", date_stamp, ".csv"))
   write_csv(contrib_all, contrib_fp)
   cat("**Mask variants for top 20 genes (snplist×annot):** `", contrib_fp, "`\n\n", sep = "")
 }

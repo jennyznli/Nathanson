@@ -48,6 +48,8 @@ seq_ids <- intersect(exome_ids, imputed_ids)
 length(seq_ids)
 # 70408
 
+x <- read.csv(here("simplexo", "reports", "reports", "SIMPLEXO4_all_array1_gene_based_results_ADDonly_20260811.csv"), header = TRUE)
+
 # ========================
 # PROGENY
 # ========================
@@ -104,8 +106,13 @@ pmcr <- pmcr_unmerged %>%
     merge_duplicates("person_id") %>%
     left_join(person %>% select("person_id", "birth_datetime"), by = "person_id")
 
+# merge_duplicates collapses conflicting FirstDxDate values into a
+# ";"-joined string, so re-parse with get_earliest_date (same pattern as
+# CaDxAge_Progeny/get_earliest_age) instead of feeding it to difftime raw
+pmcr$FirstDxDate_earliest <- as.Date(sapply(pmcr$FirstDxDate, get_earliest_date))
+
 pmcr$CaDxAge_PMCR <- as.numeric(difftime(
-    pmcr$FirstDxDate,
+    pmcr$FirstDxDate_earliest,
     pmcr$birth_datetime,
     units = "days"
 )) / 365.25
@@ -150,7 +157,6 @@ icd_ids <- sort(unique(breast_results_f4$filtered_patients$person_id))
 
 length(icd_ids)
 # 4582
-
 
 # ============================================================
 # INITIAL CASE LIST
@@ -544,9 +550,58 @@ cat("Progeny ER-:", nrow(progeny_ern), "\n")
 # 304
 
 ### PMCR
+dim(brca)
+# 3557
+
+table(brca$EstrogenReceptorSummary)
+# Negative Positive  Unknown
+# 691     2350      516
+
+x <- brca %>%
+    filter(EstrogenReceptorSummary %in% c("Positive", "Negative"))
+dim(x)
+# 3041
+
+x2 <- x |> merge_duplicates("person_id")
+dim(x2)
+# 2755
+
+x3 <- x2 %>%
+    left_join(cov,  by = "person_id") %>%
+    filter(sequenced_gender == "Female")
+dim(x3)
+# 2727
+
+table(x2$EstrogenReceptorSummary)
+# Negative Negative;Positive          Positive Positive;Negative
+# 620                19              2104                12
+
+
+# brca has 3124 unique individuals
+# pmcr unmerged has 3520   35
+table(pmcr_$EstrogenReceptorSummary)
+# Negative Positive  Unknown
+# 691     2319      509
+length(unique(pmcr_unmerged$person_id))
+# 3090
+
+
 pmcr_er <- pmcr_unmerged %>%
-    filter(EstrogenReceptorSummary %in% c("Positive", "Negative")) %>%
+    filter(EstrogenReceptorSummary %in% c("Positive", "Negative"))
+dim(pmcr_er)
+# 3010
+length(unique(pmcr_er$person_id))
+# 2727
+
+x <- pmcr_unmerged |> merge_duplicates("person_id")
+table(x$EstrogenReceptorSummary)
+# 2727
+
+pmcr_er <- pmcr_unmerged %>%
+    filter(EstrogenReceptorSummary == "Positive" | EstrogenReceptorSummary == "Negative") %>%
     merge_duplicates("person_id")
+
+table(pmcr_er$EstrogenReceptorSummary)
 cat("After merging duplicates:", nrow(pmcr_er), "\n")
 # 2727
 

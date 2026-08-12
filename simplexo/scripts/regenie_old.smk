@@ -27,6 +27,10 @@ STEP1_INPUT_TYPE = config['input']['step1']['input_type']
 PHENO_FILE = config['input'].get('pheno_file')
 PHENOTYPES = config['input'].get('phenotypes', ['STATUS'])
 
+# Brad's advanced report (report tables + advanced_report_regenie.Rmd) is single-phenotype for now.
+# Uses the first entry in PHENOTYPES (STATUS by default).
+REPORT_PHENO = PHENOTYPES[0]
+
 # Define conditional inputs for step 1 based on input type
 def get_step1_inputs():
     if STEP1_INPUT_TYPE == 'array':
@@ -65,10 +69,14 @@ rule run_regenie:
                CHR=CHROMOSOMES, PHENO=PHENOTYPES),
         expand(f"{RUN_DIR}/output/{PROJECT}.chr{{CHR}}.step2_gene_based_{{PHENO}}.regenie",
                CHR=CHROMOSOMES, PHENO=PHENOTYPES),
-        # Advanced report (M1-M4 masks, top genes, variant contrib, CHEK2 section, etc.) is the
-        # only report -- one per phenotype in PHENOTYPES. Involves a per-chromosome plink2
-        # geno-counts/export pass, so it's heavier than the association-testing outputs above.
-        expand(f"reports/{PROJECT}_{{PHENO}}_advanced_regenie_report.html", PHENO=PHENOTYPES)
+        expand(f"reports/{PROJECT}_{{PHENO}}_regenie_report.html", PHENO=PHENOTYPES)
+
+# Separate target: Brad's advanced report is heavier (per-chromosome plink2 geno-counts pass)
+# and not part of the default `run_regenie` target -- build explicitly with:
+#   snakemake --snakefile regenie.smk run_advanced_report
+rule run_advanced_report:
+    input:
+        f"reports/{PROJECT}_advanced_regenie_report.html"
 
 # ========== SAMPLE LIST CREATION ==========
 rule create_sample_list:
@@ -473,7 +481,7 @@ rule run_step2_gene_based:
                 --out {params.output_basename}) 2>&1 | tee {log}
         """
 
-# ========== ADVANCED REPORT TABLES (advanced_report_regenie.Rmd) ==========
+# ========== ADVANCED REPORT TABLES (Brad's report_regenie.Rmd) ==========
 # mask_variant_stats.py wants a list of VEP CSVs (one per line); our pipeline only has one
 # combined VEP file, so this just wraps it in a one-line list.
 rule create_vep_list:
@@ -491,24 +499,20 @@ rule mask_variant_stats:
         pheno=f"{RUN_DIR}/input/{PROJECT}.regenie.pheno.txt",
         pgen=expand(f"{RUN_DIR}/preprocess/{PROJECT}.chr{{CHR}}.pgen", CHR=CHROMOSOMES)
     output:
-        f"{RUN_DIR}/output/{PROJECT}.mask_variant_stats_{{PHENO}}.tsv"
-    wildcard_constraints:
-        PHENO='|'.join(PHENOTYPES)
+        f"{RUN_DIR}/output/{PROJECT}.mask_variant_stats.tsv"
     params:
         # lambda deactivates Snakemake's automatic wildcard expansion -- {CHR} here is a literal
         # placeholder for mask_variant_stats.py's own internal .format(CHR=chrom), not a Snakemake
         # wildcard (this rule's output has no CHR wildcard to resolve it against).
-        pfile_template=lambda wildcards: f"{RUN_DIR}/preprocess/{PROJECT}.chr{{CHR}}",
-        pheno_col=lambda wildcards: wildcards.PHENO
+        pfile_template=lambda wildcards: f"{RUN_DIR}/preprocess/{PROJECT}.chr{{CHR}}"
     threads: 4
     log:
-        f"{RUN_DIR}/logs/{PROJECT}.{{PHENO}}.mask_variant_stats.log"
+        f"{RUN_DIR}/logs/{PROJECT}.mask_variant_stats.log"
     shell:
         """
         (python mask_variant_stats.py \
         --vep-list {input.vep_list} \
         --pheno {input.pheno} \
-        --pheno-col {params.pheno_col} \
         --pfile-template {params.pfile_template} \
         --threads {threads} \
         -o {output}) 2>&1 | tee {log}
@@ -516,29 +520,26 @@ rule mask_variant_stats:
 
 rule build_regenie_report_tables:
     input:
-        gene=lambda wildcards: expand(f"{RUN_DIR}/output/{PROJECT}.chr{{CHR}}.step2_gene_based_{wildcards.PHENO}.regenie", CHR=CHROMOSOMES),
+        gene=expand(f"{RUN_DIR}/output/{PROJECT}.chr{{CHR}}.step2_gene_based_{REPORT_PHENO}.regenie", CHR=CHROMOSOMES),
         snplist=expand(f"{RUN_DIR}/output/{PROJECT}.chr{{CHR}}.step2_gene_based_masks.snplist", CHR=CHROMOSOMES),
-        stats=f"{RUN_DIR}/output/{PROJECT}.mask_variant_stats_{{PHENO}}.tsv",
+        stats=f"{RUN_DIR}/output/{PROJECT}.mask_variant_stats.tsv",
         pheno=f"{RUN_DIR}/input/{PROJECT}.regenie.pheno.txt"
     output:
-        top=f"{RUN_DIR}/output/{PROJECT}.report_{{PHENO}}.top_genes_ADD.tsv",
-        top_skat=f"{RUN_DIR}/output/{PROJECT}.report_{{PHENO}}.top_genes_SKAT.tsv",
-        contrib=f"{RUN_DIR}/output/{PROJECT}.report_{{PHENO}}.variant_contrib.tsv",
-        consequence=f"{RUN_DIR}/output/{PROJECT}.report_{{PHENO}}.consequence_matrix.tsv",
-        gene_carriers=f"{RUN_DIR}/output/{PROJECT}.report_{{PHENO}}.gene_carriers.tsv",
-        chek2_carriers=f"{RUN_DIR}/output/{PROJECT}.report_{{PHENO}}.chek2_carriers.tsv"
-    wildcard_constraints:
-        PHENO='|'.join(PHENOTYPES)
+        top=f"{RUN_DIR}/output/{PROJECT}.report.top_genes_ADD.tsv",
+        top_skat=f"{RUN_DIR}/output/{PROJECT}.report.top_genes_SKAT.tsv",
+        contrib=f"{RUN_DIR}/output/{PROJECT}.report.variant_contrib.tsv",
+        consequence=f"{RUN_DIR}/output/{PROJECT}.report.consequence_matrix.tsv",
+        gene_carriers=f"{RUN_DIR}/output/{PROJECT}.report.gene_carriers.tsv",
+        chek2_carriers=f"{RUN_DIR}/output/{PROJECT}.report.chek2_carriers.tsv"
     params:
-        gene_glob=lambda wildcards: f"{RUN_DIR}/output/{PROJECT}.chr*.step2_gene_based_{wildcards.PHENO}.regenie",
+        gene_glob=f"{RUN_DIR}/output/{PROJECT}.chr*.step2_gene_based_{REPORT_PHENO}.regenie",
         snplist_glob=f"{RUN_DIR}/output/{PROJECT}.chr*.step2_gene_based_masks.snplist",
-        out_prefix=lambda wildcards: f"{RUN_DIR}/output/{PROJECT}.report_{wildcards.PHENO}",
+        out_prefix=f"{RUN_DIR}/output/{PROJECT}.report",
         # lambda deactivates Snakemake's automatic wildcard expansion -- see mask_variant_stats above
-        pfile_template=lambda wildcards: f"{RUN_DIR}/preprocess/{PROJECT}.chr{{CHR}}",
-        pheno_col=lambda wildcards: wildcards.PHENO
+        pfile_template=lambda wildcards: f"{RUN_DIR}/preprocess/{PROJECT}.chr{{CHR}}"
     threads: 4
     log:
-        f"{RUN_DIR}/logs/{PROJECT}.{{PHENO}}.build_regenie_report_tables.log"
+        f"{RUN_DIR}/logs/{PROJECT}.build_regenie_report_tables.log"
     shell:
         """
         (python build_regenie_report_tables.py \
@@ -546,44 +547,40 @@ rule build_regenie_report_tables:
         --snplist-glob '{params.snplist_glob}' \
         --mask-stats {input.stats} \
         --pheno {input.pheno} \
-        --pheno-col {params.pheno_col} \
         --pfile-template {params.pfile_template} \
         --threads {threads} \
         --out-prefix {params.out_prefix}) 2>&1 | tee {log}
         """
 
-# Generate the advanced report (M1-M4 masks, top genes, variant contrib, CHEK2 section, etc.)
-# -- one per phenotype in PHENOTYPES; this is the only report the pipeline produces.
+# Generate Brad's advanced report (M1-M4 masks, top genes, variant contrib, CHEK2 section, etc.)
+# Single phenotype for now (REPORT_PHENO = PHENOTYPES[0]) -- not fanned out per-phenotype yet.
 rule generate_advanced_report:
     input:
-        single_variant=lambda wildcards: expand(f"{RUN_DIR}/output/{PROJECT}.chr{{CHR}}.step2_single_variant_{wildcards.PHENO}.regenie", CHR=CHROMOSOMES),
-        gene_based=lambda wildcards: expand(f"{RUN_DIR}/output/{PROJECT}.chr{{CHR}}.step2_gene_based_{wildcards.PHENO}.regenie", CHR=CHROMOSOMES),
-        report_tables=lambda wildcards: [
-            f"{RUN_DIR}/output/{PROJECT}.report_{wildcards.PHENO}.top_genes_ADD.tsv",
-            f"{RUN_DIR}/output/{PROJECT}.report_{wildcards.PHENO}.top_genes_SKAT.tsv",
-            f"{RUN_DIR}/output/{PROJECT}.report_{wildcards.PHENO}.variant_contrib.tsv",
-            f"{RUN_DIR}/output/{PROJECT}.report_{wildcards.PHENO}.consequence_matrix.tsv",
-            f"{RUN_DIR}/output/{PROJECT}.report_{wildcards.PHENO}.gene_carriers.tsv",
-            f"{RUN_DIR}/output/{PROJECT}.report_{wildcards.PHENO}.chek2_carriers.tsv",
+        single_variant=expand(f"{RUN_DIR}/output/{PROJECT}.chr{{CHR}}.step2_single_variant_{REPORT_PHENO}.regenie", CHR=CHROMOSOMES),
+        gene_based=expand(f"{RUN_DIR}/output/{PROJECT}.chr{{CHR}}.step2_gene_based_{REPORT_PHENO}.regenie", CHR=CHROMOSOMES),
+        report_tables=[
+            f"{RUN_DIR}/output/{PROJECT}.report.top_genes_ADD.tsv",
+            f"{RUN_DIR}/output/{PROJECT}.report.top_genes_SKAT.tsv",
+            f"{RUN_DIR}/output/{PROJECT}.report.variant_contrib.tsv",
+            f"{RUN_DIR}/output/{PROJECT}.report.consequence_matrix.tsv",
+            f"{RUN_DIR}/output/{PROJECT}.report.gene_carriers.tsv",
+            f"{RUN_DIR}/output/{PROJECT}.report.chek2_carriers.tsv",
         ],
-        mask_stats=f"{RUN_DIR}/output/{PROJECT}.mask_variant_stats_{{PHENO}}.tsv",
+        mask_stats=f"{RUN_DIR}/output/{PROJECT}.mask_variant_stats.tsv",
         pheno=f"{RUN_DIR}/input/{PROJECT}.regenie.pheno.txt",
         rmd="advanced_report_regenie.Rmd"
     output:
-        html=f"reports/{PROJECT}_{{PHENO}}_advanced_regenie_report.html"
-    wildcard_constraints:
-        PHENO='|'.join(PHENOTYPES)
+        html=f"reports/{PROJECT}_advanced_regenie_report.html"
     params:
         project=PROJECT,
         data_dir=f"{RUN_DIR}/output",
         output_dir="reports",
         pheno_file=f"{RUN_DIR}/input/{PROJECT}.regenie.pheno.txt",
-        pheno_col=lambda wildcards: wildcards.PHENO,
-        step2_single_variant_mid=lambda wildcards: f"step2_single_variant_{wildcards.PHENO}",
-        step2_gene_based_mid=lambda wildcards: f"step2_gene_based_{wildcards.PHENO}"
+        step2_single_variant_mid=f"step2_single_variant_{REPORT_PHENO}",
+        step2_gene_based_mid=f"step2_gene_based_{REPORT_PHENO}"
     threads: 1
     log:
-        f"{RUN_DIR}/logs/{PROJECT}.{{PHENO}}.generate_advanced_report.log"
+        f"{RUN_DIR}/logs/{PROJECT}.generate_advanced_report.log"
     shell:
         """
         export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
@@ -596,7 +593,6 @@ rule generate_advanced_report:
                 data_dir = '{params.data_dir}',
                 output_dir = '{params.output_dir}',
                 pheno_file = '{params.pheno_file}',
-                pheno_col = '{params.pheno_col}',
                 step2_single_variant_mid = '{params.step2_single_variant_mid}',
                 step2_gene_based_mid = '{params.step2_gene_based_mid}'
             )

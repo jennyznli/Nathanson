@@ -20,6 +20,8 @@ def get_args():
     p=argparse.ArgumentParser(description='Full mask variant carrier counts + VEP fields')
     p.add_argument('--vep-list',required=True,help='List of VEP report CSVs (one path per line)')
     p.add_argument('--pheno',required=True,help='REGENIE pheno: FID IID STATUS (0=ctrl,1=case)')
+    p.add_argument('--pheno-col',default='STATUS',
+                   help='Phenotype column in --pheno to use for case/control status (default: STATUS)')
     p.add_argument('--pfile-template',required=True,
                    help='PLINK2 --pfile prefix with {CHR} placeholder (e.g. preprocess/PROJECT.chr{CHR})')
     p.add_argument('--chroms',default=','.join(str(i) for i in range(1,23)))
@@ -121,12 +123,12 @@ def main():
     print(f'mask sites: {len(annot)}')
 
     pheno=pd.read_csv(args.pheno,sep=r'\s+')
-    if 'IID' not in pheno.columns or 'STATUS' not in pheno.columns:
-        print('Error: pheno needs IID and STATUS')
+    if 'IID' not in pheno.columns or args.pheno_col not in pheno.columns:
+        print(f'Error: pheno needs IID and {args.pheno_col}')
         return
-    pheno['STATUS']=pd.to_numeric(pheno['STATUS'],errors='coerce')
-    cases=pheno.loc[pheno['STATUS']==1,'IID'].astype(str).tolist()
-    controls=pheno.loc[pheno['STATUS']==0,'IID'].astype(str).tolist()
+    pheno[args.pheno_col]=pd.to_numeric(pheno[args.pheno_col],errors='coerce')
+    cases=pheno.loc[pheno[args.pheno_col]==1,'IID'].astype(str).tolist()
+    controls=pheno.loc[pheno[args.pheno_col]==0,'IID'].astype(str).tolist()
     if not cases or not controls:
         print(f'Error: need cases and controls (n_case={len(cases)} n_ctrl={len(controls)})')
         return

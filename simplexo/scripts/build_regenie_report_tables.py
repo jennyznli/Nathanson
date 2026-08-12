@@ -27,6 +27,8 @@ def get_args():
     p.add_argument('--top-n',type=int,default=20,help='Top N genes per mask×bin for contrib/CSV')
     p.add_argument('--html-n',type=int,default=10,help='Mark top N for HTML bins')
     p.add_argument('--pheno',default='',help='REGENIE pheno (FID IID STATUS); needed for unique gene carriers')
+    p.add_argument('--pheno-col',default='STATUS',
+                   help='Phenotype column in --pheno to use for case/control status (default: STATUS)')
     p.add_argument('--pfile-template',required=True,
                    help='PLINK2 --pfile prefix with {CHR} placeholder for unique carrier counts (e.g. preprocess/PROJECT.chr{CHR})')
     p.add_argument('--threads',type=int,default=1,help='Threads passed to each plink2 --export A call')
@@ -300,14 +302,14 @@ def alt_of(vid):
     return str(vid).rsplit('_',1)[-1]
 
 
-def load_pheno_status(path):
+def load_pheno_status(path,pheno_col='STATUS'):
     ph=pd.read_csv(path,sep=r'\s+')
-    if 'IID' not in ph.columns or 'STATUS' not in ph.columns:
-        raise ValueError('pheno needs IID and STATUS')
+    if 'IID' not in ph.columns or pheno_col not in ph.columns:
+        raise ValueError(f'pheno needs IID and {pheno_col}')
     ph['IID']=ph['IID'].astype(str)
-    ph['STATUS']=pd.to_numeric(ph['STATUS'],errors='coerce')
-    ph=ph[ph['STATUS'].isin([0,1])]
-    return dict(zip(ph['IID'],ph['STATUS'].astype(int)))
+    ph[pheno_col]=pd.to_numeric(ph[pheno_col],errors='coerce')
+    ph=ph[ph[pheno_col].isin([0,1])]
+    return dict(zip(ph['IID'],ph[pheno_col].astype(int)))
 
 
 def plink_export_a(pfile,extract,out_prefix,ids,threads=1):
@@ -476,7 +478,7 @@ def main():
     gene_carr=pd.DataFrame(columns=['GENE','MASK','THRESH','n_case_carriers','n_control_carriers'])
     chek2_carr=pd.DataFrame(columns=['IID','STATUS'])
     if args.pheno and os.path.isfile(args.pheno):
-        status_by_iid=load_pheno_status(args.pheno)
+        status_by_iid=load_pheno_status(args.pheno,args.pheno_col)
         carr_keys=set()
         if len(top):
             carr_keys|=needed_keys(top)
