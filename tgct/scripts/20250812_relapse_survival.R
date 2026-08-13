@@ -14,7 +14,10 @@ ss <- read_xlsx(here("tgct", "ss", "prstcstageirelapse-stageipatients_data_2026-
 # ========================
 # PREP DATA
 # ========================
-ss <- ss |> left_join(master, by = c("ktid" = "KTID"))
+ss <- ss |> left_join(master, by = c("ktid" = "KTID")) |>
+    filter(ktid != "KT0002101")
+# this guys has 20 year relasep... KT0002101
+
 
 ss$relapse_at_stage_1 <- as.factor(ss$relapse_at_stage_1)
 ss$adjuvant_chemotherapy_s1 <- as.factor(ss$adjuvant_chemotherapy_s1)
@@ -283,11 +286,6 @@ dim(sem_surv)
 
 plot_prs_survival(sem_surv, prs_type = "z", coding = NA, cohort_label = "seminoma_surveillance")
 
-
-
-
-
-
 # recreate the same PRS_Z Low vs Mid/High split plot_prs_survival() used
 z_breaks <- quantile(ss$PRS_Z, probs = c(1/3, 2/3), na.rm = TRUE)
 ss$prs_tertile_z <- cut(ss$PRS_Z, breaks = c(-Inf, z_breaks, Inf), labels = c("Low", "Mid", "High"))
@@ -299,6 +297,13 @@ ss |>
     select(ktid, time_to_event, relapse_at_stage_1, PRS_Z, PRS_Effect,
            date_of_diagnosis, date1_of_relapse, date_last_contact,
            testicular_tumor_histology, adjuvant_therapy_s1) |>
+    arrange(time_to_event)
+
+
+x <- ss |>
+    filter(prs_group_low_z == "Low", relapse_at_stage_1 == "1") |>
+    select(ktid, time_to_event, PRS_Z, date_of_diagnosis, date1_of_relapse,
+           date_last_contact, testicular_tumor_histology, adjuvant_therapy_s1) |>
     arrange(time_to_event)
 
 
