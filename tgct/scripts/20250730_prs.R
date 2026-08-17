@@ -6,55 +6,35 @@ source("config.R")
 # ========================
 # LOAD DATA & CONVERT
 # ========================
-# sso <- read_tsv(here("tgct", "ss", "pennsamples_masterslist_062226.txt"))
-# ss_old <- read_excel(here("tgct", "ss", "20260730_tgct_master.xlsx"))
+sso <- read_tsv(here("tgct", "ss", "pennsamples_masterslist_062226.txt"))
+# 1350
 
-meta  <- read_xlsx(here("tgct", "ss", "meta-hits-062526.xlsx"))
-prsz <- read.table(here("tgct", "data", "tgct_prs_z.profile"), header = TRUE)
-prse <- read.table(here("tgct", "data", "tgct_prs_effect.profile"), header = TRUE)
-snps <- fread(here("tgct", "data", "emilio-scores.txt"))
-
-ss <- read_excel(here("tgct", "ss", "20260730_tgct_master_w_import_info.xlsx"), sheet = "data", na = "NA") |>
-    select(-CNT, -IID, -PHENO, -CNT2, -SCORESUM) |>
-    mutate(
-        EMPI = as.character(EMPI),
-        MRN = as.character(MRN),
-        DOB = as.Date(DOB, format = "%m/%d/%y")
-    )
-
-dup <- read_excel(here("tgct", "ss", "20260730_tgct_master_w_import_info.xlsx"), sheet = "duplicates", na = "NA") |>
-    select(-CNT, -IID, -PHENO, -CNT2, -SCORESUM) |>
-    mutate(
-        EMPI = as.character(EMPI),
-        MRN = as.character(MRN),
-        DOB = as.Date(DOB, format = "%m/%d/%y")
-    )
-
-imputed_ids <- read.csv(here("PMBB", "4.0", "PMBB-Release-2026-4.0_genetic_imputed.sample_list.txt"), header = FALSE)$V1
+# flags
 flags <- fread(here("PMBB", "4.0", "rgcname_pmbbid_metadata_flags_freeze4.csv"), header = TRUE)
 
-dim(ss)
-# 1136
-dim(dup)
-# 40 - 20 people are duplicated
+# prs scores
+prsz <- read.table(here("tgct", "data", "tgct_prs_z.profile"), header = TRUE)
+prse <- read.table(here("tgct", "data", "tgct_prs_effect.profile"), header = TRUE)
 
 # ========================
-# DEDUPLICATE BY MATCHING NAMES
+# CHECK IF THERE ARE MULTIPLE IDS WITHIN SAME ROW
 # ========================
-# okay so for the old sheet, check if there are any with multiple IDs WITHIN the same row
-# choose by priority and make a GenoSourceFinal new column
+# 829  15
+dim(flags |> filter(flags$Testicular_CA == 1))
+
+# choose by priority and make a GenoSource2 new column
 ss <- sso %>%
-  left_join(flags %>% select(PMBB_ID, Freeze, PMBB_consent), by = c("PMBBID2" = "PMBB_ID")) %>%
-  mutate(
-    # row-wise: does THIS row individually have multiple id columns filled in?
-    GenoSourceFinal = case_when(
-      !is.na(PMBBID2) ~ "PMBB", # checked first
-      !is.na(GencoveID) ~ "Gencove", # checked next, so on if PMBB was false
-      !is.na(ReplicationID) ~ "Replication",
-      !is.na(DiscoveryID) ~ "Discovery"
-    ),
-    Final_ID = coalesce(PMBBID2, GencoveID, ReplicationID, DiscoveryID)
-  )
+    left_join(flags %>% select(PMBB_ID, Freeze, PMBB_consent), by = c("PMBBID2" = "PMBB_ID")) %>%
+    mutate(
+        # row-wise: does THIS row individually have multiple id columns filled in?
+        GenoSourceFinal = case_when(
+            !is.na(PMBBID2) ~ "PMBB", # checked first
+            !is.na(GencoveID) ~ "Gencove", # checked next, so on if PMBB was false
+            !is.na(ReplicationID) ~ "Replication",
+            !is.na(DiscoveryID) ~ "Discovery"
+        ),
+        Final_ID = coalesce(PMBBID2, GencoveID, ReplicationID, DiscoveryID)
+    )
 sum(is.na(ss$Geno.Avail))
 # 110 TGCT Not Kts
 # but 20 of those are duplicates according to Wenting
@@ -74,6 +54,36 @@ ss2 <- ss |> filter(Final_ID != "PMBB4565870091478")
 ss2$Geno.Avail <- TRUE
 dim(ss2)
 # 1135
+
+# ========================
+# HAND OVER TO WENTING, SHE DEDUPLICATED
+# ========================
+ss <- read_excel(here("tgct", "ss", "20260730_tgct_master_w_import_info.xlsx"), sheet = "data", na = "NA") |>
+    select(-CNT, -IID, -PHENO, -CNT2, -SCORESUM) |>
+    mutate(
+        EMPI = as.character(EMPI),
+        MRN = as.character(MRN),
+        DOB = as.Date(DOB, format = "%m/%d/%y")
+    )
+dim(ss)
+# 1136
+
+dup <- read_excel(here("tgct", "ss", "20260730_tgct_master_w_import_info.xlsx"), sheet = "duplicates", na = "NA") |>
+    select(-CNT, -IID, -PHENO, -CNT2, -SCORESUM) |>
+    mutate(
+        EMPI = as.character(EMPI),
+        MRN = as.character(MRN),
+        DOB = as.Date(DOB, format = "%m/%d/%y")
+    )
+
+imputed_ids <- read.csv(here("PMBB", "4.0", "PMBB-Release-2026-4.0_genetic_imputed.sample_list.txt"), header = FALSE)$V1
+flags <- fread(here("PMBB", "4.0", "rgcname_pmbbid_metadata_flags_freeze4.csv"), header = TRUE)
+
+dim(ss)
+# 1136
+dim(dup)
+# 40 - 20 people are duplicated
+
 
 # ========================
 # DEDUPLICATE

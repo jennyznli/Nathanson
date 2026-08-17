@@ -1,7 +1,8 @@
 # ============================================================
 # CNA ANALYSIS - BATCH PROCESSING
 # ============================================================
-source("config.R")
+library(here)
+source("R/config.R")
 library(survival)
 library(survminer)
 
@@ -9,15 +10,32 @@ library(survminer)
 # LOAD DATA & CONVERT
 # ========================
 master <- read_xlsx(here("tgct", "ss", "20260813_tgct_master.xlsx"))
-ss <- read_xlsx(here("tgct", "ss", "prstcstageirelapse-stageipatients_data_2026-04-14_1446.xlsx"))
+ss_s1 <- read_xlsx(here("tgct", "ss", "prstcstageirelapse-stageipatients_data_2026-04-14_1446.xlsx"))
+ss <- read_xlsx(here("tgct", "ss", "PRSTCStageIRelapse-AllPatientsAndData_DATA_2026-08-17_0843.xlsx"))
+dim(ss)
+# 1186
+
+# need to join the PRS somehow...
 
 # ========================
 # PREP DATA
 # ========================
-ss <- ss |> left_join(master, by = c("ktid" = "KTID")) |>
+not_kt <- master |> filter(KTID != "TGCT_Not_KT")
+kt <- master |> filter(KTID == "TGCT_Not_KT")
+dim(not_kt)
+# 984
+dim(kt)
+# 108
+
+ss <- ss |> left_join(kt, by = c("ktid" = "KTID")) |>
+    left_join(not_kt, by = c("PMBB_ID2" = "Final_ID2"))
     filter(ktid != "KT0002101")
 # this guys has 20 year relasep... KT0002101
 
+
+ss <- ss |> left_join(master, by = c("hup_mrn" = "MRN")) |>
+    filter(ktid != "KT0002101")
+    # this guys has 20 year relasep... KT0002101
 
 ss$relapse_at_stage_1 <- as.factor(ss$relapse_at_stage_1)
 ss$adjuvant_chemotherapy_s1 <- as.factor(ss$adjuvant_chemotherapy_s1)
