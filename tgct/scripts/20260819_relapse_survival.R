@@ -23,7 +23,8 @@ ss <- read_xlsx(here("tgct", "ss", "PRSTCStageIRelapse-AllPatientsAndData_DATA_2
         date_last_contact = as.Date(date_last_contact, format = "%Y-%m-%d"),
         relapse_at_stage_1 = as.factor(relapse_at_stage_1),
         stage_at_diagnosis = as.factor(stage_at_diagnosis),
-        adjuvant_therapy_s1 = as.factor(adjuvant_therapy_s1)
+        adjuvant_therapy_s1 = as.factor(adjuvant_therapy_s1),
+        prs_2026 = as.numeric(prs_2026)
     )
 
 # time-to-event: time to relapse for events, time to last contact for censored
@@ -56,14 +57,13 @@ dim(master)
 # ========================
 # first pass: join new PRS by ktid
 ss2 <- ss |> left_join(master, by = c("ktid" = "KTID"))
-
-examine <- ss2 |> select(ktid, date1_of_relapse, date2_of_relapse, date_of_diagnosis, date_last_contact,
-                  relapse_at_stage_1, adjuvant_therapy_s1, PRS_Z, PRS_Effect, prs_2026)
+table(ss2$GenoSource3)
+# what if i just filtered down to PMBB ...
 
 matched_ktid <- ss2 |> filter(!is.na(PRS_Effect))
 missing_ktid <- ss2 |> filter(is.na(PRS_Effect)) |> select(all_of(names(ss)))
 dim(missing_ktid)
-# 184
+# 202
 
 # sanity check -- duplications
 missing_ktid |> count(hup_mrn) |> filter(n > 1)
@@ -80,26 +80,95 @@ dim(ss3)
 # who's still missing after both passes?
 still_missing <- ss3 |> filter(is.na(PRS_Effect))
 dim(still_missing)
-# 182
-View(still_missing)
+# 184
+# View(still_missing)
 # most of these don't have PRS from before, so good
 
 # make numeric and filter out those w/o PRS
 ss4 <- ss3 |> mutate(
-    PRS_Z = as.numeric(PRS_Z),
-    PRS_Effect = as.numeric(PRS_Effect)
-) |> filter(!is.na(PRS_Effect), !is.na(PRS_Z), !is.na(ktid))
+        PRS_Z = as.numeric(PRS_Z),
+        PRS_Effect = as.numeric(PRS_Effect)
+    ) |>
+    filter(GenoSource3 == "PMBB") |>
+    filter(!is.na(PRS_Effect), !is.na(PRS_Z)) |>
+    select(histology_group, relapse_at_stage_1,
+           time_to_event, adjuvant_therapy_s1,
+           date_of_diagnosis, date_last_contact,
+           date1_of_relapse, date2_of_relapse,
+           PRS_Z, PRS_Effect, prs_2026)
 dim(ss4)
-# 1001 wtf i gotta check this later...
+# 827
 
+# ========================
+# PRS TERTILES (computed once, reused everywhere below)
+# ========================
+# computed on ss4 (everyone with a valid PRS score) rather than on the later
+# complete-case survival cohort -- PRS is fixed regardless of who has full
+# clinical follow-up, so tertile cutpoints shouldn't depend on which subset
+# happens to have complete histology/relapse/date fields. fixed cutpoints
+# also mean "Low/Mid/High" means the same PRS value in every plot and every
+# subgroup below, instead of being recomputed (and redefined) per call
+effect_breaks <- quantile(ss4$PRS_Effect, probs = c(1 / 3, 2 / 3), na.rm = TRUE)
+z_breaks      <- quantile(ss4$PRS_Z,      probs = c(1 / 3, 2 / 3), na.rm = TRUE)
+breaks_2026   <- quantile(ss4$prs_2026,   probs = c(1 / 3, 2 / 3), na.rm = TRUE)
+
+effect_breaks
+z_breaks
+breaks_2026
+
+# label each sample's tertile per PRS type -- carries through ss5/survival/
+# sem_adj/sem_surv automatically since it's just a column on ss4
+ss4 <- ss4 |> mutate(
+    PRS_Effect_tertile = cut(PRS_Effect, breaks = c(-Inf, effect_breaks, Inf), labels = c("Low", "Mid", "High")),
+    PRS_Z_tertile       = cut(PRS_Z,      breaks = c(-Inf, z_breaks, Inf),      labels = c("Low", "Mid", "High")),
+    prs_2026_tertile    = cut(prs_2026,   breaks = c(-Inf, breaks_2026, Inf),   labels = c("Low", "Mid", "High"))
+)
+
+table(ss4$PRS_Effect_tertile, useNA = "ifany")
+table(ss4$PRS_Z_tertile, useNA = "ifany")
+table(ss4$prs_2026_tertile, useNA = "ifany")
+
+# ========================
+# TERTILE CONCORDANCE
+# ========================
+# do the three PRS methods agree on which risk group (Low/Mid/High) a sample
+# falls in? PRS_Effect and PRS_Z come from the same genotypes just weighted
+# differently, so those two should track closely; prs_2026 is a separate
+# calculation, so it's the one worth actually scrutinizing here
+table(Effect = ss4$PRS_Effect_tertile, Z       = ss4$PRS_Z_tertile)
+# effect mostly agrees with Z
+table(Effect = ss4$PRS_Effect_tertile, PRS2026 = ss4$prs_2026_tertile)
+table(Z      = ss4$PRS_Z_tertile,      PRS2026 = ss4$prs_2026_tertile)
+# these really don't agree with each other ...
+
+# % exact agreement (landed in the same Low/Mid/High bucket)
+mean(ss4$PRS_Effect_tertile == ss4$PRS_Z_tertile, na.rm = TRUE)
+# 0.95
+mean(ss4$PRS_Effect_tertile == ss4$prs_2026_tertile, na.rm = TRUE)
+# 0.40
+mean(ss4$PRS_Z_tertile == ss4$prs_2026_tertile, na.rm = TRUE)
+# 0.40...
+
+# weighted kappa: Low/Mid/High is ordinal, so a Low-vs-Mid mismatch should
+# count as less disagreement than a Low-vs-High mismatch -- plain %
+# agreement or an unweighted kappa treats both misses the same way
+library(irr)
+kappa2(ss4[, c("PRS_Effect_tertile", "PRS_Z_tertile")], weight = "squared")
+kappa2(ss4[, c("PRS_Effect_tertile", "prs_2026_tertile")], weight = "squared")
+kappa2(ss4[, c("PRS_Z_tertile", "prs_2026_tertile")], weight = "squared")
+
+# how many samples land in the same tertile across all three at once?
+ss4 <- ss4 |> mutate(
+    tertile_agree_all3 = (PRS_Effect_tertile == PRS_Z_tertile) & (PRS_Z_tertile == prs_2026_tertile)
+)
+table(ss4$tertile_agree_all3, useNA = "ifany")
+mean(ss4$tertile_agree_all3, na.rm = TRUE)
 
 # ========================
 # DISTRIBUTION PLOT
 # ========================
-
-ss3 <- ss3 %>%
+ss4 <- ss4 %>%
     filter(stage_at_diagnosis %in% c(1, 2, 3, 4, 5)) %>%
-    filter(!is.na(PRS_Z)) %>%
     mutate(stage_label = case_when(
         stage_at_diagnosis == 1 ~ "Stage I",
         stage_at_diagnosis == 5 ~ "Stage IS",
@@ -110,6 +179,9 @@ ss3 <- ss3 %>%
     stage_label = factor(stage_label,
                          levels = c("Stage I", "Stage IS", "Stage II",
                                     "Stage III", "Stage II/III or Metastatic")))
+table(ss4$stage_at_diagnosis)
+# 1   2   3   4   5   6  99
+# 428 128 115  74   8   0   0
 
 # ── Distribution plot (density) ───────────────────────────────────────────────
 p <- ggplot(ss3, aes(x = PRS_Effect, color = stage_label)) +
@@ -154,9 +226,9 @@ ss3 %>%
     )
 # stage_label                    n mean_prs sd_prs median   min   max
 # <fct>                      <int>    <dbl>  <dbl>  <dbl> <dbl> <dbl>
-# 1 Stage I                      430     3.85   1.14   3.84 0.409  6.97
+#     1 Stage I                      429     3.85   1.14   3.84 0.409  6.97
 # 2 Stage IS                       8     4.23   1.21   4.70 2.13   5.34
-# 3 Stage II                     129     3.88   1.31   3.78 0.879  7.96
+# 3 Stage II                     128     3.89   1.31   3.82 0.879  7.96
 # 4 Stage III                    115     3.88   1.21   3.84 1.05   6.81
 # 5 Stage II/III or Metastatic    74     3.56   1.10   3.52 0.713  5.5
 
@@ -183,13 +255,6 @@ table(ss4$relapse_at_stage_1, useNA = "ifany")
 # 0    1 <NA>
 # 443  100  458
 
-x <- ss4 |> filter(relapse_at_stage_1 == 1)
-# some of these don't ahve dates ...
-
-examine <- ss4 |> select(histology_group, relapse_at_stage_1,
-                         time_to_event, adjuvant_therapy_s1,
-                         date_of_diagnosis, date_last_contact,
-                         date1_of_relapse, date2_of_relapse)
 
 colSums(is.na(examine))
 # histology_group  relapse_at_stage_1       time_to_event adjuvant_therapy_s1
@@ -269,8 +334,11 @@ plot_prs_distribution <- function(data, prs_type = c("effect", "z"), cohort_labe
     invisible(list(plot = p, summary = summary_table))
 }
 
-plot_prs_distribution(therapy, prs_type = "effect")
-plot_prs_distribution(therapy, prs_type = "z")
+# TODO: `therapy` is never defined anywhere in this script -- these calls
+# will error as-is. Left disabled until it's clear which subset/object this
+# was meant to reference (ss5? survival? something filtered further?).
+# plot_prs_distribution(therapy, prs_type = "effect")
+# plot_prs_distribution(therapy, prs_type = "z")
 
 # ========================
 # INITIAL TIME DISTRIBUTION
@@ -324,140 +392,20 @@ print(p)
 dev.off()
 
 # ========================
-# TEST PRS STRATIFIED
-# ========================
-dim(survival)
-tert_breaks <- quantile(survival$PRS_Effect, probs = c(1 / 3, 2 / 3), na.rm = TRUE)
-tert_breaks
-# 33.33333% 66.66667%
-# 3.368133  4.345933
-
-survival <- survival |> mutate(
-    prs_group = case_when(
-        PRS_Effect <= tert_breaks[1] ~ "Low",
-        PRS_Effect <= tert_breaks[2] ~ "Mid",
-        TRUE                 ~ "High"
-    )
-)
-
-print(table(survival$prs_group))
-# Low  Mid High
-# 146  146  146
-
-fit <- survfit(Surv(time_to_event, as.numeric(as.character(relapse_at_stage_1))) ~ prs_group, data = survival)
-
-p <- ggsurvplot(
-    fit,
-    data = survival,
-    risk.table = TRUE,
-    # conf.int = TRUE,
-    pval = TRUE,
-    ylim = c(0.5, 1.0),
-    xlim = c(0, 20),
-    xlab = "Time",
-    ylab = "Relapse-free survival probability",
-    legend.title = "PRS tertile"
-    # legend.labs = c("Low", "Mid", "High")
-)
-
-png(file.path("tgct", "figures", "test.png"), width = 7, height = 6.5, units = "in", res = 300)
-print(p)
-dev.off()
-
-
-p_dist <- ggplot(survival, aes(x = time_to_event, fill = prs_group)) +
-    geom_histogram(position = "identity", alpha = 0.3, binwidth = 1) +
-    labs(
-        title = "Distribution of Time to Event",
-        x = "Time to event (years)",
-        y = "Count",
-        fill = NULL
-    ) +
-    theme_bw()
-png(here("tgct", "figures", "tgct_time_to_event_distribution_prs.png"), width = 5, height = 4, units = "in", res = 300)
-print(p_dist)
-dev.off()
-
-
-# ========================
-# TEST PRS STRATIFIED - prs_2026
-# ========================
-dim(survival)
-survival$prs_2026 <- as.numeric(survival$prs_2026)
-tert_breaks <- quantile(survival$prs_2026, probs = c(1 / 3, 2 / 3), na.rm = TRUE)
-tert_breaks
-# 33.33333% 66.66667%
-# 3.368133  4.345933
-
-survival <- survival |> mutate(
-    prs_group_2026 = case_when(
-        prs_2026 <= tert_breaks[1] ~ "Low",
-        prs_2026 <= tert_breaks[2] ~ "Mid",
-        TRUE                       ~ "High"
-    )
-)
-print(table(survival$prs_group_2026))
-# Low  Mid High
-# 146  146  146
-
-fit <- survfit(Surv(time_to_event, as.numeric(as.character(relapse_at_stage_1))) ~ prs_group, data = survival)
-
-p <- ggsurvplot(
-    fit,
-    data = survival,
-    risk.table = TRUE,
-    # conf.int = TRUE,
-    pval = TRUE,
-    ylim = c(0.5, 1.0),
-    xlim = c(0, 20),
-    xlab = "Time",
-    ylab = "Relapse-free survival probability",
-    legend.title = "PRS tertile"
-    # legend.labs = c("Low", "Mid", "High")
-)
-
-png(file.path("tgct", "figures", "test.png"), width = 7, height = 6.5, units = "in", res = 300)
-print(p)
-dev.off()
-
-
-p_dist <- ggplot(survival, aes(x = time_to_event, fill = prs_group)) +
-    geom_histogram(position = "identity", alpha = 0.3, binwidth = 1) +
-    labs(
-        title = "Distribution of Time to Event",
-        x = "Time to event (years)",
-        y = "Count",
-        fill = NULL
-    ) +
-    theme_bw()
-png(here("tgct", "figures", "tgct_time_to_event_distribution_prs.png"), width = 5, height = 4, units = "in", res = 300)
-print(p_dist)
-dev.off()
-
-
-
-# ========================
-# DOES PRS PREDICT RELAPSE?
-# ========================
-# idk associatoin??
-
-
-
-
-# ========================
 # PRS-stratified survival plot
 # ========================
 # data: any subset of survival (must have time_to_event, relapse_at_stage_1, and the chosen prs_var)
+# breaks: fixed 2-value quantile vector, e.g. effect_breaks/z_breaks/breaks_2026
+#         from the "PRS TERTILES" section above -- always supplied by the
+#         caller so tertile cutpoints stay fixed across every plot/subgroup
+#         instead of being redefined per call
 # prs_type: "effect" (PRS_Effect), "z" (PRS_Z), or "2026" (prs_2026)
 # coding: NA (default) -> tertiles (Low/Mid/High)
 #         "binary_high" -> High vs Low/Mid
 #         "binary_low"  -> Low vs Mid/High
 # cohort_label: optional string folded into the output filename, e.g. "seminoma_adjuvant"
-# breaks: NULL (default) -> compute tertile cutpoints from this call's own `data`
-#         or pass a fixed 2-value quantile vector (e.g. computed once on the
-#         overall cohort) so "Low/Mid/High" means the same PRS value across calls
-plot_prs_survival <- function(data, prs_type = c("effect", "z", "2026"), coding = NA, cohort_label = NULL,
-                               breaks = NULL, outdir = here("tgct", "figures")) {
+plot_prs_survival <- function(data, breaks, prs_type = c("effect", "z", "2026"), coding = NA,
+                               cohort_label = NULL, outdir = here("tgct", "figures")) {
     prs_type <- match.arg(prs_type)
     prs_var <- switch(prs_type,
         effect = "PRS_Effect",
@@ -465,15 +413,9 @@ plot_prs_survival <- function(data, prs_type = c("effect", "z", "2026"), coding 
         "2026" = "prs_2026"
     )
 
-    # prs_2026 comes in from the registry sheet as character; coerce defensively
-    # so callers who forget to convert don't get a silent quantile()/cut() failure
     data[[prs_var]] <- as.numeric(data[[prs_var]])
-
     data <- data |> filter(!is.na(.data[[prs_var]]), !is.na(time_to_event), !is.na(relapse_at_stage_1))
 
-    if (is.null(breaks)) {
-        breaks <- quantile(data[[prs_var]], probs = c(1 / 3, 2 / 3), na.rm = TRUE)
-    }
     data$prs_group <- cut(
         data[[prs_var]],
         breaks = c(-Inf, breaks, Inf),
@@ -537,19 +479,20 @@ plot_prs_survival <- function(data, prs_type = c("effect", "z", "2026"), coding 
     invisible(p)
 }
 
-# could add tertile counts in?
-# pairwise survival diff pairwise_survdiff
-
 # ========================
 # STRATIFIED BY PRS
 # ========================
-plot_prs_survival(survival, prs_type = "effect", coding = NA)
-plot_prs_survival(survival, prs_type = "effect", coding = "binary_high")
-plot_prs_survival(survival, prs_type = "effect", coding = "binary_low")
+plot_prs_survival(survival, effect_breaks, prs_type = "effect", coding = NA)
+plot_prs_survival(survival, effect_breaks, prs_type = "effect", coding = "binary_high")
+plot_prs_survival(survival, effect_breaks, prs_type = "effect", coding = "binary_low")
 
-plot_prs_survival(survival, prs_type = "z", coding = NA)
-plot_prs_survival(survival, prs_type = "z", coding = "binary_high")
-plot_prs_survival(survival, prs_type = "z", coding = "binary_low")
+plot_prs_survival(survival, z_breaks, prs_type = "z", coding = NA)
+plot_prs_survival(survival, z_breaks, prs_type = "z", coding = "binary_high")
+plot_prs_survival(survival, z_breaks, prs_type = "z", coding = "binary_low")
+
+plot_prs_survival(survival, breaks_2026, prs_type = "2026", coding = NA)
+plot_prs_survival(survival, breaks_2026, prs_type = "2026", coding = "binary_high")
+plot_prs_survival(survival, breaks_2026, prs_type = "2026", coding = "binary_low")
 
 # ========================
 # SUBANALYSES - SEMINOMA
@@ -583,7 +526,7 @@ sem_adj <- survival |> filter(histology_group == "Seminoma", adjuvant_therapy_s1
 dim(sem_adj)
 # 64
 
-plot_prs_survival(sem_adj, prs_type = "z", coding = NA, cohort_label = "seminoma_adjuvant")
+plot_prs_survival(sem_adj, z_breaks, prs_type = "z", coding = NA, cohort_label = "seminoma_adjuvant")
 
 # ========================
 # RESTRICT DOWN TO SEMINOMA, SURVEILLANCE - PRS Stratified
@@ -592,30 +535,9 @@ sem_surv <- survival |> filter(histology_group == "Seminoma", adjuvant_therapy_s
 dim(sem_surv)
 # 163
 
-plot_prs_survival(sem_surv, prs_type = "z", coding = NA, cohort_label = "seminoma_surveillance")
+plot_prs_survival(sem_surv, z_breaks, prs_type = "z", coding = NA, cohort_label = "seminoma_surveillance")
 
-# ========================
-# SEMINOMA SUBGROUPS, TERTILES FIXED TO THE OVERALL COHORT
-# ========================
-# the calls above re-derive tertile cutpoints from each subgroup's own data,
-# so "Low/Mid/High" is redefined in every subgroup. these calls instead reuse
-# breaks computed once on the full `survival` cohort, so a "High PRS" patient
-# means the same PRS value whether they're in sem_adj, sem_surv, or overall
-overall_z_breaks      <- quantile(survival$PRS_Z,      probs = c(1 / 3, 2 / 3), na.rm = TRUE)
-overall_effect_breaks <- quantile(survival$PRS_Effect, probs = c(1 / 3, 2 / 3), na.rm = TRUE)
-
-plot_prs_survival(sem_adj,  prs_type = "z", coding = NA, breaks = overall_z_breaks,
-                  cohort_label = "seminoma_adjuvant_overallbreaks")
-plot_prs_survival(sem_surv, prs_type = "z", coding = NA, breaks = overall_z_breaks,
-                  cohort_label = "seminoma_surveillance_overallbreaks")
-
-plot_prs_survival(sem_adj,  prs_type = "effect", coding = NA, breaks = overall_effect_breaks,
-                  cohort_label = "seminoma_adjuvant_overallbreaks")
-plot_prs_survival(sem_surv, prs_type = "effect", coding = NA, breaks = overall_effect_breaks,
-                  cohort_label = "seminoma_surveillance_overallbreaks")
-
-# recreate the same PRS_Z Low vs Mid/High split plot_prs_survival() used
-z_breaks <- quantile(survival$PRS_Z, probs = c(1/3, 2/3), na.rm = TRUE)
+# same PRS_Z Low vs Mid/High split, using the tertiles fixed above
 survival$prs_tertile_z <- cut(survival$PRS_Z, breaks = c(-Inf, z_breaks, Inf), labels = c("Low", "Mid", "High"))
 survival$prs_group_low_z <- if_else(survival$prs_tertile_z == "Low", "Low", "Mid/High")
 
@@ -627,12 +549,9 @@ survival |>
            testicular_tumor_histology, adjuvant_therapy_s1) |>
     arrange(time_to_event)
 
-
 x <- survival |>
     filter(prs_group_low_z == "Low", relapse_at_stage_1 == "1") |>
     select(ktid, time_to_event, PRS_Z, date_of_diagnosis, date1_of_relapse,
            date_last_contact, testicular_tumor_histology, adjuvant_therapy_s1) |>
     arrange(time_to_event)
-
-
 
