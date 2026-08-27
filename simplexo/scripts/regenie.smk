@@ -1,3 +1,42 @@
+# =============================================================================
+# REGENIE
+# =============================================================================
+#   Full Regenie pipeline. Builds the sample list,
+#   prepares Step 1 genotypes (array or LD-pruned exome, per config), prepares
+#   Step 2 per-chromosome exome genotypes with sex updated, builds regenie
+#   inputs (annotation/set/mask/covariates/phenotype via preprocess_regenie.py),
+#   runs regenie Step 1 (null model) and Step 2 (single-variant + gene-based
+#   burden/SKAT), then builds HTML report per phenotype.
+#
+# Optional multi-phenotype support. If config['input']['pheno_file'] is set, preprocess_regenie
+# reads that pre-built multi-phenotype file directly (see preprocess_regenie.py --pheno-file)
+# instead of building a single STATUS column from cases/controls. config['input']['phenotypes']
+# must list the exact phenotype column names present in that file, in the order regenie should
+# report them -- this list is also passed to regenie as --phenoColList so the output file names
+# it writes (<out>_<phenoName>.regenie) match what's declared below. Default (no pheno_file):
+# unchanged single-STATUS behavior.
+# 
+#  Dependencies:
+#   - preprocess_regenie.py
+#   - mask_variant_stats.py,
+#   - build_regenie_report_tables.py
+#   - report_regenie.Rmd
+#
+# Configs: 
+#   - config (e.g. all_array3) 
+# 
+# Outputs ({run_dir}/output/ and reports/):
+#   - step2_single_variant_{PHENO}.regenie, step2_gene_based_{PHENO}.regenie (per chromosome)
+#   - report_{PHENO}.{top_genes_ADD,top_genes_SKAT,variant_contrib,consequence_matrix,
+#     gene_carriers,chek2_carriers}.tsv
+#   - reports/{PROJECT}_{PHENO}_regenie_report.html
+#
+# Submission:
+# bsub -N -J all_array2 -eo logs/all_array2.e -oo logs/all_array2.o \
+#   snakemake -s regenie.smk --workflow-profile profiles/lsf -j 22 \
+#  --configfile config/all_array_config2.yaml
+# =============================================================================
+
 from datetime import datetime
 import os
 
@@ -17,17 +56,11 @@ os.makedirs("reports", exist_ok=True)  # Shared reports directory
 # Determine step 1 input type (exome or array)
 STEP1_INPUT_TYPE = config['input']['step1']['input_type']
 
-# Optional multi-phenotype support. If config['input']['pheno_file'] is set, preprocess_regenie
-# reads that pre-built multi-phenotype file directly (see preprocess_regenie.py --pheno-file)
-# instead of building a single STATUS column from cases/controls. config['input']['phenotypes']
-# must list the exact phenotype column names present in that file, in the order regenie should
-# report them -- this list is also passed to regenie as --phenoColList so the output file names
-# it writes (<out>_<phenoName>.regenie) match what's declared below. Default (no pheno_file):
-# unchanged single-STATUS behavior.
+
 PHENO_FILE = config['input'].get('pheno_file')
 PHENOTYPES = config['input'].get('phenotypes', ['STATUS'])
 
-# Define conditional inputs for step 1 based on input type
+# Step 1 genotype file set: array-derived if configured, else LD-pruned/merged exome
 def get_step1_inputs():
     if STEP1_INPUT_TYPE == 'array':
         return {
@@ -48,12 +81,14 @@ def get_step1_dependencies():
     step1_files = get_step1_inputs()
     return [step1_files['pgen'], step1_files['snplist']]
 
+# Lightweight rules (no heavy compute) that Snakemake can run locally instead of submitting to LSF
 localrules: create_vep_list, create_sample_list
 
 wildcard_constraints:
     CHR='[1-9]|1[0-9]|2[0-2]'
 
-# Main rule
+# Top-level target: pulls in Step 1/Step 2 outputs and the final advanced report
+# for every phenotype in PHENOTYPES, driving the whole DAG below.
 rule run_regenie:
     input:
         # Step 1 files (conditional based on input type)
@@ -68,9 +103,11 @@ rule run_regenie:
         # Advanced report (M1-M4 masks, top genes, variant contrib, CHEK2 section, etc.) is the
         # only report -- one per phenotype in PHENOTYPES. Involves a per-chromosome plink2
         # geno-counts/export pass, so it's heavier than the association-testing outputs above.
-        expand(f"reports/{PROJECT}_{{PHENO}}_advanced_regenie_report.html", PHENO=PHENOTYPES)
+        expand(f"reports/{PROJECT}_{{PHENO}}_report.html", PHENO=PHENOTYPES)
 
 # ========== SAMPLE LIST CREATION ==========
+# Union cases + controls into a single sample list, in both single-column
+# (IID) and PLINK two-column (FID IID) formats.
 rule create_sample_list:
     input:
         cases=config['input']['cases'],
@@ -101,6 +138,8 @@ rule create_sample_list:
                 f.write(f'{sample}\t{sample}\n')
 
 # ========== ARRAY DATA RULES (for step 1) ==========
+# QC the genotyping array data for use as Step 1 input: keep only case/control
+# samples, remap IDs, and apply geno/MAF/HWE filters.
 rule array_qc:
     input:
         bed=lambda wildcards: config['input']['step1']['array_all'] + ".bed",
@@ -136,6 +175,8 @@ rule array_qc:
         """
         
 # ========== EXOME DATA RULES  ==========
+# Pull the sample IDs present in the exome data (from chr1's psam) so they
+# can be intersected with the config/array sample lists below.
 rule get_exome_sample_ids:
     input:
         psam=config['input']['exome_chr'].format(CHR=1) + ".psam"
@@ -146,7 +187,8 @@ rule get_exome_sample_ids:
         awk '$1!~/^#/{{print $1}}' {input.psam} > {output}
         """
 
-# Updated to handle conditional dependency more cleanly
+# exome_id/config_samples are always required; array_id is only pulled in when
+# Step 1 uses array data, so the intersection below matches whatever's actually available.
 def get_sample_list_inputs(wildcards):
     inputs = {
         "exome_id": f"{RUN_DIR}/preprocess/{PROJECT}.exome.all_chr.step1.id",
@@ -156,6 +198,8 @@ def get_sample_list_inputs(wildcards):
         inputs["array_id"] = f"{RUN_DIR}/preprocess/{PROJECT}.array.all_chr.step1.id"
     return inputs
 
+# Intersect exome sample IDs, config sample list, and (if array-based Step 1)
+# array sample IDs into the final analysis sample set.
 rule get_sample_list:
     input:
         unpack(get_sample_list_inputs)
@@ -185,6 +229,9 @@ rule get_sample_list:
             for sample in samples:
                 f.write(f'{sample}\t{sample}\n')
 
+# Update sex from sex_info, restrict to final_samples, and apply a light
+# per-chromosome genotype missingness filter (--geno 0.1). This is the
+# Step 2 genotype set used directly by run_step2_single_variant/gene_based.
 rule exome_chr_update_sex:
     input:
         pgen=lambda wildcards: config['input']['exome_chr'].format(CHR=wildcards.CHR) + ".pgen",
@@ -296,13 +343,14 @@ rule exome_merge_chr_snplist_step1:
                     raise FileNotFoundError(f"Expected SNPlist file not found: {snplist_file}")
                     
 # ========== SHARED RULES ==========
+# Inputs common to preprocess_regenie, plus pheno_file OR cases/controls
+# depending on whether multi-phenotype mode (PHENO_FILE) is configured.
 def preprocess_regenie_inputs(wildcards):
     inputs = {
         'vep_file': config['input']['vep_file'],
         'samples': f"{RUN_DIR}/preprocess/{PROJECT}.samples.txt",
         'step1_covariates': config['input']['step1_covariates'],
         'step2_covariates': config['input']['step2_covariates'],
-        'gene_consequence_exclude': config['input'].get('gene_consequence_exclude', 'mask_gene_consequence_exclude.txt'),
     }
     if PHENO_FILE:
         inputs['pheno_file'] = PHENO_FILE
@@ -311,15 +359,27 @@ def preprocess_regenie_inputs(wildcards):
         inputs['controls'] = config['input']['controls']
     return inputs
 
+# Selects the matching --pheno-file or --cases/--controls CLI args for preprocess_regenie.py
 def preprocess_regenie_pheno_args(wildcards, input):
     if PHENO_FILE:
         return f"--pheno-file {input.pheno_file}"
     return f"--cases {input.cases} --controls {input.controls}"
 
+# Optional: GENE<TAB>CONSEQUENCE_SUBSTRING exclusion rules, dropped before pathogenic/VUS
+# filtering. Not required -- preprocess_regenie.py skips cleanly with a warning if unset/missing.
+GENE_CONSEQUENCE_EXCLUDE = config['input'].get('gene_consequence_exclude', '')
+
 # Optional: variant IDs (e.g. potential MNP-pairs) to scrub from the M4 synonymous negative-control
 # mask. Not required -- preprocess_regenie.py skips cleanly with a warning if unset/missing.
 NEGATIVE_CONTROL_BLACKLIST = config['input'].get('negative_control_blacklist', '')
 
+# Optional: custom regenie mask definitions (lines of "Mx category1,category2,..."). Not required --
+# preprocess_regenie.py falls back to the built-in M1 pathogenic / M2 pathogenic,vus default if unset/missing.
+MASK_FILE = config['input'].get('mask_file', '')
+
+# Build all regenie-ready inputs from the VEP annotation file: gene burden
+# annotation/set/mask files, Step 1/2 covariate files, and the phenotype file
+# (see preprocess_regenie.py).
 rule preprocess_regenie:
     input:
         unpack(preprocess_regenie_inputs)
@@ -333,20 +393,23 @@ rule preprocess_regenie:
     params:
         output_prefix=f"{RUN_DIR}/input/{PROJECT}.regenie",
         pheno_args=preprocess_regenie_pheno_args,
-        blacklist_arg=(f"--negative-control-blacklist {NEGATIVE_CONTROL_BLACKLIST}" if NEGATIVE_CONTROL_BLACKLIST else "")
+        exclude_arg=(f"--gene-consequence-exclude {GENE_CONSEQUENCE_EXCLUDE}" if GENE_CONSEQUENCE_EXCLUDE else ""),
+        blacklist_arg=(f"--negative-control-blacklist {NEGATIVE_CONTROL_BLACKLIST}" if NEGATIVE_CONTROL_BLACKLIST else ""),
+        mask_arg=(f"--mask-file {MASK_FILE}" if MASK_FILE else "")
     threads: 1
     log:
         f"{RUN_DIR}/logs/{PROJECT}.preprocess_regenie.log"
     shell:
         """
-        (python preprocess_regenie.py \
+        (python scripts/preprocess_regenie.py \
         --vep-file {input.vep_file} \
         --samples {input.samples} \
         {params.pheno_args} \
         --step1-covariates {input.step1_covariates} \
         --step2-covariates {input.step2_covariates} \
-        --gene-consequence-exclude {input.gene_consequence_exclude} \
+        {params.exclude_arg} \
         {params.blacklist_arg} \
+        {params.mask_arg} \
         -O {params.output_prefix}) 2>&1 | tee {log}
         """
 
@@ -473,7 +536,7 @@ rule run_step2_gene_based:
                 --out {params.output_basename}) 2>&1 | tee {log}
         """
 
-# ========== ADVANCED REPORT TABLES (advanced_report_regenie.Rmd) ==========
+# ========== REPORT TABLES ==========
 # mask_variant_stats.py wants a list of VEP CSVs (one per line); our pipeline only has one
 # combined VEP file, so this just wraps it in a one-line list.
 rule create_vep_list:
@@ -485,6 +548,8 @@ rule create_vep_list:
         with open(output[0], 'w') as f:
             f.write(f"{params.vep_file}\n")
 
+# Per-mask, per-gene carrier/variant stats for the given phenotype (mask_variant_stats.py),
+# used to populate the report tables below.
 rule mask_variant_stats:
     input:
         vep_list=f"{RUN_DIR}/preprocess/vep_files.list",
@@ -495,9 +560,6 @@ rule mask_variant_stats:
     wildcard_constraints:
         PHENO='|'.join(PHENOTYPES)
     params:
-        # lambda deactivates Snakemake's automatic wildcard expansion -- {CHR} here is a literal
-        # placeholder for mask_variant_stats.py's own internal .format(CHR=chrom), not a Snakemake
-        # wildcard (this rule's output has no CHR wildcard to resolve it against).
         pfile_template=lambda wildcards: f"{RUN_DIR}/preprocess/{PROJECT}.chr{{CHR}}",
         pheno_col=lambda wildcards: wildcards.PHENO
     threads: 4
@@ -505,7 +567,7 @@ rule mask_variant_stats:
         f"{RUN_DIR}/logs/{PROJECT}.{{PHENO}}.mask_variant_stats.log"
     shell:
         """
-        (python mask_variant_stats.py \
+        (python scripts/mask_variant_stats.py \
         --vep-list {input.vep_list} \
         --pheno {input.pheno} \
         --pheno-col {params.pheno_col} \
@@ -514,6 +576,9 @@ rule mask_variant_stats:
         -o {output}) 2>&1 | tee {log}
         """
 
+# Assemble the per-phenotype report tables (top genes by ADD/SKAT, variant
+# contribution, consequence matrix, gene/CHEK2 carrier lists) that feed the
+# advanced HTML report (build_regenie_report_tables.py).
 rule build_regenie_report_tables:
     input:
         gene=lambda wildcards: expand(f"{RUN_DIR}/output/{PROJECT}.chr{{CHR}}.step2_gene_based_{wildcards.PHENO}.regenie", CHR=CHROMOSOMES),
@@ -541,7 +606,7 @@ rule build_regenie_report_tables:
         f"{RUN_DIR}/logs/{PROJECT}.{{PHENO}}.build_regenie_report_tables.log"
     shell:
         """
-        (python build_regenie_report_tables.py \
+        (python scripts/build_regenie_report_tables.py \
         --gene-glob '{params.gene_glob}' \
         --snplist-glob '{params.snplist_glob}' \
         --mask-stats {input.stats} \
@@ -549,6 +614,7 @@ rule build_regenie_report_tables:
         --pheno-col {params.pheno_col} \
         --pfile-template {params.pfile_template} \
         --threads {threads} \
+        --top-n 50 \
         --out-prefix {params.out_prefix}) 2>&1 | tee {log}
         """
 
@@ -568,9 +634,9 @@ rule generate_advanced_report:
         ],
         mask_stats=f"{RUN_DIR}/output/{PROJECT}.mask_variant_stats_{{PHENO}}.tsv",
         pheno=f"{RUN_DIR}/input/{PROJECT}.regenie.pheno.txt",
-        rmd="advanced_report_regenie.Rmd"
+        rmd="scripts/report_regenie.Rmd"
     output:
-        html=f"reports/{PROJECT}_{{PHENO}}_advanced_regenie_report.html"
+        html=f"reports/{PROJECT}_{{PHENO}}_report.html"
     wildcard_constraints:
         PHENO='|'.join(PHENOTYPES)
     params:

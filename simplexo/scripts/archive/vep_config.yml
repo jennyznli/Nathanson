@@ -1,0 +1,31 @@
+# VEP Annotation Pipeline Configuration File
+project:
+  name: "SIMPLEXO_vep_annotation"
+  run_dir: "vep"
+
+input:
+  qc_vcf: "/home/jennyzli/PMBB-3.0/Exome/pVCF/NF_by_chromosome/PMBB-Release-2024-3.0_genetic_exome_chr{CHR}_NF.vcf.gz"
+  blacklist: ""
+
+# VEP configuration
+vep:
+  container: "/appl/containers/vep112.sif"
+  cache_dir: "/project/knmkln_shared/.vep"
+  resources_dir: "/project/knathans_shared/resources"
+  
+  # Reference genome
+  fasta: "/project/knathans_shared/resources/Genomes/Human/hg38/fa/Homo_sapiens_assembly38.fasta"
+  
+  # VEP plugins
+  plugins:
+    revel: "/opt/vep/.vep/revel/revel_grch38.tsv.gz"
+    spliceai_snv: "/opt/vep/.vep/spliceai/spliceai_scores.raw.snv.hg38.vcf.gz"
+    spliceai_indel: "/opt/vep/.vep/spliceai/spliceai_scores.raw.indel.hg38.vcf.gz"
+    gnomad: "/opt/vep/.vep/gnomAD/gnomad.v3.1.1.hg38.genomes.gz"
+    utr_annotator: "/opt/vep/.vep/Plugins/UTRannotator/uORF_5UTR_GRCh38_PUBLIC.txt"
+    clinvar: "/opt/vep/.vep/clinvar/vcf_GRCh38/clinvar.autogvp.vcf.gz"
+    alphamissense: "/opt/vep/.vep/alphamissense/AlphaMissense_GRCh38.tsv.gz"
+    mavedb: "/opt/vep/.vep/mavedb/MaveDB_variants.tsv.gz"
+
+# Example bsub command:
+# bsub -N -J vep_annotation -eo vep_annotation.e -oo vep_annotation.o snakemake -s vep_annotation.smk --configfile vep_annotation_config.yml --cluster-config vep_cluster_config.yml -j 22 --profile lsf

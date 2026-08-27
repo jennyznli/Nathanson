@@ -1,0 +1,8 @@
+# VEP Annotation Pipeline Configuration File
+project:
+  name: "vep_gl"
+  run_dir: "vep_gl"
+
+input:
+  qc_vcf: "/static/PMBB/PMBB-Release-2026-4.0/Exome/by_chromosome_GL/PMBB-Release-2026-4.0_genetic_exome.gl.chr{CHR}.vcf.gz"
+  blacklist: "blacklist.txt"

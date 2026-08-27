@@ -48,8 +48,6 @@ seq_ids <- intersect(exome_ids, imputed_ids)
 length(seq_ids)
 # 70408
 
-x <- read.csv(here("simplexo", "reports", "reports", "SIMPLEXO4_all_array1_gene_based_results_ADDonly_20260811.csv"), header = TRUE)
-
 # ========================
 # PROGENY
 # ========================
@@ -170,6 +168,7 @@ write.csv(case_ids, file.path(here("simplexo", "data", "simplexo4_case_ids_temp.
 # ============================================================
 # FIND AGE of DX
 # ============================================================
+# case_ids <- read.csv(file.path(here("simplexo", "data", "simplexo4_case_ids_temp.csv")))$X
 case_seq_ids <- intersect(case_ids, seq_ids)
 length(case_seq_ids)
 # 5120
@@ -579,7 +578,7 @@ table(x2$EstrogenReceptorSummary)
 
 # brca has 3124 unique individuals
 # pmcr unmerged has 3520   35
-table(pmcr_$EstrogenReceptorSummary)
+# table(pmcr_$EstrogenReceptorSummary)
 # Negative Positive  Unknown
 # 691     2319      509
 length(unique(pmcr_unmerged$person_id))
