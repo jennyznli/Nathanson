@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+#BSUB -J loftee_test
+#BSUB -o examine/loftee_test.%J.out
+#BSUB -e examine/loftee_test.%J.err
+#BSUB -n 4
+#BSUB -R "rusage[mem=16000]"
+#BSUB -M 16000
+#BSUB -W 01:00
+
+set -euo pipefail
+
+CHR=22
+IN_VCF="data/bcftools/chr${CHR}.site-qc.no_sample.vcf"
+LOFTEE_DIR="/home/jennyzli/software/loftee/GRCh38"
+LOFTEE_REPO="/home/jennyzli/software/loftee"
+
+mkdir -p examine
+TEST_VCF="examine/chr${CHR}.loftee_test.vcf"
+OUT_VCF="examine/chr${CHR}.loftee_test.annotation.vep.vcf"
+
+[ -f "$IN_VCF" ] || { echo "ERROR: missing $IN_VCF" >&2; exit 1; }
+for f in gerp_conservation_scores.homo_sapiens.GRCh38.bw human_ancestor.fa.gz human_ancestor.fa.gz.fai human_ancestor.fa.gz.gzi loftee.sql; do
+    [ -f "$LOFTEE_DIR/$f" ] || { echo "ERROR: missing $LOFTEE_DIR/$f" >&2; exit 1; }
+done
+[ -f "$LOFTEE_REPO/LoF.pm" ] || { echo "ERROR: LoF.pm not found in $LOFTEE_REPO" >&2; exit 1; }
+
+bcftools view -h "$IN_VCF" > "$TEST_VCF"
+bcftools view -H "$IN_VCF" | head -200 >> "$TEST_VCF"
+echo "Test VCF: $(grep -vc '^#' "$TEST_VCF") variants"
+
+export SINGULARITY_TMPDIR=/scratch/$USER/sing_tmp
+export SINGULARITY_CACHEDIR=/scratch/$USER/sing_cache
+# Prepends to the container's own default PATH rather than replacing it --
+# plain --env "PATH=...:$PATH" bakes in the HOST's PATH (host dirs don't
+# exist inside the container's mount namespace) and clobbers whatever PATH
+# the container needs internally for vep/perl to resolve at all.
+export SINGULARITYENV_PREPEND_PATH=/appl/samtools-1.21/bin
+
+echo "--- checking Bio::DB::BigFile is available in the container ---"
+singularity exec -B "$PWD":"$PWD" -H "$PWD":"$PWD" \
+    --bind /home/bwubb/resources:/opt/vep/resources \
+    --bind /home/bwubb/.vep:/opt/vep/.vep \
+    --bind /home/jennyzli/software/loftee:/home/jennyzli/software/loftee \
+    --bind /appl/samtools-1.21:/appl/samtools-1.21 \
+    /appl/containers/vep112.sif perl -MBio::DB::BigFile -e 'print "Bio::DB::BigFile OK\n"' \
+    || { echo "ERROR: Bio::DB::BigFile not available in vep112.sif" >&2; exit 1; }
+
+echo "--- running VEP with only the LoF plugin ---"
+singularity run --pwd "$PWD" -B "$PWD":"$PWD" -H "$PWD":"$PWD" \
+    --bind /home/bwubb/resources:/opt/vep/resources \
+    --bind /home/bwubb/.vep:/opt/vep/.vep \
+    --bind /home/jennyzli/software/loftee:/home/jennyzli/software/loftee \
+    --bind /appl/samtools-1.21:/appl/samtools-1.21 \
+    /appl/containers/vep112.sif vep \
+    --dir /opt/vep/.vep \
+    --dir_plugins ${LOFTEE_REPO} \
+    -i "$PWD/$TEST_VCF" \
+    -o "$PWD/$OUT_VCF" \
+    --force_overwrite \
+    --offline \
+    --cache \
+    --format vcf \
+    --vcf --canonical \
+    --assembly GRCh38 \
+    --species homo_sapiens \
+    --fasta /opt/vep/resources/Genomes/Human/hg38/fa/Homo_sapiens_assembly38.fasta \
+    --vcf_info_field ANN \
+    --plugin LoF,loftee_path:${LOFTEE_REPO},human_ancestor_fa:${LOFTEE_DIR}/human_ancestor.fa.gz,conservation_file:${LOFTEE_DIR}/loftee.sql,gerp_bigwig:${LOFTEE_DIR}/gerp_conservation_scores.homo_sapiens.GRCh38.bw
+
+echo "--- done: $OUT_VCF ---"
+grep -o 'LoF=[A-Z]*' "$OUT_VCF" | sort | uniq -c || echo "WARNING: no LoF= annotations found"

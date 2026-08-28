@@ -51,7 +51,7 @@ os.makedirs(f"{RUN_DIR}/logs", exist_ok=True)
 os.makedirs(f"{RUN_DIR}/preprocess", exist_ok=True)
 os.makedirs(f"{RUN_DIR}/input", exist_ok=True)
 os.makedirs(f"{RUN_DIR}/output", exist_ok=True)
-os.makedirs("reports", exist_ok=True)  # Shared reports directory
+os.makedirs(f"{RUN_DIR}/reports", exist_ok=True)
 
 # Determine step 1 input type (exome or array)
 STEP1_INPUT_TYPE = config['input']['step1']['input_type']
@@ -103,7 +103,7 @@ rule run_regenie:
         # Advanced report (M1-M4 masks, top genes, variant contrib, CHEK2 section, etc.) is the
         # only report -- one per phenotype in PHENOTYPES. Involves a per-chromosome plink2
         # geno-counts/export pass, so it's heavier than the association-testing outputs above.
-        expand(f"reports/{PROJECT}_{{PHENO}}_report.html", PHENO=PHENOTYPES)
+        expand(f"{RUN_DIR}/reports/{PROJECT}_{{PHENO}}_report.html", PHENO=PHENOTYPES)
 
 # ========== SAMPLE LIST CREATION ==========
 # Union cases + controls into a single sample list, in both single-column
@@ -636,14 +636,17 @@ rule generate_advanced_report:
         pheno=f"{RUN_DIR}/input/{PROJECT}.regenie.pheno.txt",
         rmd="scripts/report_regenie.Rmd"
     output:
-        html=f"reports/{PROJECT}_{{PHENO}}_report.html"
+        html=f"{RUN_DIR}/reports/{PROJECT}_{{PHENO}}_report.html"
     wildcard_constraints:
         PHENO='|'.join(PHENOTYPES)
     params:
+        # Absolute paths: rmarkdown::render() evaluates the Rmd's own chunks with the
+        # working directory set to the Rmd's location (scripts/), not Snakemake's CWD --
+        # relative paths here get silently misresolved against scripts/ instead of RUN_DIR.
         project=PROJECT,
-        data_dir=f"{RUN_DIR}/output",
-        output_dir="reports",
-        pheno_file=f"{RUN_DIR}/input/{PROJECT}.regenie.pheno.txt",
+        data_dir=os.path.abspath(f"{RUN_DIR}/output"),
+        output_dir=os.path.abspath(f"{RUN_DIR}/reports"),
+        pheno_file=os.path.abspath(f"{RUN_DIR}/input/{PROJECT}.regenie.pheno.txt"),
         pheno_col=lambda wildcards: wildcards.PHENO,
         step2_single_variant_mid=lambda wildcards: f"step2_single_variant_{wildcards.PHENO}",
         step2_gene_based_mid=lambda wildcards: f"step2_gene_based_{wildcards.PHENO}"

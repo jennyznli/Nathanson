@@ -173,7 +173,8 @@ single_variant_list <- list()
 for(i in 1:22) {
   file_path <- paste0(params$data_dir, "/", params$project_name, ".chr", i, ".", params$step2_single_variant_mid, ".regenie")
   if(file.exists(file_path)) {
-    single_variant_list[[i]] <- read_delim(file_path, delim = " ", col_names = TRUE, trim_ws = TRUE)
+    # Skip comment lines (e.g. "# Regenie step 2") so header is CHROM GENPOS ... LOG10P; matches gene-based loader below.
+    single_variant_list[[i]] <- read_delim(file_path, delim = " ", col_names = TRUE, trim_ws = TRUE, comment = "#")
   }
 }
 
