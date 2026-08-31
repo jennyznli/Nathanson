@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+#BSUB -J examine_qc_plots
+#BSUB -o examine/examine_qc_plots.%J.out
+#BSUB -e examine/examine_qc_plots.%J.err
+#BSUB -n 1
+#BSUB -R "rusage[mem=8000]"
+#BSUB -M 8000
+#BSUB -W 00:30
+
+set -euo pipefail
+
+Rscript scripts/examine_qc_plots.R

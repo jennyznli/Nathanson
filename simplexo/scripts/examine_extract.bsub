@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+#BSUB -J "examine_extract[1-15]"
+#BSUB -o examine/examine_extract.%I.out
+#BSUB -e examine/examine_extract.%I.err
+#BSUB -n 1
+#BSUB -R "rusage[mem=4000]"
+#BSUB -W 00:30
+
+# LSF job array: one task per gene (index = line number in genes_examine.txt).
+# genes_examine.txt is "GENE CHR" per line, e.g.:
+#   BRCA1 17
+#   BRCA2 13
+#   CHEK2 22
+# If the gene list grows/shrinks past 15 lines, update the [1-15] range above
+# (or resubmit with `bsub -J "examine_extract[1-N]" < examine_extract.bsub`
+# to override it from the command line without editing the file).
+set -euo pipefail
+
+GENE_LIST="examine/genes_examine.txt"
+[ -f "$GENE_LIST" ] || { echo "ERROR: gene list not found: $GENE_LIST" >&2; exit 1; }
+
+mkdir -p examine
+
+LINE=$(sed -n "${LSB_JOBINDEX}p" "$GENE_LIST")
+[ -z "$LINE" ] && { echo "ERROR: no line $LSB_JOBINDEX in $GENE_LIST" >&2; exit 1; }
+
+read -r GENE CHR <<< "$LINE"
+
+CSV="data/preprocess/chr${CHR}.annotation.no_sample.vep.report.csv"
+if [ ! -f "$CSV" ]; then
+    echo "ERROR: missing CSV for $GENE (chr$CHR): $CSV" >&2
+    exit 1
+fi
+
+OUT="examine/tmp_ids.$GENE.txt"
+
+python3 - "$GENE" "$CSV" > "$OUT" <<'EOF'
+import csv, sys
+gene, path = sys.argv[1], sys.argv[2]
+with open(path) as f:
+    for row in csv.DictReader(f):
+        if row.get("Gene") == gene:
+            print(row["ID"])
+EOF
+
+N=$(wc -l < "$OUT")
+if [ "$N" -eq 0 ]; then
+    echo "WARNING: no IDs found for $GENE in $CSV (check symbol spelling / chr number)" >&2
+else
+    echo "OK: $GENE (chr$CHR) -> $N variant IDs"
+fi

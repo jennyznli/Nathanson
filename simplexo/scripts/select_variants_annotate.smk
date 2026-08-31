@@ -116,6 +116,38 @@ rule bcftools_no_sample_vcf:
         "bcftools view -G -Ov -o {output.vcf} {input.bcf}"
 
 # vep annotation (threaded)
+#
+# LOFTEE (LoF plugin) integration notes, 2026-08-31 -- see
+# scripts/test_loftee4.bsub and scripts/test_loftee_full_plugins.smk for the
+# smoke-test trail this was validated against (200-variant chr22 slice, 6 real
+# HC calls, LoF field confirmed present in the ANN Format string):
+#   - --cache_version 116: neither jennyzli's nor bwubb's .vep actually has a
+#     112_GRCh38 cache anymore (both gave "No cache found ... version 112"),
+#     even though this container (vep112.sif) bundles Ensembl API v112 and
+#     looks for a matching cache by default. This is NOT loftee-specific --
+#     the pipeline's cache lookup was already stale before this change; using
+#     jennyzli's resources/.vep here (rather than re-adding bwubb's untested
+#     with-cache-version-116 combination) because that's the exact
+#     combination actually run end-to-end, not an assumed-equivalent swap.
+#   - loftee's LoF.pm + 10 helper .pl/.pm files + maxEntScan/ are bound
+#     individually onto /plugins (the container's own default plugin dir),
+#     not via --dir_plugins -- confirmed this VEP version does not merge or
+#     accumulate multiple --dir_plugins values (neither a comma-joined value
+#     nor repeated flags work, only the last one silently wins), and the
+#     container has its own incomplete LoF.pm baked into /plugins that
+#     shadows an unmounted loftee dir otherwise.
+#   - samtools (LoF.pm shells out to `samtools faidx` at runtime) is copied to
+#     this job's local /scratch and bound from there, not from /appl directly
+#     -- binding straight from /appl (NFS) gives "Permission denied" on exec
+#     even though the file itself is -rwxr-xr-x; Singularity denies execution
+#     of binds sourced from NFS on this cluster, confirmed via an isolated
+#     test (test_samtools_exec.bsub). Bound to /usr/local/bin/samtools, not
+#     /appl/samtools-1.21/bin/samtools -- the latter path still failed with
+#     "Permission denied" even after switching the source to /scratch in a
+#     full VEP run (test_loftee4.bsub, job 48678996), while /usr/local/bin
+#     resolved cleanly both in isolation (job 48678989) and in a full rerun
+#     with the entire plugin stack (test_loftee4.bsub, zero "Can't exec
+#     samtools" warnings, confirmed 2026-08-31).
 rule first_variant_annotation:
     input:
         "data/bcftools/chr{CHR}.site-qc.no_sample.vcf"
@@ -128,9 +160,28 @@ rule first_variant_annotation:
         """
         export SINGULARITY_TMPDIR=/scratch/$USER/sing_tmp
         export SINGULARITY_CACHEDIR=/scratch/$USER/sing_cache
+
+        mkdir -p /scratch/$USER/bin
+        cp /appl/samtools-1.21/bin/samtools /scratch/$USER/bin/samtools
+        chmod +x /scratch/$USER/bin/samtools
+
         singularity run --pwd "$PWD" -B "$PWD":"$PWD" -H "$PWD":"$PWD" \
-        --bind /home/bwubb/resources:/opt/vep/resources \
-        --bind /home/bwubb/.vep:/opt/vep/.vep \
+        --bind /home/jennyzli/resources:/opt/vep/resources \
+        --bind /home/jennyzli/.vep:/opt/vep/.vep \
+        --bind /home/jennyzli/software/loftee:/home/jennyzli/software/loftee \
+        --bind /scratch/$USER/bin/samtools:/usr/local/bin/samtools \
+        --bind /home/jennyzli/software/loftee/LoF.pm:/plugins/LoF.pm \
+        --bind /home/jennyzli/software/loftee/ancestral.pm:/plugins/ancestral.pm \
+        --bind /home/jennyzli/software/loftee/context.pm:/plugins/context.pm \
+        --bind /home/jennyzli/software/loftee/de_novo_donor.pl:/plugins/de_novo_donor.pl \
+        --bind /home/jennyzli/software/loftee/extended_splice.pl:/plugins/extended_splice.pl \
+        --bind /home/jennyzli/software/loftee/gerp_dist.pl:/plugins/gerp_dist.pl \
+        --bind /home/jennyzli/software/loftee/loftee_splice_utils.pl:/plugins/loftee_splice_utils.pl \
+        --bind /home/jennyzli/software/loftee/splice_site_scan.pl:/plugins/splice_site_scan.pl \
+        --bind /home/jennyzli/software/loftee/svm.pl:/plugins/svm.pl \
+        --bind /home/jennyzli/software/loftee/TissueExpression.pm:/plugins/TissueExpression.pm \
+        --bind /home/jennyzli/software/loftee/utr_splice.pl:/plugins/utr_splice.pl \
+        --bind /home/jennyzli/software/loftee/maxEntScan:/plugins/maxEntScan \
         /appl/containers/vep112.sif vep \
         --dir /opt/vep/.vep \
         -i $PWD/{input} \
@@ -152,7 +203,9 @@ rule first_variant_annotation:
         --plugin UTRAnnotator,/opt/vep/.vep/Plugins/UTRannotator/uORF_5UTR_GRCh38_PUBLIC.txt \
         --custom /opt/vep/.vep/clinvar/vcf_GRCh38/clinvar.autogvp.vcf.gz,ClinVar,vcf,exact,0,CLNSIG,CLNREVSTAT,CLNDN,AutoGVP \
         --plugin AlphaMissense,file=/opt/vep/.vep/alphamissense/AlphaMissense_GRCh38.tsv.gz \
-        --plugin MaveDB,file=/opt/vep/.vep/mavedb/MaveDB_variants.tsv.gz
+        --plugin MaveDB,file=/opt/vep/.vep/mavedb/MaveDB_variants.tsv.gz \
+        --plugin LoF,loftee_path:/home/jennyzli/software/loftee,human_ancestor_fa:/home/jennyzli/software/loftee/GRCh38/human_ancestor.fa.gz,conservation_file:/home/jennyzli/software/loftee/GRCh38/loftee.sql,gerp_bigwig:/home/jennyzli/software/loftee/GRCh38/gerp_conservation_scores.homo_sapiens.GRCh38.bw \
+        --cache_version 116
         """
 
 # convert to plink files — the only PLINK conversion in this pipeline.

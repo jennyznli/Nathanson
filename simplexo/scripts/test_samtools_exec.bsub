@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+#BSUB -J samtools_exec_test
+#BSUB -o /home/jennyzli/jenny/simplexo4/examine/samtools_exec_test.%J.out
+#BSUB -e /home/jennyzli/jenny/simplexo4/examine/samtools_exec_test.%J.err
+#BSUB -n 1
+#BSUB -R "rusage[mem=4000]"
+#BSUB -M 4000
+#BSUB -W 00:10
+
+# Minimal, isolated test: does a samtools binary copied onto this compute
+# node's local disk execute through a singularity bind, when the same bind
+# sourced from /appl (NFS) and from $HOME both failed with
+# "Can't exec samtools: Permission denied"? No VEP, no plugins -- just the
+# one exec question, so this is fast to rerun.
+set -euo pipefail
+
+echo "hostname: $(hostname)"
+echo "--- non-NFS filesystems on this node ---"
+df -hT | grep -v nfs
+
+mkdir -p /scratch/$USER/bin
+cp /appl/samtools-1.21/bin/samtools /scratch/$USER/bin/samtools
+chmod +x /scratch/$USER/bin/samtools
+ls -la /scratch/$USER/bin/samtools
+
+echo "--- testing samtools exec via singularity bind from /scratch ---"
+singularity exec --bind /scratch/$USER/bin/samtools:/usr/local/bin/samtools \
+    /appl/containers/vep112.sif samtools --version

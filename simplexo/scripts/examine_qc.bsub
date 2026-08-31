@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+#BSUB -J "examine_qc[1-15]"
+#BSUB -o examine/examine_qc.%I.out
+#BSUB -e examine/examine_qc.%I.err
+#BSUB -n 1
+#BSUB -R "rusage[mem=4000]"
+#BSUB -W 00:30
+
+# LSF job array: one task per gene (index = line number in genes_examine.txt).
+# Depends on examine/tmp_ids.$GENE.txt already existing (from examine_extract.bsub).
+# Each task writes its OWN per-gene file rather than appending to one shared
+# file -- 15 parallel tasks all appending to the same file would interleave
+# and corrupt each other's output. Combine afterward with:
+#   head -1 examine/gene_qc_metrics.<any_gene>.tsv > examine/gene_qc_metrics.tsv
+#   tail -n +1 -q examine/gene_qc_metrics.*.tsv >> examine/gene_qc_metrics.tsv
+# (there's no header row here, so a plain cat is fine too:)
+#   cat examine/gene_qc_metrics.*.tsv > examine/gene_qc_metrics.tsv
+# If the gene list grows/shrinks past 15 lines, update the [1-15] range above
+# (or resubmit with `bsub -J "examine_qc[1-N]" < examine_qc.bsub` instead).
+set -euo pipefail
+
+GENE_LIST="examine/genes_examine.txt"
+[ -f "$GENE_LIST" ] || { echo "ERROR: gene list not found: $GENE_LIST" >&2; exit 1; }
+
+LINE=$(sed -n "${LSB_JOBINDEX}p" "$GENE_LIST")
+[ -z "$LINE" ] && { echo "ERROR: no line $LSB_JOBINDEX in $GENE_LIST" >&2; exit 1; }
+
+read -r GENE CHR <<< "$LINE"
+
+IDS="examine/tmp_ids.$GENE.txt"
+BCF="data/bcftools/chr${CHR}.site-qc.bcf"
+OUT="examine/gene_qc_metrics.$GENE.tsv"
+
+if [ ! -s "$IDS" ]; then
+    echo "SKIP: $GENE -- no IDs in $IDS (empty or missing)" >&2
+    exit 0
+fi
+if [ ! -f "$BCF" ]; then
+    echo "ERROR: $GENE -- missing $BCF" >&2
+    exit 1
+fi
+
+bcftools view -i "ID=@${IDS}" "$BCF" |
+    bcftools query -f '[%CHROM\t%POS\t%ID\t%SAMPLE\t%GT\t%DP\t%AD\t%GQ\n]' |
+    awk -v g="$GENE" '{print $0"\t"g}' > "$OUT"
+
+echo "OK: $GENE (chr$CHR) -> $OUT"

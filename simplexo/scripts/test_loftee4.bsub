@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+#BSUB -J loftee_test4
+#BSUB -o /home/jennyzli/jenny/simplexo4/examine/loftee_test4.%J.out
+#BSUB -e /home/jennyzli/jenny/simplexo4/examine/loftee_test4.%J.err
+#BSUB -n 16
+#BSUB -R "rusage[mem=48000]"
+#BSUB -M 48000
+#BSUB -W 02:00
+
+# Standalone LOFTEE smoke test, run via bsub instead of interactively on the
+# login node (cybertron2) -- the login node has no local/non-NFS scratch at
+# all (confirmed via `df -hT`, `ls -ld /scratch /local /scr1` all empty), so
+# copying samtools anywhere writable there still failed with the same
+# "Permission denied" on exec. CONFIRMED (test_samtools_exec.bsub, job
+# 48678989, 2026-08-31): a samtools binary bound from /scratch on an actual
+# compute node executes fine -- the exec restriction is specific to binds
+# sourced from NFS (/appl, and apparently $HOME too), not something wrong
+# with the binary itself. This script copies samtools into /scratch/$USER at
+# runtime (real local disk on the compute node bsub lands on) and binds from
+# there instead of /appl directly.
+#
+# Full plugin stack (NMD/REVEL/SpliceAI/gnomADc/UTRAnnotator/ClinVar/
+# AlphaMissense/MaveDB/LoF), same as test_loftee3.sh / test_loftee_full_plugins.smk,
+# plus everything discovered this session:
+#   - loftee's own dependency files (LoF.pm + 10 helper .pl/.pm files, listed
+#     via `ls /home/jennyzli/software/loftee/*.pl *.pm`) individually bound
+#     into /plugins, since --dir_plugins does not merge/split multiple
+#     directories in this VEP version (confirmed: neither a comma-joined
+#     value nor repeated flags accumulate -- only the last one survives, and
+#     the container already has its OWN incomplete LoF.pm baked into /plugins
+#     that silently shadows an unmounted /opt/vep/loftee otherwise)
+#   - maxEntScan/ (a loftee dependency, not part of VEP or the loftee repo's
+#     flat file list) bound in as its own subdirectory
+#   - --cache_version 116, since the only VEP cache actually available
+#     (jennyzli's own ~/.vep, symlinked to /project/knmkln_shared/.vep) is
+#     release 116, not the 112 this container's bundled API expects by default
+set -euo pipefail
+
+CHR=22
+IN_VCF="data/bcftools/chr${CHR}.site-qc.no_sample.vcf"
+LOFTEE_REPO="/home/jennyzli/software/loftee"
+LOFTEE_DIR="${LOFTEE_REPO}/GRCh38"
+
+mkdir -p examine
+TEST_VCF="examine/chr${CHR}.loftee_test.vcf"
+OUT_VCF="examine/chr${CHR}.loftee_test.annotation.vep.vcf"
+
+[ -f "$IN_VCF" ] || { echo "ERROR: missing $IN_VCF" >&2; exit 1; }
+
+bcftools view -h "$IN_VCF" > "$TEST_VCF"
+bcftools view -H "$IN_VCF" | head -200 >> "$TEST_VCF" || true
+echo "Test VCF: $(grep -vc '^#' "$TEST_VCF") variants"
+
+export SINGULARITY_TMPDIR=/scratch/$USER/sing_tmp
+export SINGULARITY_CACHEDIR=/scratch/$USER/sing_cache
+
+# copy samtools onto this compute node's local scratch -- binding it straight
+# from /appl (NFS) gave "Permission denied" on exec even though the file
+# itself is -rwxr-xr-x; confirmed fixed by sourcing from local /scratch instead
+mkdir -p /scratch/$USER/bin
+cp /appl/samtools-1.21/bin/samtools /scratch/$USER/bin/samtools
+chmod +x /scratch/$USER/bin/samtools
+
+echo "--- running VEP with the full plugin stack (NMD/REVEL/SpliceAI/gnomADc/UTRAnnotator/ClinVar/AlphaMissense/MaveDB/LoF) ---"
+singularity run --pwd "$PWD" -B "$PWD":"$PWD" -H "$PWD":"$PWD" \
+    --bind /home/jennyzli/resources:/opt/vep/resources \
+    --bind /home/jennyzli/.vep:/opt/vep/.vep \
+    --bind ${LOFTEE_REPO}:${LOFTEE_REPO} \
+    --bind /scratch/$USER/bin/samtools:/usr/local/bin/samtools \
+    --bind ${LOFTEE_REPO}/LoF.pm:/plugins/LoF.pm \
+    --bind ${LOFTEE_REPO}/ancestral.pm:/plugins/ancestral.pm \
+    --bind ${LOFTEE_REPO}/context.pm:/plugins/context.pm \
+    --bind ${LOFTEE_REPO}/de_novo_donor.pl:/plugins/de_novo_donor.pl \
+    --bind ${LOFTEE_REPO}/extended_splice.pl:/plugins/extended_splice.pl \
+    --bind ${LOFTEE_REPO}/gerp_dist.pl:/plugins/gerp_dist.pl \
+    --bind ${LOFTEE_REPO}/loftee_splice_utils.pl:/plugins/loftee_splice_utils.pl \
+    --bind ${LOFTEE_REPO}/splice_site_scan.pl:/plugins/splice_site_scan.pl \
+    --bind ${LOFTEE_REPO}/svm.pl:/plugins/svm.pl \
+    --bind ${LOFTEE_REPO}/TissueExpression.pm:/plugins/TissueExpression.pm \
+    --bind ${LOFTEE_REPO}/utr_splice.pl:/plugins/utr_splice.pl \
+    --bind ${LOFTEE_REPO}/maxEntScan:/plugins/maxEntScan \
+    /appl/containers/vep112.sif vep \
+    --dir /opt/vep/.vep \
+    -i "$PWD/$TEST_VCF" \
+    -o "$PWD/$OUT_VCF" \
+    --force_overwrite \
+    --offline \
+    --cache \
+    --format vcf \
+    --vcf --everything --canonical --mane \
+    --assembly GRCh38 \
+    --species homo_sapiens \
+    --fasta /opt/vep/resources/Genomes/Human/hg38/fa/Homo_sapiens_assembly38.fasta \
+    --vcf_info_field ANN \
+    --plugin NMD \
+    --plugin REVEL,/opt/vep/.vep/revel/revel_grch38.tsv.gz \
+    --plugin SpliceAI,snv=/opt/vep/.vep/spliceai/spliceai_scores.raw.snv.hg38.vcf.gz,indel=/opt/vep/.vep/spliceai/spliceai_scores.raw.indel.hg38.vcf.gz \
+    --plugin gnomADc,/opt/vep/.vep/gnomAD/gnomad.v3.1.1.hg38.genomes.gz \
+    --plugin UTRAnnotator,/opt/vep/.vep/Plugins/UTRannotator/uORF_5UTR_GRCh38_PUBLIC.txt \
+    --custom /opt/vep/.vep/clinvar/vcf_GRCh38/clinvar.autogvp.vcf.gz,ClinVar,vcf,exact,0,CLNSIG,CLNREVSTAT,CLNDN,AutoGVP \
+    --plugin AlphaMissense,file=/opt/vep/.vep/alphamissense/AlphaMissense_GRCh38.tsv.gz \
+    --plugin MaveDB,file=/opt/vep/.vep/mavedb/MaveDB_variants.tsv.gz \
+    --plugin LoF,loftee_path:${LOFTEE_REPO},human_ancestor_fa:${LOFTEE_DIR}/human_ancestor.fa.gz,conservation_file:${LOFTEE_DIR}/loftee.sql,gerp_bigwig:${LOFTEE_DIR}/gerp_conservation_scores.homo_sapiens.GRCh38.bw \
+    --cache_version 116
+
+echo "--- done: $OUT_VCF ---"
+
+# NOTE: do not grep for the literal string 'LoF=' -- with --vcf_info_field ANN,
+# LoF is a positional pipe-delimited subfield inside ANN=..., never written as
+# its own LoF=VALUE key, so that pattern will never match regardless of
+# whether the plugin worked. Pull the real field index from the header instead.
+FMT=$(bcftools view -h "$OUT_VCF" | grep '^##INFO=<ID=ANN' | sed -E 's/.*Format: ([^">]+).*/\1/')
+IDX=$(echo "$FMT" | tr '|' '\n' | grep -nx 'LoF' | cut -d: -f1)
+echo "LoF is field $IDX of $(echo "$FMT" | tr '|' '\n' | wc -l)"
+if [ -z "$IDX" ]; then
+    echo "WARNING: LoF not found in ANN Format string at all -- plugin did not register"
+else
+    echo "LoF call breakdown:"
+    bcftools query -f '%INFO/ANN\n' "$OUT_VCF" | tr ',' '\n' | awk -F'|' -v i="$IDX" '{print $i}' | sort | uniq -c
+fi

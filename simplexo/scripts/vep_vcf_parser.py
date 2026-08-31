@@ -231,6 +231,17 @@ class MANEAnnot:
         self.fields['MANE.Select']=CSQ.get('MANE_SELECT','.')
         self.fields['MANE.PlusClinical']=CSQ.get('MANE_PLUS_CLINICAL','.')
 
+class LofteeAnnot:
+    def loftee(self,CSQ):
+        fields=[
+            ('LoF','LoF'),
+            ('LoF.filter','LoF_filter'),
+            ('LoF.flags','LoF_flags'),
+            ('LoF.info','LoF_info')
+        ]
+        for field,csq_key in fields:
+            self.fields[field]=CSQ.get(csq_key,'.')
+
 class BasicInfoAnnot:
     def info(self,CSQ):
         fields=[
@@ -347,7 +358,7 @@ class LofLevelAnnot:
 
 
 class VEPannotation(BasicInfoAnnot,MANEAnnot,GnomadAnnot,ClinvarAnnot,SpliceAIAnnot,
-                   PredictionAnnot,AlphaMissenseAnnot,MaveDBAnnot,
+                   PredictionAnnot,AlphaMissenseAnnot,MaveDBAnnot,LofteeAnnot,
                    SampleAnnot,TumorNormalAnnot,LofLevelAnnot):
     """
     Main class for parsing VEP-annotated VCF files.
@@ -586,12 +597,14 @@ def get_args(argv):
 def process_annotation(vep_data,csq_dict,tumor_normal,single,tumor,normal,sample):
     """Process a single annotation and set sample IDs"""
     vep_data.info(csq_dict)
+    vep_data.mane(csq_dict)
     vep_data.snv_prediction(csq_dict)
     vep_data.splice_ai(csq_dict)
     vep_data.gnomAD(csq_dict)
     vep_data.clinvar(csq_dict)
     vep_data.alphamissense(csq_dict)
     vep_data.mavedb(csq_dict)
+    vep_data.loftee(csq_dict)
     vep_data.lof_level()
     
     # Set sample IDs based on mode
