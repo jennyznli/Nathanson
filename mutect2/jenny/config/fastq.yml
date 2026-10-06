@@ -1,0 +1,420 @@
+110R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/110R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CTGATCGT-GCGCATAT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/110R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CTGATCGT-GCGCATAT_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/110R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CTGATCGT-GCGCATAT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/110R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CTGATCGT-GCGCATAT_R2.fastq.gz
+156R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/156R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CGGCTAAT-CTCGTTCT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/156R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CGGCTAAT-CTCGTTCT_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/156R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CGGCTAAT-CTCGTTCT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/156R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CGGCTAAT-CTCGTTCT_R2.fastq.gz
+166R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/166R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ATCGATCG-TGGAAGCA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/166R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ATCGATCG-TGGAAGCA_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/166R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ATCGATCG-TGGAAGCA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/166R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ATCGATCG-TGGAAGCA_R2.fastq.gz
+169L:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/169L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GTTGACCT-CAGTGCTT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/169L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GTTGACCT-CAGTGCTT_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/169L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GTTGACCT-CAGTGCTT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/169L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GTTGACCT-CAGTGCTT_R2.fastq.gz
+190L:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/190L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CGACGTTA-CTCTGGAT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/190L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CGACGTTA-CTCTGGAT_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/190L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CGACGTTA-CTCTGGAT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/190L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CGACGTTA-CTCTGGAT_R2.fastq.gz
+201L:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/201L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GCAAGATC-AGTCGAAG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/201L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GCAAGATC-AGTCGAAG_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/201L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GCAAGATC-AGTCGAAG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/201L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GCAAGATC-AGTCGAAG_R2.fastq.gz
+202L:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/202L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GCTATCCT-AACAGGTG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/202L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GCTATCCT-AACAGGTG_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/202L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GCTATCCT-AACAGGTG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/202L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GCTATCCT-AACAGGTG_R2.fastq.gz
+223R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/223R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TACGCTAC-CGTGTGAT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/223R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TACGCTAC-CGTGTGAT_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/223R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TACGCTAC-CGTGTGAT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/223R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TACGCTAC-CGTGTGAT_R2.fastq.gz
+251R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/251R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_AGTTCGTC-ACTCGATC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/251R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_AGTTCGTC-ACTCGATC_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/251R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_AGTTCGTC-ACTCGATC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/251R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_AGTTCGTC-ACTCGATC_R2.fastq.gz
+285R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/285R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ACTCTCGA-CTGTACCA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/285R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ACTCTCGA-CTGTACCA_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/285R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ACTCTCGA-CTGTACCA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/285R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ACTCTCGA-CTGTACCA_R2.fastq.gz
+289L:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/289L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GAGACGAT-ACCGGTTA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/289L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GAGACGAT-ACCGGTTA_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/289L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GAGACGAT-ACCGGTTA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/289L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GAGACGAT-ACCGGTTA_R2.fastq.gz
+316L:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/316L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TTGCGAAG-AACACGCT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/316L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TTGCGAAG-AACACGCT_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/316L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TTGCGAAG-AACACGCT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/316L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TTGCGAAG-AACACGCT_R2.fastq.gz
+333L:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/333L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CTTGTCGA-CGATGTTC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/333L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CTTGTCGA-CGATGTTC_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/333L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CTTGTCGA-CGATGTTC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/333L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CTTGTCGA-CGATGTTC_R2.fastq.gz
+356R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/356R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ATCGCCAT-TGCGTAAC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/356R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ATCGCCAT-TGCGTAAC_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/356R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ATCGCCAT-TGCGTAAC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/356R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ATCGCCAT-TGCGTAAC_R2.fastq.gz
+365L:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/365L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CCTTGATC-GATGGAGT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/365L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CCTTGATC-GATGGAGT_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/365L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CCTTGATC-GATGGAGT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/365L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CCTTGATC-GATGGAGT_R2.fastq.gz
+366L:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/366L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GTCGAAGA-CCACATTG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/366L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GTCGAAGA-CCACATTG_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/366L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GTCGAAGA-CCACATTG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/366L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GTCGAAGA-CCACATTG_R2.fastq.gz
+369L:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/369L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GACGATCT-TCGTGCAT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/369L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GACGATCT-TCGTGCAT_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/369L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GACGATCT-TCGTGCAT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/369L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GACGATCT-TCGTGCAT_R2.fastq.gz
+372R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/372R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GTTCTCGT-TGTTCCGT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/372R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GTTCTCGT-TGTTCCGT_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/372R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GTTCTCGT-TGTTCCGT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/372R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GTTCTCGT-TGTTCCGT_R2.fastq.gz
+388L:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/388L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_AGCGTGTT-CTTCGCAA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/388L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_AGCGTGTT-CTTCGCAA_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/388L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_AGCGTGTT-CTTCGCAA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/388L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_AGCGTGTT-CTTCGCAA_R2.fastq.gz
+394R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/394R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CTGTTGAC-ACCTCAGT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/394R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CTGTTGAC-ACCTCAGT_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/394R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CTGTTGAC-ACCTCAGT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/394R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CTGTTGAC-ACCTCAGT_R2.fastq.gz
+398R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/398R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ATGACGTC-CTTCCTTC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/398R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ATGACGTC-CTTCCTTC_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/398R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ATGACGTC-CTTCCTTC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/398R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ATGACGTC-CTTCCTTC_R2.fastq.gz
+412R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/412R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TGAAGACG-ACATGCCA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/412R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TGAAGACG-ACATGCCA_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/412R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TGAAGACG-ACATGCCA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/412R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TGAAGACG-ACATGCCA_R2.fastq.gz
+413R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/413R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TGGACTCT-TCTTACGG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/413R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TGGACTCT-TCTTACGG_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/413R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TGGACTCT-TCTTACGG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/413R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TGGACTCT-TCTTACGG_R2.fastq.gz
+438L:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/438L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_AACCGTTC-CTAGCTCA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/438L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_AACCGTTC-CTAGCTCA_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/438L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_AACCGTTC-CTAGCTCA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/438L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_AACCGTTC-CTAGCTCA_R2.fastq.gz
+443R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/443R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CATACCAC-AACAACCG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/443R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CATACCAC-AACAACCG_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/443R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CATACCAC-AACAACCG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/443R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CATACCAC-AACAACCG_R2.fastq.gz
+444L:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/444L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TTCCAAGG-CTACAAGG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/444L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TTCCAAGG-CTACAAGG_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/444L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TTCCAAGG-CTACAAGG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/444L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TTCCAAGG-CTACAAGG_R2.fastq.gz
+450R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/450R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CGCATGAT-AAGCCTGA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/450R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CGCATGAT-AAGCCTGA_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/450R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CGCATGAT-AAGCCTGA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/450R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CGCATGAT-AAGCCTGA_R2.fastq.gz
+453R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/453R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GTCATCGA-GATCCACT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/453R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GTCATCGA-GATCCACT_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/453R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GTCATCGA-GATCCACT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/453R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GTCATCGA-GATCCACT_R2.fastq.gz
+458R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/458R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_AACTGAGC-CAATCAGG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/458R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_AACTGAGC-CAATCAGG_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/458R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_AACTGAGC-CAATCAGG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/458R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_AACTGAGC-CAATCAGG_R2.fastq.gz
+467L:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/467L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CTTAGGAC-ACTCCTAC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/467L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CTTAGGAC-ACTCCTAC_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/467L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CTTAGGAC-ACTCCTAC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/467L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CTTAGGAC-ACTCCTAC_R2.fastq.gz
+468L:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/468L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ACCACGAT-GTCTGCAA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/468L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ACCACGAT-GTCTGCAA_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/468L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ACCACGAT-GTCTGCAA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/468L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ACCACGAT-GTCTGCAA_R2.fastq.gz
+474R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/474R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GTGAAGTG-GAGCAATC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/474R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GTGAAGTG-GAGCAATC_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/474R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GTGAAGTG-GAGCAATC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/474R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GTGAAGTG-GAGCAATC_R2.fastq.gz
+475L:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/475L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TATCGGTC-TACCGGAT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/475L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TATCGGTC-TACCGGAT_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/475L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TATCGGTC-TACCGGAT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/475L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TATCGGTC-TACCGGAT_R2.fastq.gz
+479R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/479R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GATTACCG-TTGGACTG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/479R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GATTACCG-TTGGACTG_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/479R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GATTACCG-TTGGACTG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/479R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GATTACCG-TTGGACTG_R2.fastq.gz
+482R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/482R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GAATCCGA-AGCTAGTG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/482R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GAATCCGA-AGCTAGTG_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/482R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GAATCCGA-AGCTAGTG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/482R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GAATCCGA-AGCTAGTG_R2.fastq.gz
+484L:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/484L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GAAGTTGG-CGAACAAC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/484L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GAAGTTGG-CGAACAAC_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/484L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GAAGTTGG-CGAACAAC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/484L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GAAGTTGG-CGAACAAC_R2.fastq.gz
+487R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/487R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_AGAGTAGC-AAGGCGTA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/487R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_AGAGTAGC-AAGGCGTA_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/487R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_AGAGTAGC-AAGGCGTA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/487R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_AGAGTAGC-AAGGCGTA_R2.fastq.gz
+489L:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/489L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GCACAACT-CTGAACGT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/489L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GCACAACT-CTGAACGT_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/489L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GCACAACT-CTGAACGT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/489L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GCACAACT-CTGAACGT_R2.fastq.gz
+490R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/490R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GCGTCATT-CAGACGTT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/490R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GCGTCATT-CAGACGTT_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/490R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GCGTCATT-CAGACGTT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/490R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GCGTCATT-CAGACGTT_R2.fastq.gz
+493R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/493R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TCGCTGTT-CAAGTCGT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/493R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TCGCTGTT-CAAGTCGT_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/493R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TCGCTGTT-CAAGTCGT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/493R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TCGCTGTT-CAAGTCGT_R2.fastq.gz
+495R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/495R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ATCCGGTA-GACCGATA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/495R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ATCCGGTA-GACCGATA_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/495R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ATCCGGTA-GACCGATA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/495R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ATCCGGTA-GACCGATA_R2.fastq.gz
+498R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/498R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CCTTGTAG-CCTTGGAA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/498R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CCTTGTAG-CCTTGGAA_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/498R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CCTTGTAG-CCTTGGAA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/498R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CCTTGTAG-CCTTGGAA_R2.fastq.gz
+501R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/501R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ACGGAACA-ACGAGAAC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/501R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ACGGAACA-ACGAGAAC_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/501R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ACGGAACA-ACGAGAAC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/501R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ACGGAACA-ACGAGAAC_R2.fastq.gz
+503R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/503R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CAACACCT-AGCTACCA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/503R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CAACACCT-AGCTACCA_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/503R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CAACACCT-AGCTACCA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/503R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CAACACCT-AGCTACCA_R2.fastq.gz
+510L:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/510L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GAAGGAAG-GACGTCAT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/510L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GAAGGAAG-GACGTCAT_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/510L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GAAGGAAG-GACGTCAT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/510L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GAAGGAAG-GACGTCAT_R2.fastq.gz
+512L:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/512L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ACAGCTCA-TACTGCTC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/512L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ACAGCTCA-TACTGCTC_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/512L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ACAGCTCA-TACTGCTC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/512L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ACAGCTCA-TACTGCTC_R2.fastq.gz
+515R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/515R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ATGCACGA-AGATCGTC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/515R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ATGCACGA-AGATCGTC_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/515R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ATGCACGA-AGATCGTC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/515R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ATGCACGA-AGATCGTC_R2.fastq.gz
+518L:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/518L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TGGTAGCT-AGGTGTTG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/518L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TGGTAGCT-AGGTGTTG_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/518L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TGGTAGCT-AGGTGTTG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/518L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TGGTAGCT-AGGTGTTG_R2.fastq.gz
+531R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/531R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TTCGTTGG-TACACACG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/531R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TTCGTTGG-TACACACG_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/531R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TTCGTTGG-TACACACG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/531R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TTCGTTGG-TACACACG_R2.fastq.gz
+532R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/532R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CGTGTGTA-CCAACGAA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/532R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CGTGTGTA-CCAACGAA_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/532R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CGTGTGTA-CCAACGAA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/532R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CGTGTGTA-CCAACGAA_R2.fastq.gz
+533L:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/533L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_AAGCACTG-AGGTCAAC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/533L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_AAGCACTG-AGGTCAAC_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/533L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_AAGCACTG-AGGTCAAC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/533L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_AAGCACTG-AGGTCAAC_R2.fastq.gz
+534L:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/534L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GATGTGTG-TAGCCATG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/534L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GATGTGTG-TAGCCATG_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/534L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GATGTGTG-TAGCCATG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/534L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GATGTGTG-TAGCCATG_R2.fastq.gz
+536R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/536R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TACGCCTT-GCTACTCT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/536R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TACGCCTT-GCTACTCT_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/536R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TACGCCTT-GCTACTCT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/536R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TACGCCTT-GCTACTCT_R2.fastq.gz
+539L:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/539L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GATTGCTC-CACTTCAC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/539L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GATTGCTC-CACTTCAC_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/539L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GATTGCTC-CACTTCAC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/539L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GATTGCTC-CACTTCAC_R2.fastq.gz
+541R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/541R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ACTAGGAG-TATGGCAC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/541R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ACTAGGAG-TATGGCAC_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/541R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ACTAGGAG-TATGGCAC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/541R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ACTAGGAG-TATGGCAC_R2.fastq.gz
+542R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/542R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CACCTGTT-AGGATAGC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/542R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CACCTGTT-AGGATAGC_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/542R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CACCTGTT-AGGATAGC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/542R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CACCTGTT-AGGATAGC_R2.fastq.gz
+543L:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/543L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TGCTTCCA-CGATCGAT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/543L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TGCTTCCA-CGATCGAT_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/543L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TGCTTCCA-CGATCGAT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/543L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TGCTTCCA-CGATCGAT_R2.fastq.gz
+544R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/544R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TGGTACAG-TCGAGAGT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/544R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TGGTACAG-TCGAGAGT_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/544R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TGGTACAG-TCGAGAGT_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/544R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TGGTACAG-TCGAGAGT_R2.fastq.gz
+546L:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/546L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TCAGGCTT-ATCATGCG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/546L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TCAGGCTT-ATCATGCG_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/546L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TCAGGCTT-ATCATGCG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/546L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TCAGGCTT-ATCATGCG_R2.fastq.gz
+550R:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/550R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ATATGCGC-ACGATCAG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/550R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ATATGCGC-ACGATCAG_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/550R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ATATGCGC-ACGATCAG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/550R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ATATGCGC-ACGATCAG_R2.fastq.gz
+B1-7486:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/B1-7486_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CTTCGACT-GATCTTGC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/B1-7486_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CTTCGACT-GATCTTGC_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/B1-7486_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CTTCGACT-GATCTTGC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/B1-7486_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CTTCGACT-GATCTTGC_R2.fastq.gz
+B1-7528:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/B1-7528_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ATCACACG-GTAGCGTA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/B1-7528_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ATCACACG-GTAGCGTA_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/B1-7528_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ATCACACG-GTAGCGTA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/B1-7528_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ATCACACG-GTAGCGTA_R2.fastq.gz
+B1-7587:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/B1-7587_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GAACATCG-TCGACAAG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/B1-7587_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GAACATCG-TCGACAAG_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/B1-7587_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GAACATCG-TCGACAAG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/B1-7587_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GAACATCG-TCGACAAG_R2.fastq.gz
+B1-7653:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/B1-7653_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ACGACTTG-AACAGCGA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/B1-7653_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ACGACTTG-AACAGCGA_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/B1-7653_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ACGACTTG-AACAGCGA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/B1-7653_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ACGACTTG-AACAGCGA_R2.fastq.gz
+B1-7658:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/B1-7658_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CCGTAAGA-AGAGTCCA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/B1-7658_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CCGTAAGA-AGAGTCCA_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/B1-7658_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CCGTAAGA-AGAGTCCA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/B1-7658_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CCGTAAGA-AGAGTCCA_R2.fastq.gz
+B2-7652:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/B2-7652_IDT-Targeted-HYB-Precancer_NextSeq240913_1_AGAACGAG-ATTAGCCG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/B2-7652_IDT-Targeted-HYB-Precancer_NextSeq240913_1_AGAACGAG-ATTAGCCG_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/B2-7652_IDT-Targeted-HYB-Precancer_NextSeq240913_2_AGAACGAG-ATTAGCCG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/B2-7652_IDT-Targeted-HYB-Precancer_NextSeq240913_2_AGAACGAG-ATTAGCCG_R2.fastq.gz
+WT-7449:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/WT-7449_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CAGTCCAA-CGGTAATC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/WT-7449_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CAGTCCAA-CGGTAATC_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/WT-7449_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CAGTCCAA-CGGTAATC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/WT-7449_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CAGTCCAA-CGGTAATC_R2.fastq.gz
+WT-7450:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/WT-7450_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GTAGGAGT-GTCCTAAG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/WT-7450_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GTAGGAGT-GTCCTAAG_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/WT-7450_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GTAGGAGT-GTCCTAAG_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/WT-7450_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GTAGGAGT-GTCCTAAG_R2.fastq.gz
+WT-7490:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/WT-7490_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GATAGGCT-CAGTCACA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/WT-7490_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GATAGGCT-CAGTCACA_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/WT-7490_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GATAGGCT-CAGTCACA_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/WT-7490_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GATAGGCT-CAGTCACA_R2.fastq.gz
+WT-7648:
+  files:
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/WT-7648_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CACTAGCT-TCGGATTC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/WT-7648_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CACTAGCT-TCGGATTC_R2.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/WT-7648_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CACTAGCT-TCGGATTC_R1.fastq.gz
+  - /home/jennyzli/brad/029-Gray_PreCancer/FASTQ/WT-7648_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CACTAGCT-TCGGATTC_R2.fastq.gz

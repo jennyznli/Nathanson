@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+#BSUB -J bwa_mem2_index
+#BSUB -o logs/bwa_mem2_index.%J.out
+#BSUB -e logs/bwa_mem2_index.%J.err
+#BSUB -n 1
+#BSUB -R "rusage[mem=65536]"
+#BSUB -M 65536
+#BSUB -W 04:00
+
+set -euo pipefail
+
+FASTA=/home/jennyzli/resources/Genomes/Human/hg38/fa/Homo_sapiens_assembly38.fasta
+
+# FMI_search (the suffix-array build step) is the memory-hungry part of
+# bwa-mem2 index -- for a ~3GB human genome fasta it can spike to ~30-40GB,
+# which is why the earlier interactive attempt on the login node was
+# OOM-killed right after "Entering FMI_search". Requesting well above that
+# here, submitted as a batch job so it actually gets the allocation.
+bwa-mem2 index "$FASTA"

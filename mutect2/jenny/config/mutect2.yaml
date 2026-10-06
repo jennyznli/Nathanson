@@ -1,0 +1,31 @@
+reference:
+  # reference genome files
+  fasta: "/home/jennyzli/resources/Genomes/Human/hg38/fa/Homo_sapiens_assembly38.fasta"
+  fai: "/home/jennyzli/resources/Genomes/Human/hg38/fa/Homo_sapiens_assembly38.fasta.fai"
+  dict: "/home/jennyzli/resources/Genomes/Human/hg38/fa/Homo_sapiens_assembly38.dict"
+
+resources:
+  # database of known germline variants
+  gnomad: "/home/jennyzli/software/mutect2/af-only-gnomad.hg38.vcf.gz"
+  # vcf of common variants w allele freqs and index  
+  variants_for_contamination: "/home/jennyzli/software/mutect2/small_exac_common_3.hg38.vcf.gz"
+  targets_bed: "/home/jennyzli/jenny/gray/bed/IDT-Target-HYB-PreCancer.hg38.targets.slop50.merged.bed"
+  masked_intervals: ""
+
+samples:
+  cases_tsv: "input/gray_sample_ids_bams.tsv"     # sample_id<TAB>cram_or_bam_path 
+
+pon:
+  name: "mutect2"
+  use_pon: false
+
+analysis:
+  label: "no_pon"
+
+parameters:
+  # mutect2
+  m2_extra_args: ""  
+  m2_extra_filtering_args: ""  
+
+  # vardict 
+  vardict_af_thr: 0.01

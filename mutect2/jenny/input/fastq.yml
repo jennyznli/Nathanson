@@ -1,0 +1,910 @@
+110R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-CTGATCGT-GCGCATAT
+    files:
+    - 110R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CTGATCGT-GCGCATAT_R1.fastq.gz
+    - 110R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CTGATCGT-GCGCATAT_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-CTGATCGT-GCGCATAT
+    files:
+    - 110R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CTGATCGT-GCGCATAT_R1.fastq.gz
+    - 110R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CTGATCGT-GCGCATAT_R2.fastq.gz
+156R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-CGGCTAAT-CTCGTTCT
+    files:
+    - 156R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CGGCTAAT-CTCGTTCT_R1.fastq.gz
+    - 156R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CGGCTAAT-CTCGTTCT_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-CGGCTAAT-CTCGTTCT
+    files:
+    - 156R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CGGCTAAT-CTCGTTCT_R1.fastq.gz
+    - 156R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CGGCTAAT-CTCGTTCT_R2.fastq.gz
+166R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-ATCGATCG-TGGAAGCA
+    files:
+    - 166R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ATCGATCG-TGGAAGCA_R1.fastq.gz
+    - 166R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ATCGATCG-TGGAAGCA_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-ATCGATCG-TGGAAGCA
+    files:
+    - 166R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ATCGATCG-TGGAAGCA_R1.fastq.gz
+    - 166R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ATCGATCG-TGGAAGCA_R2.fastq.gz
+169L:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-GTTGACCT-CAGTGCTT
+    files:
+    - 169L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GTTGACCT-CAGTGCTT_R1.fastq.gz
+    - 169L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GTTGACCT-CAGTGCTT_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-GTTGACCT-CAGTGCTT
+    files:
+    - 169L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GTTGACCT-CAGTGCTT_R1.fastq.gz
+    - 169L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GTTGACCT-CAGTGCTT_R2.fastq.gz
+190L:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-CGACGTTA-CTCTGGAT
+    files:
+    - 190L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CGACGTTA-CTCTGGAT_R1.fastq.gz
+    - 190L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CGACGTTA-CTCTGGAT_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-CGACGTTA-CTCTGGAT
+    files:
+    - 190L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CGACGTTA-CTCTGGAT_R1.fastq.gz
+    - 190L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CGACGTTA-CTCTGGAT_R2.fastq.gz
+201L:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-GCAAGATC-AGTCGAAG
+    files:
+    - 201L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GCAAGATC-AGTCGAAG_R1.fastq.gz
+    - 201L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GCAAGATC-AGTCGAAG_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-GCAAGATC-AGTCGAAG
+    files:
+    - 201L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GCAAGATC-AGTCGAAG_R1.fastq.gz
+    - 201L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GCAAGATC-AGTCGAAG_R2.fastq.gz
+202L:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-GCTATCCT-AACAGGTG
+    files:
+    - 202L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GCTATCCT-AACAGGTG_R1.fastq.gz
+    - 202L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GCTATCCT-AACAGGTG_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-GCTATCCT-AACAGGTG
+    files:
+    - 202L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GCTATCCT-AACAGGTG_R1.fastq.gz
+    - 202L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GCTATCCT-AACAGGTG_R2.fastq.gz
+223R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-TACGCTAC-CGTGTGAT
+    files:
+    - 223R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TACGCTAC-CGTGTGAT_R1.fastq.gz
+    - 223R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TACGCTAC-CGTGTGAT_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-TACGCTAC-CGTGTGAT
+    files:
+    - 223R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TACGCTAC-CGTGTGAT_R1.fastq.gz
+    - 223R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TACGCTAC-CGTGTGAT_R2.fastq.gz
+251R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-AGTTCGTC-ACTCGATC
+    files:
+    - 251R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_AGTTCGTC-ACTCGATC_R1.fastq.gz
+    - 251R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_AGTTCGTC-ACTCGATC_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-AGTTCGTC-ACTCGATC
+    files:
+    - 251R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_AGTTCGTC-ACTCGATC_R1.fastq.gz
+    - 251R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_AGTTCGTC-ACTCGATC_R2.fastq.gz
+285R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-ACTCTCGA-CTGTACCA
+    files:
+    - 285R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ACTCTCGA-CTGTACCA_R1.fastq.gz
+    - 285R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ACTCTCGA-CTGTACCA_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-ACTCTCGA-CTGTACCA
+    files:
+    - 285R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ACTCTCGA-CTGTACCA_R1.fastq.gz
+    - 285R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ACTCTCGA-CTGTACCA_R2.fastq.gz
+289L:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-GAGACGAT-ACCGGTTA
+    files:
+    - 289L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GAGACGAT-ACCGGTTA_R1.fastq.gz
+    - 289L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GAGACGAT-ACCGGTTA_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-GAGACGAT-ACCGGTTA
+    files:
+    - 289L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GAGACGAT-ACCGGTTA_R1.fastq.gz
+    - 289L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GAGACGAT-ACCGGTTA_R2.fastq.gz
+316L:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-TTGCGAAG-AACACGCT
+    files:
+    - 316L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TTGCGAAG-AACACGCT_R1.fastq.gz
+    - 316L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TTGCGAAG-AACACGCT_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-TTGCGAAG-AACACGCT
+    files:
+    - 316L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TTGCGAAG-AACACGCT_R1.fastq.gz
+    - 316L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TTGCGAAG-AACACGCT_R2.fastq.gz
+333L:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-CTTGTCGA-CGATGTTC
+    files:
+    - 333L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CTTGTCGA-CGATGTTC_R1.fastq.gz
+    - 333L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CTTGTCGA-CGATGTTC_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-CTTGTCGA-CGATGTTC
+    files:
+    - 333L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CTTGTCGA-CGATGTTC_R1.fastq.gz
+    - 333L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CTTGTCGA-CGATGTTC_R2.fastq.gz
+356R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-ATCGCCAT-TGCGTAAC
+    files:
+    - 356R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ATCGCCAT-TGCGTAAC_R1.fastq.gz
+    - 356R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ATCGCCAT-TGCGTAAC_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-ATCGCCAT-TGCGTAAC
+    files:
+    - 356R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ATCGCCAT-TGCGTAAC_R1.fastq.gz
+    - 356R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ATCGCCAT-TGCGTAAC_R2.fastq.gz
+365L:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-CCTTGATC-GATGGAGT
+    files:
+    - 365L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CCTTGATC-GATGGAGT_R1.fastq.gz
+    - 365L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CCTTGATC-GATGGAGT_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-CCTTGATC-GATGGAGT
+    files:
+    - 365L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CCTTGATC-GATGGAGT_R1.fastq.gz
+    - 365L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CCTTGATC-GATGGAGT_R2.fastq.gz
+366L:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-GTCGAAGA-CCACATTG
+    files:
+    - 366L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GTCGAAGA-CCACATTG_R1.fastq.gz
+    - 366L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GTCGAAGA-CCACATTG_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-GTCGAAGA-CCACATTG
+    files:
+    - 366L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GTCGAAGA-CCACATTG_R1.fastq.gz
+    - 366L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GTCGAAGA-CCACATTG_R2.fastq.gz
+369L:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-GACGATCT-TCGTGCAT
+    files:
+    - 369L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GACGATCT-TCGTGCAT_R1.fastq.gz
+    - 369L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GACGATCT-TCGTGCAT_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-GACGATCT-TCGTGCAT
+    files:
+    - 369L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GACGATCT-TCGTGCAT_R1.fastq.gz
+    - 369L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GACGATCT-TCGTGCAT_R2.fastq.gz
+372R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-GTTCTCGT-TGTTCCGT
+    files:
+    - 372R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GTTCTCGT-TGTTCCGT_R1.fastq.gz
+    - 372R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GTTCTCGT-TGTTCCGT_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-GTTCTCGT-TGTTCCGT
+    files:
+    - 372R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GTTCTCGT-TGTTCCGT_R1.fastq.gz
+    - 372R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GTTCTCGT-TGTTCCGT_R2.fastq.gz
+388L:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-AGCGTGTT-CTTCGCAA
+    files:
+    - 388L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_AGCGTGTT-CTTCGCAA_R1.fastq.gz
+    - 388L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_AGCGTGTT-CTTCGCAA_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-AGCGTGTT-CTTCGCAA
+    files:
+    - 388L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_AGCGTGTT-CTTCGCAA_R1.fastq.gz
+    - 388L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_AGCGTGTT-CTTCGCAA_R2.fastq.gz
+394R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-CTGTTGAC-ACCTCAGT
+    files:
+    - 394R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CTGTTGAC-ACCTCAGT_R1.fastq.gz
+    - 394R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CTGTTGAC-ACCTCAGT_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-CTGTTGAC-ACCTCAGT
+    files:
+    - 394R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CTGTTGAC-ACCTCAGT_R1.fastq.gz
+    - 394R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CTGTTGAC-ACCTCAGT_R2.fastq.gz
+398R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-ATGACGTC-CTTCCTTC
+    files:
+    - 398R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ATGACGTC-CTTCCTTC_R1.fastq.gz
+    - 398R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ATGACGTC-CTTCCTTC_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-ATGACGTC-CTTCCTTC
+    files:
+    - 398R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ATGACGTC-CTTCCTTC_R1.fastq.gz
+    - 398R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ATGACGTC-CTTCCTTC_R2.fastq.gz
+412R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-TGAAGACG-ACATGCCA
+    files:
+    - 412R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TGAAGACG-ACATGCCA_R1.fastq.gz
+    - 412R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TGAAGACG-ACATGCCA_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-TGAAGACG-ACATGCCA
+    files:
+    - 412R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TGAAGACG-ACATGCCA_R1.fastq.gz
+    - 412R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TGAAGACG-ACATGCCA_R2.fastq.gz
+413R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-TGGACTCT-TCTTACGG
+    files:
+    - 413R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TGGACTCT-TCTTACGG_R1.fastq.gz
+    - 413R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TGGACTCT-TCTTACGG_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-TGGACTCT-TCTTACGG
+    files:
+    - 413R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TGGACTCT-TCTTACGG_R1.fastq.gz
+    - 413R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TGGACTCT-TCTTACGG_R2.fastq.gz
+438L:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-AACCGTTC-CTAGCTCA
+    files:
+    - 438L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_AACCGTTC-CTAGCTCA_R1.fastq.gz
+    - 438L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_AACCGTTC-CTAGCTCA_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-AACCGTTC-CTAGCTCA
+    files:
+    - 438L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_AACCGTTC-CTAGCTCA_R1.fastq.gz
+    - 438L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_AACCGTTC-CTAGCTCA_R2.fastq.gz
+443R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-CATACCAC-AACAACCG
+    files:
+    - 443R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CATACCAC-AACAACCG_R1.fastq.gz
+    - 443R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CATACCAC-AACAACCG_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-CATACCAC-AACAACCG
+    files:
+    - 443R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CATACCAC-AACAACCG_R1.fastq.gz
+    - 443R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CATACCAC-AACAACCG_R2.fastq.gz
+444L:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-TTCCAAGG-CTACAAGG
+    files:
+    - 444L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TTCCAAGG-CTACAAGG_R1.fastq.gz
+    - 444L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TTCCAAGG-CTACAAGG_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-TTCCAAGG-CTACAAGG
+    files:
+    - 444L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TTCCAAGG-CTACAAGG_R1.fastq.gz
+    - 444L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TTCCAAGG-CTACAAGG_R2.fastq.gz
+450R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-CGCATGAT-AAGCCTGA
+    files:
+    - 450R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CGCATGAT-AAGCCTGA_R1.fastq.gz
+    - 450R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CGCATGAT-AAGCCTGA_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-CGCATGAT-AAGCCTGA
+    files:
+    - 450R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CGCATGAT-AAGCCTGA_R1.fastq.gz
+    - 450R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CGCATGAT-AAGCCTGA_R2.fastq.gz
+453R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-GTCATCGA-GATCCACT
+    files:
+    - 453R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GTCATCGA-GATCCACT_R1.fastq.gz
+    - 453R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GTCATCGA-GATCCACT_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-GTCATCGA-GATCCACT
+    files:
+    - 453R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GTCATCGA-GATCCACT_R1.fastq.gz
+    - 453R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GTCATCGA-GATCCACT_R2.fastq.gz
+458R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-AACTGAGC-CAATCAGG
+    files:
+    - 458R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_AACTGAGC-CAATCAGG_R1.fastq.gz
+    - 458R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_AACTGAGC-CAATCAGG_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-AACTGAGC-CAATCAGG
+    files:
+    - 458R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_AACTGAGC-CAATCAGG_R1.fastq.gz
+    - 458R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_AACTGAGC-CAATCAGG_R2.fastq.gz
+467L:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-CTTAGGAC-ACTCCTAC
+    files:
+    - 467L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CTTAGGAC-ACTCCTAC_R1.fastq.gz
+    - 467L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CTTAGGAC-ACTCCTAC_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-CTTAGGAC-ACTCCTAC
+    files:
+    - 467L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CTTAGGAC-ACTCCTAC_R1.fastq.gz
+    - 467L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CTTAGGAC-ACTCCTAC_R2.fastq.gz
+468L:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-ACCACGAT-GTCTGCAA
+    files:
+    - 468L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ACCACGAT-GTCTGCAA_R1.fastq.gz
+    - 468L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ACCACGAT-GTCTGCAA_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-ACCACGAT-GTCTGCAA
+    files:
+    - 468L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ACCACGAT-GTCTGCAA_R1.fastq.gz
+    - 468L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ACCACGAT-GTCTGCAA_R2.fastq.gz
+474R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-GTGAAGTG-GAGCAATC
+    files:
+    - 474R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GTGAAGTG-GAGCAATC_R1.fastq.gz
+    - 474R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GTGAAGTG-GAGCAATC_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-GTGAAGTG-GAGCAATC
+    files:
+    - 474R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GTGAAGTG-GAGCAATC_R1.fastq.gz
+    - 474R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GTGAAGTG-GAGCAATC_R2.fastq.gz
+475L:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-TATCGGTC-TACCGGAT
+    files:
+    - 475L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TATCGGTC-TACCGGAT_R1.fastq.gz
+    - 475L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TATCGGTC-TACCGGAT_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-TATCGGTC-TACCGGAT
+    files:
+    - 475L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TATCGGTC-TACCGGAT_R1.fastq.gz
+    - 475L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TATCGGTC-TACCGGAT_R2.fastq.gz
+479R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-GATTACCG-TTGGACTG
+    files:
+    - 479R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GATTACCG-TTGGACTG_R1.fastq.gz
+    - 479R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GATTACCG-TTGGACTG_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-GATTACCG-TTGGACTG
+    files:
+    - 479R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GATTACCG-TTGGACTG_R1.fastq.gz
+    - 479R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GATTACCG-TTGGACTG_R2.fastq.gz
+482R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-GAATCCGA-AGCTAGTG
+    files:
+    - 482R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GAATCCGA-AGCTAGTG_R1.fastq.gz
+    - 482R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GAATCCGA-AGCTAGTG_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-GAATCCGA-AGCTAGTG
+    files:
+    - 482R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GAATCCGA-AGCTAGTG_R1.fastq.gz
+    - 482R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GAATCCGA-AGCTAGTG_R2.fastq.gz
+484L:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-GAAGTTGG-CGAACAAC
+    files:
+    - 484L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GAAGTTGG-CGAACAAC_R1.fastq.gz
+    - 484L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GAAGTTGG-CGAACAAC_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-GAAGTTGG-CGAACAAC
+    files:
+    - 484L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GAAGTTGG-CGAACAAC_R1.fastq.gz
+    - 484L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GAAGTTGG-CGAACAAC_R2.fastq.gz
+487R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-AGAGTAGC-AAGGCGTA
+    files:
+    - 487R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_AGAGTAGC-AAGGCGTA_R1.fastq.gz
+    - 487R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_AGAGTAGC-AAGGCGTA_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-AGAGTAGC-AAGGCGTA
+    files:
+    - 487R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_AGAGTAGC-AAGGCGTA_R1.fastq.gz
+    - 487R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_AGAGTAGC-AAGGCGTA_R2.fastq.gz
+489L:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-GCACAACT-CTGAACGT
+    files:
+    - 489L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GCACAACT-CTGAACGT_R1.fastq.gz
+    - 489L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GCACAACT-CTGAACGT_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-GCACAACT-CTGAACGT
+    files:
+    - 489L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GCACAACT-CTGAACGT_R1.fastq.gz
+    - 489L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GCACAACT-CTGAACGT_R2.fastq.gz
+490R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-GCGTCATT-CAGACGTT
+    files:
+    - 490R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GCGTCATT-CAGACGTT_R1.fastq.gz
+    - 490R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GCGTCATT-CAGACGTT_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-GCGTCATT-CAGACGTT
+    files:
+    - 490R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GCGTCATT-CAGACGTT_R1.fastq.gz
+    - 490R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GCGTCATT-CAGACGTT_R2.fastq.gz
+493R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-TCGCTGTT-CAAGTCGT
+    files:
+    - 493R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TCGCTGTT-CAAGTCGT_R1.fastq.gz
+    - 493R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TCGCTGTT-CAAGTCGT_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-TCGCTGTT-CAAGTCGT
+    files:
+    - 493R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TCGCTGTT-CAAGTCGT_R1.fastq.gz
+    - 493R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TCGCTGTT-CAAGTCGT_R2.fastq.gz
+495R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-ATCCGGTA-GACCGATA
+    files:
+    - 495R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ATCCGGTA-GACCGATA_R1.fastq.gz
+    - 495R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ATCCGGTA-GACCGATA_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-ATCCGGTA-GACCGATA
+    files:
+    - 495R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ATCCGGTA-GACCGATA_R1.fastq.gz
+    - 495R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ATCCGGTA-GACCGATA_R2.fastq.gz
+498R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-CCTTGTAG-CCTTGGAA
+    files:
+    - 498R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CCTTGTAG-CCTTGGAA_R1.fastq.gz
+    - 498R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CCTTGTAG-CCTTGGAA_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-CCTTGTAG-CCTTGGAA
+    files:
+    - 498R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CCTTGTAG-CCTTGGAA_R1.fastq.gz
+    - 498R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CCTTGTAG-CCTTGGAA_R2.fastq.gz
+501R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-ACGGAACA-ACGAGAAC
+    files:
+    - 501R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ACGGAACA-ACGAGAAC_R1.fastq.gz
+    - 501R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ACGGAACA-ACGAGAAC_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-ACGGAACA-ACGAGAAC
+    files:
+    - 501R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ACGGAACA-ACGAGAAC_R1.fastq.gz
+    - 501R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ACGGAACA-ACGAGAAC_R2.fastq.gz
+503R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-CAACACCT-AGCTACCA
+    files:
+    - 503R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CAACACCT-AGCTACCA_R1.fastq.gz
+    - 503R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CAACACCT-AGCTACCA_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-CAACACCT-AGCTACCA
+    files:
+    - 503R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CAACACCT-AGCTACCA_R1.fastq.gz
+    - 503R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CAACACCT-AGCTACCA_R2.fastq.gz
+510L:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-GAAGGAAG-GACGTCAT
+    files:
+    - 510L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GAAGGAAG-GACGTCAT_R1.fastq.gz
+    - 510L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GAAGGAAG-GACGTCAT_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-GAAGGAAG-GACGTCAT
+    files:
+    - 510L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GAAGGAAG-GACGTCAT_R1.fastq.gz
+    - 510L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GAAGGAAG-GACGTCAT_R2.fastq.gz
+512L:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-ACAGCTCA-TACTGCTC
+    files:
+    - 512L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ACAGCTCA-TACTGCTC_R1.fastq.gz
+    - 512L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ACAGCTCA-TACTGCTC_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-ACAGCTCA-TACTGCTC
+    files:
+    - 512L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ACAGCTCA-TACTGCTC_R1.fastq.gz
+    - 512L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ACAGCTCA-TACTGCTC_R2.fastq.gz
+515R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-ATGCACGA-AGATCGTC
+    files:
+    - 515R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ATGCACGA-AGATCGTC_R1.fastq.gz
+    - 515R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ATGCACGA-AGATCGTC_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-ATGCACGA-AGATCGTC
+    files:
+    - 515R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ATGCACGA-AGATCGTC_R1.fastq.gz
+    - 515R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ATGCACGA-AGATCGTC_R2.fastq.gz
+518L:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-TGGTAGCT-AGGTGTTG
+    files:
+    - 518L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TGGTAGCT-AGGTGTTG_R1.fastq.gz
+    - 518L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TGGTAGCT-AGGTGTTG_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-TGGTAGCT-AGGTGTTG
+    files:
+    - 518L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TGGTAGCT-AGGTGTTG_R1.fastq.gz
+    - 518L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TGGTAGCT-AGGTGTTG_R2.fastq.gz
+531R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-TTCGTTGG-TACACACG
+    files:
+    - 531R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TTCGTTGG-TACACACG_R1.fastq.gz
+    - 531R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TTCGTTGG-TACACACG_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-TTCGTTGG-TACACACG
+    files:
+    - 531R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TTCGTTGG-TACACACG_R1.fastq.gz
+    - 531R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TTCGTTGG-TACACACG_R2.fastq.gz
+532R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-CGTGTGTA-CCAACGAA
+    files:
+    - 532R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CGTGTGTA-CCAACGAA_R1.fastq.gz
+    - 532R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CGTGTGTA-CCAACGAA_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-CGTGTGTA-CCAACGAA
+    files:
+    - 532R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CGTGTGTA-CCAACGAA_R1.fastq.gz
+    - 532R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CGTGTGTA-CCAACGAA_R2.fastq.gz
+533L:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-AAGCACTG-AGGTCAAC
+    files:
+    - 533L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_AAGCACTG-AGGTCAAC_R1.fastq.gz
+    - 533L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_AAGCACTG-AGGTCAAC_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-AAGCACTG-AGGTCAAC
+    files:
+    - 533L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_AAGCACTG-AGGTCAAC_R1.fastq.gz
+    - 533L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_AAGCACTG-AGGTCAAC_R2.fastq.gz
+534L:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-GATGTGTG-TAGCCATG
+    files:
+    - 534L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GATGTGTG-TAGCCATG_R1.fastq.gz
+    - 534L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GATGTGTG-TAGCCATG_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-GATGTGTG-TAGCCATG
+    files:
+    - 534L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GATGTGTG-TAGCCATG_R1.fastq.gz
+    - 534L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GATGTGTG-TAGCCATG_R2.fastq.gz
+536R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-TACGCCTT-GCTACTCT
+    files:
+    - 536R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TACGCCTT-GCTACTCT_R1.fastq.gz
+    - 536R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TACGCCTT-GCTACTCT_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-TACGCCTT-GCTACTCT
+    files:
+    - 536R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TACGCCTT-GCTACTCT_R1.fastq.gz
+    - 536R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TACGCCTT-GCTACTCT_R2.fastq.gz
+539L:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-GATTGCTC-CACTTCAC
+    files:
+    - 539L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GATTGCTC-CACTTCAC_R1.fastq.gz
+    - 539L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GATTGCTC-CACTTCAC_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-GATTGCTC-CACTTCAC
+    files:
+    - 539L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GATTGCTC-CACTTCAC_R1.fastq.gz
+    - 539L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GATTGCTC-CACTTCAC_R2.fastq.gz
+541R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-ACTAGGAG-TATGGCAC
+    files:
+    - 541R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ACTAGGAG-TATGGCAC_R1.fastq.gz
+    - 541R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ACTAGGAG-TATGGCAC_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-ACTAGGAG-TATGGCAC
+    files:
+    - 541R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ACTAGGAG-TATGGCAC_R1.fastq.gz
+    - 541R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ACTAGGAG-TATGGCAC_R2.fastq.gz
+542R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-CACCTGTT-AGGATAGC
+    files:
+    - 542R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CACCTGTT-AGGATAGC_R1.fastq.gz
+    - 542R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CACCTGTT-AGGATAGC_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-CACCTGTT-AGGATAGC
+    files:
+    - 542R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CACCTGTT-AGGATAGC_R1.fastq.gz
+    - 542R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CACCTGTT-AGGATAGC_R2.fastq.gz
+543L:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-TGCTTCCA-CGATCGAT
+    files:
+    - 543L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TGCTTCCA-CGATCGAT_R1.fastq.gz
+    - 543L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TGCTTCCA-CGATCGAT_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-TGCTTCCA-CGATCGAT
+    files:
+    - 543L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TGCTTCCA-CGATCGAT_R1.fastq.gz
+    - 543L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TGCTTCCA-CGATCGAT_R2.fastq.gz
+544R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-TGGTACAG-TCGAGAGT
+    files:
+    - 544R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TGGTACAG-TCGAGAGT_R1.fastq.gz
+    - 544R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TGGTACAG-TCGAGAGT_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-TGGTACAG-TCGAGAGT
+    files:
+    - 544R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TGGTACAG-TCGAGAGT_R1.fastq.gz
+    - 544R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TGGTACAG-TCGAGAGT_R2.fastq.gz
+546L:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-TCAGGCTT-ATCATGCG
+    files:
+    - 546L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TCAGGCTT-ATCATGCG_R1.fastq.gz
+    - 546L_IDT-Targeted-HYB-Precancer_NextSeq240913_1_TCAGGCTT-ATCATGCG_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-TCAGGCTT-ATCATGCG
+    files:
+    - 546L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TCAGGCTT-ATCATGCG_R1.fastq.gz
+    - 546L_IDT-Targeted-HYB-Precancer_NextSeq240913_2_TCAGGCTT-ATCATGCG_R2.fastq.gz
+550R:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-ATATGCGC-ACGATCAG
+    files:
+    - 550R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ATATGCGC-ACGATCAG_R1.fastq.gz
+    - 550R_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ATATGCGC-ACGATCAG_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-ATATGCGC-ACGATCAG
+    files:
+    - 550R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ATATGCGC-ACGATCAG_R1.fastq.gz
+    - 550R_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ATATGCGC-ACGATCAG_R2.fastq.gz
+B1-7486:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-CTTCGACT-GATCTTGC
+    files:
+    - B1-7486_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CTTCGACT-GATCTTGC_R1.fastq.gz
+    - B1-7486_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CTTCGACT-GATCTTGC_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-CTTCGACT-GATCTTGC
+    files:
+    - B1-7486_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CTTCGACT-GATCTTGC_R1.fastq.gz
+    - B1-7486_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CTTCGACT-GATCTTGC_R2.fastq.gz
+B1-7528:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-ATCACACG-GTAGCGTA
+    files:
+    - B1-7528_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ATCACACG-GTAGCGTA_R1.fastq.gz
+    - B1-7528_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ATCACACG-GTAGCGTA_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-ATCACACG-GTAGCGTA
+    files:
+    - B1-7528_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ATCACACG-GTAGCGTA_R1.fastq.gz
+    - B1-7528_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ATCACACG-GTAGCGTA_R2.fastq.gz
+B1-7587:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-GAACATCG-TCGACAAG
+    files:
+    - B1-7587_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GAACATCG-TCGACAAG_R1.fastq.gz
+    - B1-7587_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GAACATCG-TCGACAAG_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-GAACATCG-TCGACAAG
+    files:
+    - B1-7587_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GAACATCG-TCGACAAG_R1.fastq.gz
+    - B1-7587_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GAACATCG-TCGACAAG_R2.fastq.gz
+B1-7653:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-ACGACTTG-AACAGCGA
+    files:
+    - B1-7653_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ACGACTTG-AACAGCGA_R1.fastq.gz
+    - B1-7653_IDT-Targeted-HYB-Precancer_NextSeq240913_1_ACGACTTG-AACAGCGA_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-ACGACTTG-AACAGCGA
+    files:
+    - B1-7653_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ACGACTTG-AACAGCGA_R1.fastq.gz
+    - B1-7653_IDT-Targeted-HYB-Precancer_NextSeq240913_2_ACGACTTG-AACAGCGA_R2.fastq.gz
+B1-7658:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-CCGTAAGA-AGAGTCCA
+    files:
+    - B1-7658_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CCGTAAGA-AGAGTCCA_R1.fastq.gz
+    - B1-7658_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CCGTAAGA-AGAGTCCA_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-CCGTAAGA-AGAGTCCA
+    files:
+    - B1-7658_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CCGTAAGA-AGAGTCCA_R1.fastq.gz
+    - B1-7658_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CCGTAAGA-AGAGTCCA_R2.fastq.gz
+B2-7652:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-AGAACGAG-ATTAGCCG
+    files:
+    - B2-7652_IDT-Targeted-HYB-Precancer_NextSeq240913_1_AGAACGAG-ATTAGCCG_R1.fastq.gz
+    - B2-7652_IDT-Targeted-HYB-Precancer_NextSeq240913_1_AGAACGAG-ATTAGCCG_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-AGAACGAG-ATTAGCCG
+    files:
+    - B2-7652_IDT-Targeted-HYB-Precancer_NextSeq240913_2_AGAACGAG-ATTAGCCG_R1.fastq.gz
+    - B2-7652_IDT-Targeted-HYB-Precancer_NextSeq240913_2_AGAACGAG-ATTAGCCG_R2.fastq.gz
+WT-7449:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-CAGTCCAA-CGGTAATC
+    files:
+    - WT-7449_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CAGTCCAA-CGGTAATC_R1.fastq.gz
+    - WT-7449_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CAGTCCAA-CGGTAATC_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-CAGTCCAA-CGGTAATC
+    files:
+    - WT-7449_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CAGTCCAA-CGGTAATC_R1.fastq.gz
+    - WT-7449_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CAGTCCAA-CGGTAATC_R2.fastq.gz
+WT-7450:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-GTAGGAGT-GTCCTAAG
+    files:
+    - WT-7450_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GTAGGAGT-GTCCTAAG_R1.fastq.gz
+    - WT-7450_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GTAGGAGT-GTCCTAAG_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-GTAGGAGT-GTCCTAAG
+    files:
+    - WT-7450_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GTAGGAGT-GTCCTAAG_R1.fastq.gz
+    - WT-7450_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GTAGGAGT-GTCCTAAG_R2.fastq.gz
+WT-7490:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-GATAGGCT-CAGTCACA
+    files:
+    - WT-7490_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GATAGGCT-CAGTCACA_R1.fastq.gz
+    - WT-7490_IDT-Targeted-HYB-Precancer_NextSeq240913_1_GATAGGCT-CAGTCACA_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-GATAGGCT-CAGTCACA
+    files:
+    - WT-7490_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GATAGGCT-CAGTCACA_R1.fastq.gz
+    - WT-7490_IDT-Targeted-HYB-Precancer_NextSeq240913_2_GATAGGCT-CAGTCACA_R2.fastq.gz
+WT-7648:
+  NextSeq240913-1:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-1-CACTAGCT-TCGGATTC
+    files:
+    - WT-7648_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CACTAGCT-TCGGATTC_R1.fastq.gz
+    - WT-7648_IDT-Targeted-HYB-Precancer_NextSeq240913_1_CACTAGCT-TCGGATTC_R2.fastq.gz
+  NextSeq240913-2:
+    LB: IDT-Targeted-HYB-Precancer
+    PU: NextSeq240913-2-CACTAGCT-TCGGATTC
+    files:
+    - WT-7648_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CACTAGCT-TCGGATTC_R1.fastq.gz
+    - WT-7648_IDT-Targeted-HYB-Precancer_NextSeq240913_2_CACTAGCT-TCGGATTC_R2.fastq.gz

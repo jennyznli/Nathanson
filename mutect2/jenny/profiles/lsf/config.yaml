@@ -1,0 +1,8 @@
+executor: lsf
+jobs: 10
+keep-incomplete: true
+latency-wait: 30
+restart-times: 2
+default-resources:
+  mem_mb: 8000
+  lsf_queue: "knmkln_normal"

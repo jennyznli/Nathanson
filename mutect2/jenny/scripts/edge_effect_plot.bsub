@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+#BSUB -J edge_effect_plot
+#BSUB -o logs/edge_effect_plot.%J.out
+#BSUB -e logs/edge_effect_plot.%J.err
+#BSUB -n 1
+#BSUB -R "rusage[mem=16000]"
+#BSUB -M 16000
+#BSUB -W 01:00
+
+set -euo pipefail
+
+# Usage: bsub scripts/edge_effect_plot.bsub
+# (edge_window.bed files are already trimmed to +-100bp of target edges, so
+# this shouldn't need much memory -- but the interactive run on the login
+# node was OOM-killed, so submitting as a batch job instead.)
+
+OUTDIR="./mosdepth"
+SAMPLES=$(cut -f1 input/cases.tsv | tr '\n' ' ')
+
+Rscript scripts/edge_effect_plot.R "$OUTDIR" $SAMPLES

@@ -1,0 +1,38 @@
+# Tumor calling pipeline config (tumor-only Mutect2)
+reference:
+  fasta: "/home/jennyzli/resources/Genomes/Human/hg38/fa/Homo_sapiens_assembly38.fasta"
+  fai: "/home/jennyzli/resources/Genomes/Human/hg38/fa/Homo_sapiens_assembly38.fasta.fai"
+  dict: "/home/jennyzli/resources/Genomes/Human/hg38/fa/Homo_sapiens_assembly38.dict"
+
+resources:
+  gnomad: "/home/jennyzli/software/mutect2/af-only-gnomad.hg38.vcf.gz"
+  variants_for_contamination: "/home/jennyzli/software/mutect2/small_exac_common_3.hg38.vcf.gz"
+  targets_bed: "/home/jennyzli/jenny/gray/bed/IDT-Target-HYB-PreCancer.hg38.targets.slop50.merged.bed"
+  masked_intervals: ""
+
+samples:
+  normals_tsv: "input/controls.tsv"    # sample_id<TAB>cram_or_bam_path -- used ONLY to build the PoN
+  tumor_tsv: "input/cases.tsv"         # sample_id<TAB>cram_or_bam_path -- final tumor-calling cohort
+
+scatter_count: 6
+
+pon:
+  name: "mutect2_pon"
+  panel_scatter_count: 6
+  min_contig_size: 1000000    # --min-contig-size for the panel-building SplitIntervals (--dont-mix-contigs)
+  existing_pon_vcf: ""
+  use_pon: true    # mutect2.smk only -- false skips PoN/-pon/--germline-resource/--max-population-af
+                    # for the tumor cohort entirely (and skips building the PoN). Flip + rerun into a
+                    # different --outdir to compare with-PoN vs without-PoN calls.
+                    # (panel_scatter_count/min_contig_size above are only used by mutect2_scatter.smk)
+
+# NOTE: max_population_af=0.05 is more permissive than GATK's own default (0.01) -- review
+tumor_calling:
+  minimum_allele_fraction: 0.001 
+  tumor_lod_to_emit: 2.0
+  initial_tumor_lod: 2.0
+  max_population_af: 0.05 # reconsider this? 
+  max_mnp_distance: 0
+  m2_extra_args: ""
+  m2_extra_filtering_args: ""
+  vardict_af_thr: 0.01
