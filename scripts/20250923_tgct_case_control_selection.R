@@ -20,15 +20,19 @@ icds <- readLines((here("tgct", "data", "tgct_cancer_filtered_patients_ids.txt")
 brad <- fread(here("tgct", "data", "geno_map_20250828.csv"), header = TRUE)
 mrn <- read_excel(here("tgct", "data", "KT_IDS_MRNs_UIDs.xlsx"))
 
+x <- read_tsv(here("tgct", "data", "tgct_final_controls.txt"))
+
 # ========================
 # TGCT Cancer Selection
 # ========================
+# NR6A1 and AR
+
 library(here)
 source(here("R", "sample_selection.R"))
 
 tgct_results <- select_samples(
     sample_name = "tgct",
-    icd_codes = c("^C62", "^Z80.43", "^186", "^V10.47"),
+    icd_codes = c("^C62", "^Z85.47", "^186", "^V10.47"),
     gender_filter = "Male",
     crep_filter = NULL,
     min_instances = 2,

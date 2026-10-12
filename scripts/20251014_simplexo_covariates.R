@@ -57,7 +57,6 @@ cat("ICD ages extracted:", nrow(icd_ages), "records\n") # 3448
 # ========================
 # EXTRACT DIAGNOSIS AGES FROM PMCR (Cancer Registry)
 # ========================
-
 pmcr_case <- pmcr %>% filter(PmcrBreastFlag == 1)
 
 pmcr_ages <- pmcr_case %>%

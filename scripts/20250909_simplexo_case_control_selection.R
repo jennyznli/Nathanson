@@ -12,7 +12,6 @@ source(here("R", "control_selection.R"))
 # ========================
 # BREAST CANCER ICD SELECTION
 # ========================
-
 breast_results <- select_samples(
     sample_name = "simplexo",
     icd_codes = c("^C50", "^Z85.3", "^D05", "^Z86.000",

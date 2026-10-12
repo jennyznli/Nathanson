@@ -125,12 +125,12 @@ rule array_qc:
 # ========== EXOME DATA RULES  ==========
 rule get_exome_sample_ids:
     input:
-        fam=config['input']['exome_chr'].format(CHR=1) + ".fam"
+        psam=config['input']['exome_chr'].format(CHR=1) + ".psam"
     output:
         f"{RUN_DIR}/preprocess/{PROJECT}.exome.all_chr.step1.id"
     shell:
         """
-        awk '{{print $1}}' {input.fam} > {output}
+        awk '$1!~/^#/{{print $1}}' {input.psam} > {output}
         """
 
 # Updated to handle conditional dependency more cleanly
@@ -174,7 +174,7 @@ rule get_sample_list:
 
 rule exome_chr_update_sex:
     input:
-        bed=lambda wildcards: config['input']['exome_chr'].format(CHR=wildcards.CHR) + ".bed",
+        pgen=lambda wildcards: config['input']['exome_chr'].format(CHR=wildcards.CHR) + ".pgen",
         samples=f"{RUN_DIR}/preprocess/{PROJECT}.final_samples.txt"
     output:
         pgen=f"{RUN_DIR}/preprocess/{PROJECT}.chr{{CHR}}.pgen",
@@ -189,12 +189,11 @@ rule exome_chr_update_sex:
         f"{RUN_DIR}/logs/{PROJECT}.chr{{CHR}}.chr_update_sex.log"
     shell:
         """
-        (plink2 --bfile {params.input_prefix} \
+        (plink2 --pfile {params.input_prefix} \
                --update-sex {params.sex_info} \
                --keep {input.samples} \
                --threads {threads} \
                --geno 0.1 \
-               --double-id \
                --make-pgen \
                --out {params.output_prefix}) 2>&1 | tee {log}
         """
@@ -343,6 +342,7 @@ rule run_step1_regenie:
                 --bsize 1000 \
                 --threads {threads} \
                 --gz \
+                --cv 5 \
                 --bt \
                 --lowmem \
                 --lowmem-prefix {params.lowmem_prefix} \
@@ -374,7 +374,9 @@ rule run_step2_single_variant:
                 --firth \
                 --approx \
                 --pThresh 0.999 \
+                --catCovarList batch \
                 --firth-se \
+                --minMAC 1 \
                 --pred {input.pred_list} \
                 --bsize 400 \
                 --threads {threads} \
@@ -410,6 +412,8 @@ rule run_step2_gene_based:
                 --firth \
                 --approx \
                 --pThresh 0.999 \
+                --minMAC 1 \
+                --catCovarList batch \
                 --firth-se \
                 --pred {input.pred_list} \
                 --anno-file {input.annotation} \
@@ -419,6 +423,7 @@ rule run_step2_gene_based:
                 --write-mask-snplist \
                 --check-burden-files \
                 --threads {threads} \
+                --aaf-bins 0.001,0.005,0.01,1.00 \
                 --af-cc \
                 --bsize 200 \
                 --vc-tests skat,skato \
@@ -452,6 +457,7 @@ rule generate_report:
         f"{RUN_DIR}/logs/{PROJECT}.generate_report.log"
     shell:
         """
+        export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
         Rscript -e "rmarkdown::render(
             input = '{input.rmd}',
             output_file = basename('{output.html}'),
