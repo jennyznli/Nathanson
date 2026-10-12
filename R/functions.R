@@ -31,12 +31,60 @@ process_icd_codes <- function(icd_df) {
 }
 
 merge_duplicates <- function(df, group_col) {
-    df %>%
+    # group_by() lumps all NA group_col values into a single group, which would
+    # merge unrelated rows together -- so rows with a missing id are left as-is
+    # instead of being deduplicated
+    # merged's non-group columns all come out as character (see across() below),
+    # so na_rows needs the same coercion or bind_rows() errors on type mismatch
+    na_rows <- df %>%
+        filter(if_any(all_of(group_col), is.na)) %>%
+        mutate(across(-any_of(group_col), as.character))
+    id_rows <- df %>% filter(!if_any(all_of(group_col), is.na))
+
+    merged <- id_rows %>%
         group_by(across(all_of(group_col))) %>%
         summarise(
-            across(-any_of(group_col), ~ paste(unique(as.character(.x)), collapse = ";")),
+            across(-any_of(group_col), ~ {
+                vals <- unique(trimws(as.character(.x)))
+                vals <- vals[!is.na(vals) & vals != ""]
+                if (length(vals) == 0) NA_character_ else paste(vals, collapse = ";")
+            }),
             .groups = "drop"
         )
+
+    bind_rows(merged, na_rows)
+}
+
+#' Clean up an already semicolon-joined field: trim whitespace, drop blank
+#' segments, and dedupe repeated values (e.g. "Category 1: Negative;" or
+#' ";Yes" from a prior manual merge) without touching real multi-value data.
+clean_semicolon_field <- function(x) {
+    if (is.na(x)) return(NA_character_)
+    parts <- trimws(strsplit(x, ";")[[1]])
+    parts <- unique(parts[parts != ""])
+    if (length(parts) == 0) NA_character_ else paste(parts, collapse = ";")
+}
+
+#' Rename columns to Capital_Snake_Case: periods -> underscores, collapse
+#' repeated underscores, capitalize the first letter of each segment (the
+#' rest of each segment's casing is left alone so acronyms like BRCA1 or
+#' IHC survive). If two source columns tidy to the same name (e.g.
+#' "Collection_Type" and "Collection.Type" both already existed), make.unique
+#' suffixes the later one with "_1" rather than silently colliding -- that
+#' suffix is a signal the two source columns need to be reconciled by hand.
+tidy_colnames <- function(df) {
+    nm <- names(df)
+    nm <- gsub("\\.", "_", nm)
+    nm <- gsub("_+", "_", nm)
+    nm <- gsub("^_|_$", "", nm)
+    nm <- sapply(strsplit(nm, "_"), function(parts) {
+        parts <- ifelse(nchar(parts) > 0,
+                         paste0(toupper(substring(parts, 1, 1)), substring(parts, 2)),
+                         parts)
+        paste(parts, collapse = "_")
+    })
+    names(df) <- make.unique(nm, sep = "_")
+    df
 }
 
 # Function to get earliest age (your existing function)

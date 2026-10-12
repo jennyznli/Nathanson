@@ -12,7 +12,7 @@ packages <- list(
     cran = c(
         "dplyr", "ggplot2", "readr", "tidyr", "plotly", "readxl", "here", "stringr",
         "Rtsne", "pheatmap", "RColorBrewer", "ggpubr", "ggrepel",  "lubridate", "data.table",
-         "tidyverse",  "pals",  "impute"
+         "tidyverse",  "pals",  "impute", "gridExtra", "grid", "writexl", "data.table", "ggrepel"
     ),
     bioc = c(
         "BiocParallel"
