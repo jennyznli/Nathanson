@@ -108,6 +108,59 @@ tgct_controls <- select_controls_f4(
     log_dir = here("tgct", "log")
 )
 
+# non cancer are hispanic? 
+controls <- select_controls_f4(
+  control_name = "kate_request",
+  exclude_codes = malig_neoplasms,
+  gender_filter = "Male",
+  age_filter = NULL,
+  crep_filter = NULL,
+  pmbb_dir = here("PMBB", "4.0"),
+  data_dir = here("tgct", "data"),
+  log_dir = here("tgct", "log")
+)
+dim(controls$final_controls)
+# [1] 15417    12
+
+### should chekc not in PMCR
+pmcr_ids <- unique(pmcr_all$person_id)
+controls2 <- controls$final_controls %>% filter(!(person_id %in% pmcr_ids))
+dim(controls2)
+
+person_filtered <- cov |> filter(person_id %in% controls2$person_id)
+dim(person_filtered)
+table(person_filtered$ethnicity_source_value)
+
+# non cancer are hispanic? 
+controls <- select_controls_f4(
+  control_name = "brad_request",
+  exclude_codes = malig_neoplasms,
+  gender_filter = "Male",
+  age_filter = NULL,
+  crep_filter = NULL,
+  pmbb_dir = here("PMBB", "4.0"),
+  data_dir = here("tgct", "data"),
+  log_dir = here("tgct", "log")
+)
+### should chekc not in PMCR
+pmcr_ids <- unique(pmcr_all$person_id)
+controls2 <- controls$final_controls %>% filter(!(person_id %in% pmcr_ids))
+dim(controls2)
+
+person_filtered <- cov |> filter(person_id %in% controls2$person_id)
+dim(person_filtered)
+table(person_filtered$Class)
+
+eur <- cov |> filter(Class == "EUR")
+dim(eur)
+
+
+
+
+
+
+
+### back to original 
 controls <- tgct_controls$final_controls
 dim(controls)
 # 9507

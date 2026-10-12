@@ -15,8 +15,8 @@ flags <- fread(here("PMBB", "4.0", "rgcname_pmbbid_metadata_flags_freeze4.csv"),
 imputed_ids <- read.csv(here("PMBB", "4.0", "PMBB-Release-2026-4.0_genetic_imputed.sample_list.txt"), header = FALSE)$V1
 
 # 2026 version
-prs_26e <- read.table(here("tgct", "data", "output", "gwas2026_effect.txt"), header = TRUE)
-prs_26z <- read.table(here("tgct", "data", "output", "gwas2026_z.txt"), header = TRUE)
+prs_26e <- read.table(here("tgct", "data", "output", "gwas2026_effect_pos.txt"), header = TRUE)
+prs_26z <- read.table(here("tgct", "data", "output", "gwas2026_z_pos.txt"), header = TRUE)
 
 # 2021 version
 prs_21e <- read.table(here("tgct", "data", "output", "gwas2021_effect.txt"), header = TRUE)
@@ -88,12 +88,6 @@ have_geno <- missing_geno |> filter(Final_ID %in% prs_ids)
 dim(have_geno)
 head(have_geno)
 # 1
-# but they all have KT IDS?
-
-missing_geno_ids <- missing_geno$KTID
-sum(prs_ids %in% missing_geno_ids)
-# 0
-# so actually probably missing ...
 
 # put that one back
 ss2 <- ss |> filter(Geno.Avail == TRUE) |>
@@ -272,7 +266,7 @@ ss4 <- ss4 |> left_join(prs, by = c("Final_ID3" = "FID"))
 
 sum(is.na(ss4$PRS26_Z))
 # 24 without
-View(ss4[is.na(ss4$PRS26_Z),])
+# View(ss4[is.na(ss4$PRS26_Z),])
 # these are mostly Gencove and discovery
 # examine their files, but still can't find them ...
 
@@ -306,113 +300,367 @@ write_xlsx(ss6, here("tgct", "ss", "20260820_tgct_master_cleaned.xlsx"))
 cases <- ss6
 
 # ========================
-# COMPUTE TERTILES on CONTROLS ONLY
+# CHECK IF DUPLICATE SCORES ARE SAME
 # ========================
-# get all cases ever
-# but what if some are duplicats...
-# so literally take all IDs across PMBBID1, PMBBID2, GencoveID, ReplicationID, DiscoveryID and
-# make it a unique vector
-# but remember replication has to be like the existing one ID_ID with the underscore and doubled.
-# pulled from sso (the untouched 1350-row masterlist) rather than ss6 -- ss6
-# is the final deduped/filtered case cohort, so anyone dropped along the way
-# (missing genotype, removed dup, etc.) would wrongly fall through to
-# "control" if we sourced case IDs from ss6 instead
-case_ids <- sso |>
-    mutate(ReplicationID = if_else(!is.na(ReplicationID), paste0(ReplicationID, "_", ReplicationID), ReplicationID)) |>
-    select(PMBBID1, PMBBID2, GencoveID, ReplicationID, DiscoveryID) |>
-    unlist(use.names = FALSE) |>
-    na.omit() |>
-    unique()
-length(case_ids)
-# 2751
+dup <- dup |>  mutate(Final_ID2 = if_else(GenoSource2 %in% c("Replication"),
+                                    paste0(Final_ID, "_", Final_ID), Final_ID))
+check <- dup |> left_join(prs, by = c("Final_ID2" = "FID"))
+write_xlsx(check, file.path("tgct", "data", "20260831_prs_dups.xlsx"))
 
-# mark case/controls
-prs2 <- prs |> mutate(Case = if_else(FID %in% case_ids, 1, 0))
-table(prs2$Case)
-# 0     1
-# 84282  1799
+# CHECK IF THERE ARE MULTIPLE IDS WITHIN SAME ROW
+ss <- sso %>%
+  left_join(flags, by = c("PMBBID2" = "PMBB_ID")) %>%
+  mutate(
+    # row-wise: does THIS row individually have multiple id columns filled in?
+    GenoSource2 = case_when(
+      !is.na(PMBBID2) ~ "PMBB", # checked first
+      !is.na(GencoveID) ~ "Gencove", # checked next, so on if PMBB was false
+      !is.na(ReplicationID) ~ "Replication",
+      !is.na(DiscoveryID) ~ "Discovery"
+    ),
+    Final_ID = coalesce(PMBBID2, GencoveID, ReplicationID, DiscoveryID)
+  )
 
-# computed on ss4 (everyone with a valid PRS score) rather than on the later
-# complete-case survival cohort -- PRS is fixed regardless of who has full
-# clinical follow-up, so tertile cutpoints shouldn't depend on which subset
-# happens to have complete histology/relapse/date fields. fixed cutpoints
-# also mean "Low/Mid/High" means the same PRS value in every plot and every
-# subgroup below, instead of being recomputed (and redefined) per call
-controls <- prs2 |> filter(Case == 0)
+# check if any row has more than one ID in the column....
+ss <- sso %>%
+  left_join(flags, by = c("PMBBID2" = "PMBB_ID")) %>%
+  mutate(
+    .row_id = row_number(),
+    GenoSource2 = case_when(
+      !is.na(PMBBID2) ~ "PMBB",
+      !is.na(GencoveID) ~ "Gencove",
+      !is.na(ReplicationID) ~ "Replication",
+      !is.na(DiscoveryID) ~ "Discovery"
+    ),
+    Final_ID = coalesce(PMBBID2, GencoveID, ReplicationID, DiscoveryID),
+    source_col = recode(GenoSource2,
+                        PMBB = "PMBBID2", Gencove = "GencoveID",
+                        Replication = "ReplicationID", Discovery = "DiscoveryID"
+    )
+  )
 
-effect_breaks   <- quantile(controls$PRS26_Effect, probs = c(1 / 3, 2 / 3), na.rm = TRUE)
-z_breaks        <- quantile(controls$PRS26_Z,      probs = c(1 / 3, 2 / 3), na.rm = TRUE)
-effect21_breaks <- quantile(controls$PRS21_Effect, probs = c(1 / 3, 2 / 3), na.rm = TRUE)
-z21_breaks      <- quantile(controls$PRS21_Z,      probs = c(1 / 3, 2 / 3), na.rm = TRUE)
+id_cols <- c("PMBBID2", "GencoveID", "ReplicationID", "DiscoveryID")
 
-effect_breaks
-z_breaks
-effect21_breaks
-z21_breaks
+id_long <- ss %>%
+  select(.row_id, all_of(id_cols)) %>%
+  pivot_longer(all_of(id_cols), names_to = "id_col", values_to = "id_value") %>%
+  filter(!is.na(id_value))
 
-# label each sample's tertile per PRS type -- carries through ss5/survival/
-# sem_adj/sem_surv automatically since it's just a column on ss4
-ss7 <- ss6 |> mutate(
-    PRS26_Effect_tertile = cut(PRS26_Effect, breaks = c(-Inf, effect_breaks, Inf), labels = c("Low", "Mid", "High")),
-    PRS26_Z_tertile       = cut(PRS26_Z,      breaks = c(-Inf, z_breaks, Inf),      labels = c("Low", "Mid", "High")),
-    PRS21_Effect_tertile = cut(PRS21_Effect, breaks = c(-Inf, effect21_breaks, Inf), labels = c("Low", "Mid", "High")),
-    PRS21_Z_tertile       = cut(PRS21_Z,      breaks = c(-Inf, z21_breaks, Inf),      labels = c("Low", "Mid", "High"))
+dupe_rows <- ss %>%
+  select(.row_id, source_col, Final_ID) %>%
+  inner_join(id_long, by = c("Final_ID" = "id_value"), suffix = c("", "_other")) %>%
+  filter(.row_id != .row_id_other, source_col != id_col) %>%
+  distinct(.row_id) %>%
+  pull(.row_id)
+
+ss <- ss %>%
+  mutate(ID_in_other_row_diff_col = .row_id %in% dupe_rows)
+
+# ========================
+# PRS SUMMARY STATISTICS
+# ========================
+prs_cols <- c("PRS26_Effect", "PRS26_Z", "PRS21_Effect", "PRS21_Z")
+
+prs_stats <- function(x) {
+  tibble(
+    n = sum(!is.na(x)),
+    n_missing = sum(is.na(x)),
+    mean = mean(x, na.rm = TRUE),
+    sd = sd(x, na.rm = TRUE),
+    median = median(x, na.rm = TRUE),
+    IQR = IQR(x, na.rm = TRUE),
+    Q1 = quantile(x, 0.25, na.rm = TRUE),
+    Q3 = quantile(x, 0.75, na.rm = TRUE),
+    min = min(x, na.rm = TRUE),
+    max = max(x, na.rm = TRUE)
+  )
+}
+
+prs_summary <- map_dfr(prs_cols, function(col) {
+  by_source <- cases |>
+    group_by(GenoSource3) |>
+    group_modify(~ prs_stats(.x[[col]])) |>
+    rename(Source = GenoSource3)
+
+  overall <- prs_stats(cases[[col]]) |> mutate(Source = "Overall", .before = 1)
+
+  bind_rows(by_source, overall) |> mutate(PRS = col, .before = 1)
+})
+
+print(prs_summary)
+write_xlsx(prs_summary, here("tgct", "data", "20260910_tgct_prs_summary_stats.xlsx"))
+
+# ========================
+# PRS DISTRIBUTIONS BY SOURCE
+# ========================
+table(cases$GenoSource3)
+# Discovery     Gencove        PMBB Replication 
+# 64          50         827          62 
+
+dist_long <- cases |>
+    select(GenoSource3, all_of(prs_cols)) |>
+    pivot_longer(all_of(prs_cols), names_to = "PRS", values_to = "Score")
+
+stat_test <- dist_long |>
+  group_by(PRS) |>
+  wilcox_test(Score ~ GenoSource3) |>          
+  adjust_pvalue(method = "BH") |>               
+  add_significance("p.adj") |>
+  add_xy_position(x = "GenoSource3", fun = "max", step.increase = 0.12)
+
+p_dist <- ggplot(dist_long, aes(x = GenoSource3, y = Score, fill = GenoSource3)) +
+  geom_boxplot(outlier.shape = 21, outlier.alpha = 0.5) +
+  facet_wrap(~PRS, scales = "free_y") +
+  stat_pvalue_manual(stat_test, label = "p.adj.signif", tip.length = 0.01, hide.ns = TRUE) +
+  labs(x = "Genotyping Source", y = "PRS", fill = "Source") +
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+print(p_dist)
+ggsave(here("tgct", "figures", "20260908_tgct_prs_distribution_by_source_sig.png"), plot = p_dist, width = 10, height = 8)
+
+write_xlsx(stat_test, here("tgct", "data", "20260908_tgct_prs_pairwise_by_source.xlsx"))
+
+# print out significant ones.. there are none
+stat_test |>
+  mutate(across(c(statistic, p, p.adj), \(x) round(x, 4))) |>
+  select(PRS, group1, group2, n1, n2, p, p.adj, p.adj.signif) |>
+  arrange(PRS, p.adj) |>
+  print(n = Inf)
+
+# ========================
+# PAIRWISE SCATTERPLOTS
+# ========================
+library(patchwork)
+
+prs_pairs <- combn(prs_cols, 2, simplify = FALSE)
+
+for (pair in prs_pairs) {
+    p <- ggplot(cases, aes(x = .data[[pair[1]]], y = .data[[pair[2]]], color = GenoSource3)) +
+        geom_point(alpha = 0.6, size = 1.5) +
+        stat_cor(aes(color = NULL), method = "pearson", label.sep = "\n") +
+        labs(x = pair[1], y = pair[2], color = "Source") +
+        theme_bw()
+    print(p)
+    fname <- paste0("20260901_tgct_prs_scatter_", pair[1], "_vs_", pair[2], ".png")
+    ggsave(here("tgct", "figures", fname), plot = p, width = 6, height = 5)
+}
+
+prs_pairs <- list(
+  c("PRS26_Effect", "PRS21_Effect"),
+  c("PRS26_Effect", "PRS26_Z"),
+  c("PRS21_Effect", "PRS21_Z"),
+  c("PRS26_Z",      "PRS21_Z")
 )
 
-table(ss7$PRS26_Effect_tertile, useNA = "ifany")
-table(ss7$PRS26_Z_tertile, useNA = "ifany")
-table(ss7$PRS21_Effect_tertile, useNA = "ifany")
-table(ss7$PRS21_Z_tertile, useNA = "ifany")
+plots <- lapply(prs_pairs, function(pair) {
+  ggplot(cases, aes(x = .data[[pair[1]]], y = .data[[pair[2]]], color = GenoSource3)) +
+    geom_point(alpha = 0.6, size = 1.5) +
+    stat_cor(aes(color = NULL), method = "pearson", label.sep = "\n") +
+    labs(x = pair[1], y = pair[2], color = "Source") +
+    theme_bw()
+})
+
+p_all <- wrap_plots(plots, ncol = 2) +
+  plot_layout(guides = "collect") &
+  theme(legend.position = "bottom")
+
+print(p_all)
+
+ggsave(
+  here("tgct", "figures", "20260901_tgct_prs_scatter_all_pairs.png"),
+  plot = p_all, width = 9, height = 9, dpi = 300
+)
 
 # ========================
-# PMBB RESTRICTED - COMPUTE TERTILES on CONTROLS ONLY
+# PRS TERTILES 
 # ========================
-pmbb_ids <- unique(flags$PMBB_ID)
-pmbb_controls <- prs2 |> filter(Case == 0, FID %in% pmbb_ids)
-dim(pmbb_controls)
-# 69488
+effect26_breaks   <- quantile(cases$PRS26_Effect, probs = c(1 / 3, 2 / 3), na.rm = TRUE)
+z26_breaks        <- quantile(cases$PRS26_Z,      probs = c(1 / 3, 2 / 3), na.rm = TRUE)
+effect21_breaks <- quantile(cases$PRS21_Effect, probs = c(1 / 3, 2 / 3), na.rm = TRUE)
+z21_breaks      <- quantile(cases$PRS21_Z,      probs = c(1 / 3, 2 / 3), na.rm = TRUE)
 
-effect_breaks   <- quantile(pmbb_controls$PRS26_Effect, probs = c(1 / 3, 2 / 3), na.rm = TRUE)
-z_breaks        <- quantile(pmbb_controls$PRS26_Z,      probs = c(1 / 3, 2 / 3), na.rm = TRUE)
-effect21_breaks <- quantile(pmbb_controls$PRS21_Effect, probs = c(1 / 3, 2 / 3), na.rm = TRUE)
-z21_breaks      <- quantile(pmbb_controls$PRS21_Z,      probs = c(1 / 3, 2 / 3), na.rm = TRUE)
+# label each sample's tertile per PRS type
+cases <- cases |> mutate(
+  PRS26_Effect_tertile = cut(PRS26_Effect, breaks = c(-Inf, effect26_breaks, Inf), labels = c("Low", "Mid", "High")),
+  PRS26_Z_tertile       = cut(PRS26_Z,      breaks = c(-Inf, z26_breaks, Inf),      labels = c("Low", "Mid", "High")),
+  PRS21_Effect_tertile = cut(PRS21_Effect, breaks = c(-Inf, effect21_breaks, Inf), labels = c("Low", "Mid", "High")),
+  PRS21_Z_tertile       = cut(PRS21_Z,      breaks = c(-Inf, z21_breaks, Inf),      labels = c("Low", "Mid", "High"))
+)
 
-effect_breaks
-z_breaks
-effect21_breaks
-z21_breaks
-# this is insanely high...not quite right??
+table(cases$PRS26_Effect_tertile, useNA = "ifany")
+# table(cases$PRS26_Z_tertile, useNA = "ifany")
+# table(cases$PRS21_Effect_tertile, useNA = "ifany")
+# table(cases$PRS21_Z_tertile, useNA = "ifany")
+# Low  Mid High
+# 335  334  334
 
-pmbb_cases <- ss6 |> filter(Final_ID3 %in% pmbb_ids)
-dim(pmbb_cases)
-# 827
+# ========================
+# CHECK DUPLICATES
+# ========================
+check <- check |>
+  filter(!is.na(PRS26_Effect)) |>
+  group_by(REDCap_record_id) |>
+  filter(n() >= 2) |>
+  ungroup()
+check |> group_by(REDCap_record_id) |> summarize(sources = paste(sort(GenoSource2), collapse = " vs ")) |> count(sources)
 
-pmbb_cases <- pmbb_cases |> mutate(
-        PRS26_Effect_tertile = cut(PRS26_Effect, breaks = c(-Inf, effect_breaks, Inf), labels = c("Low", "Mid", "High")),
-        PRS26_Z_tertile       = cut(PRS26_Z,      breaks = c(-Inf, z_breaks, Inf),      labels = c("Low", "Mid", "High")),
-        PRS21_Effect_tertile = cut(PRS21_Effect, breaks = c(-Inf, effect21_breaks, Inf), labels = c("Low", "Mid", "High")),
-        PRS21_Z_tertile       = cut(PRS21_Z,      breaks = c(-Inf, z21_breaks, Inf),      labels = c("Low", "Mid", "High"))
+# # A tibble: 4 × 2
+# sources                 n
+# <chr>               <int>
+# 1 Discovery vs PMBB       3
+# 2 Gencove vs PMBB         7
+# 3 PMBB vs PMBB            1
+# 4 PMBB vs Replication     4
+
+wide <- check |>
+  distinct(REDCap_record_id, GenoSource2, .keep_all = TRUE) |>
+  pivot_wider(id_cols = REDCap_record_id, names_from = GenoSource2, values_from = PRS26_Effect)
+
+paired <- check |>
+  group_by(REDCap_record_id) |>
+  mutate(n_pmbb = sum(GenoSource2 == "PMBB")) |>
+  filter(n_pmbb == 1) |>  
+  summarize(
+    pmbb_score   = PRS26_Effect[GenoSource2 == "PMBB"],
+    other_score  = PRS26_Effect[GenoSource2 != "PMBB"],
+    other_source = GenoSource2[GenoSource2 != "PMBB"],
+    .groups = "drop"
+  )
+
+# paired_long <- paired |>
+#   mutate(person = row_number()) |>
+#   pivot_longer(c(pmbb_score, other_score), names_to = "source_type", values_to = "score") |>
+#   mutate(source_type = if_else(source_type == "pmbb_score", "PMBB", other_source))
+# 
+# p_slope <- ggplot(paired_long, aes(x = source_type, y = score, group = person)) +
+#   geom_line(alpha = 0.5) +
+#   geom_point(aes(color = source_type), size = 2) +
+#   facet_wrap(~other_source, scales = "free_x") +
+#   labs(x = NULL, y = "PRS26_Effect") +
+#   theme_bw()
+# 
+# ggsave(here("tgct", "figures", "20260908_tgct_prs_paired_slope_by_source_26effect.png"),
+#        plot = p_slope, width = 8, height = 5)
+
+# what if we graphed the tertile breaks as a line to see if any cross the line?
+paired <- paired |>
+  mutate(
+    pmbb_tertile    = cut(pmbb_score,  breaks = c(-Inf, effect26_breaks, Inf), labels = c("Low", "Mid", "High")),
+    other_tertile   = cut(other_score, breaks = c(-Inf, effect26_breaks, Inf), labels = c("Low", "Mid", "High")),
+    crosses_tertile = pmbb_tertile != other_tertile,
+    person          = row_number()
+  )
+
+cat(sum(paired$crosses_tertile), "of", nrow(paired), "duplicate pairs land in different tertiles\n")
+paired |> select(REDCap_record_id, other_source, pmbb_score, pmbb_tertile, other_score, other_tertile, crosses_tertile) |>
+  print(n = Inf)
+
+paired_long <- paired |>
+  pivot_longer(c(pmbb_score, other_score), names_to = "source_type", values_to = "score") |>
+  mutate(source_type = if_else(source_type == "pmbb_score", "PMBB", other_source))
+
+# p_slope_tertile <- ggplot(paired_long, aes(x = source_type, y = score, group = person)) +
+#   geom_hline(yintercept = effect26_breaks, linetype = "dashed", color = "grey50") +
+#   geom_line(aes(color = crosses_tertile), alpha = 0.7) +
+#   geom_point(aes(color = crosses_tertile), size = 2) +
+#   facet_wrap(~other_source, scales = "free_x") +
+#   scale_color_manual(values = c(`FALSE` = "grey50", `TRUE` = "red"), name = "Crosses tertile?") +
+#   labs(x = NULL, y = "PRS26_Effect") +
+#   theme_bw()
+# 
+# ggsave(here("tgct", "figures", "20260908_tgct_prs_paired_slope_tertile_crossing_26effect.png"),
+#        plot = p_slope_tertile, width = 8, height = 5)
+
+# ========================
+# PAIRWISE COMPARISON
+# ========================
+prs_cols <- c("PRS26_Effect", "PRS26_Z", "PRS21_Effect", "PRS21_Z")
+
+# per-column tertile breaks computed earlier in the PRS TERTILES section
+tertile_breaks <- list(
+  PRS26_Effect = effect26_breaks,
+  PRS26_Z      = z26_breaks,
+  PRS21_Effect = effect21_breaks,
+  PRS21_Z      = z21_breaks
+)
+
+for (col in prs_cols) {
+
+  check_i <- dup |>
+    left_join(prs, by = c("Final_ID2" = "FID")) |>
+    filter(!is.na(.data[[col]])) |>
+    group_by(REDCap_record_id) |>
+    filter(n() >= 2) |>
+    ungroup()
+
+  paired_i <- check_i |>
+    group_by(REDCap_record_id) |>
+    mutate(n_pmbb = sum(GenoSource2 == "PMBB")) |>
+    filter(n_pmbb == 1) |>
+    summarize(
+      pmbb_score   = .data[[col]][GenoSource2 == "PMBB"],
+      pmbb_id      = Final_ID2[GenoSource2 == "PMBB"],
+      other_score  = .data[[col]][GenoSource2 != "PMBB"],
+      other_id     = Final_ID2[GenoSource2 != "PMBB"],
+      other_source = GenoSource2[GenoSource2 != "PMBB"],
+      .groups = "drop"
     )
 
-table(pmbb_cases$PRS26_Effect_tertile, useNA = "ifany")
-# Low  Mid High
-# 53  172  602
+  if (nrow(paired_i) == 0) next
 
-table(pmbb_cases$PRS26_Z_tertile, useNA = "ifany")
-# Low  Mid High
-# 52  177  598
+  breaks_i <- tertile_breaks[[col]]
 
-table(pmbb_cases$PRS21_Effect_tertile, useNA = "ifany")
-# Low  Mid High
-# 68  228  531
+  paired_i <- paired_i |>
+    mutate(
+      pmbb_tertile    = cut(pmbb_score,  breaks = c(-Inf, breaks_i, Inf), labels = c("Low", "Mid", "High")),
+      other_tertile   = cut(other_score, breaks = c(-Inf, breaks_i, Inf), labels = c("Low", "Mid", "High")),
+      crosses_tertile = pmbb_tertile != other_tertile,
+      person          = row_number()
+    )
 
-table(pmbb_cases$PRS21_Z_tertile, useNA = "ifany")
-# Low  Mid High
-# 75  226  526
+  cat(col, ":", sum(paired_i$crosses_tertile), "of", nrow(paired_i), "duplicate pairs cross tertiles\n")
 
-write_xlsx(pmbb_cases, here("tgct", "ss", "20260820_tgct_pmbb_cases.xlsx"))
+  paired_long_i <- bind_rows(
+    paired_i |> transmute(person, other_source, crosses_tertile, source_type = "PMBB",       score = pmbb_score,  id = pmbb_id),
+    paired_i |> transmute(person, other_source, crosses_tertile, source_type = other_source, score = other_score, id = other_id)
+  )
+
+  p <- ggplot(paired_long_i, aes(x = source_type, y = score, group = person)) +
+    geom_hline(yintercept = breaks_i, linetype = "dashed", color = "grey50") +
+    geom_line(alpha = 0.5) +
+    geom_point(aes(color = source_type, shape = crosses_tertile), size = 2) +
+    geom_text_repel(aes(label = id), size = 2.3, show.legend = FALSE,
+                    max.overlaps = Inf, segment.size = 0.2) +
+    facet_wrap(~other_source, scales = "free_x") +
+    scale_shape_manual(values = c(`FALSE` = 16, `TRUE` = 8), name = "Crosses tertile?") +
+    labs(x = NULL, y = col, title = paste("Paired PRS by GenoSource:", col)) +
+    theme_bw()
+
+  ggsave(here("tgct", "figures", paste0("20260908_tgct_prs_paired_slope_", col, ".png")),
+         plot = p, width = 8, height = 6)
+}
 
 
+# ========================
+# STANDARDIZE LIKE EMILIO
+# ========================
+plot_data <- cases |>
+  mutate(PRS26_Z_std = as.numeric(scale(PRS26_Z))) |>   # mean 0, SD 1 across your own cohort
+  filter(!is.na(PRS26_Z_tertile))
 
+facet_means <- plot_data |>
+  group_by(PRS26_Z_tertile, GenoSource3) |>
+  summarize(mean_prs = mean(PRS26_Z_std), .groups = "drop")
 
+p_dist_tecac <- ggplot(plot_data, aes(x = PRS26_Z_std)) +
+  geom_histogram(aes(y = after_stat(density)), fill = "pink", color = "black", alpha = 0.6, bins = 30) +
+  geom_density(color = "black", linewidth = 0.6) +
+  geom_vline(data = facet_means, aes(xintercept = mean_prs), color = "blue", linetype = "dashed") +
+  facet_grid(rows = vars(PRS26_Z_tertile, GenoSource3)) +   # tertile outer, source inner -- matches Emilio's layout
+  labs(x = "PRS26_Z (standardized)", y = "density") +
+  theme_bw()
+
+ggsave(here("tgct", "figures", "20260908_tgct_prs_std_tertile_by_source.png"),
+       plot = p_dist_tecac, width = 8, height = 12)
 

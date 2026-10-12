@@ -56,3 +56,32 @@ gwas2026_score_z <- gwas2026_raw |> select(SNP_b38, A1, A2, Z) |>
     rename(AltAllele = A2) |>
     rename(Effect = Z)
 write_tsv(gwas2026_score_z, here("tgct", "data", "scorefiles", "gwas2026_hits_z.txt"))
+
+# ========================
+# POSITIVE VERSION of 2026 
+# to match 2021...
+# ========================
+gwas2026_positive <- gwas2026_raw |>
+    mutate(
+        flip         = BETA < 0,
+        EffectAllele = if_else(flip, A2, A1),
+        AltAllele    = if_else(flip, A1, A2),
+        Effect       = if_else(flip, -BETA, BETA),
+        Z            = if_else(flip, -Z, Z)
+    ) |>
+    rename(MarkerName = SNP_b38)
+
+cat(sum(gwas2026_positive$flip), "of", nrow(gwas2026_positive), "SNPs flipped\n")
+stopifnot(all(gwas2026_positive$Effect >= 0))
+
+# effect (beta) scored version, positive
+gwas2026_score_effect_pos <- gwas2026_positive |>
+    select(MarkerName, EffectAllele, AltAllele, Effect)
+write_tsv(gwas2026_score_effect_pos, here("tgct", "data", "scorefiles", "gwas2026_hits_effect_positive.txt"))
+
+# Z-scored version, positive
+gwas2026_score_z_pos <- gwas2026_positive |>
+    select(MarkerName, EffectAllele, AltAllele, Z) |>
+    rename(Effect = Z)
+write_tsv(gwas2026_score_z_pos, here("tgct", "data", "scorefiles", "gwas2026_hits_z_positive.txt"))
+

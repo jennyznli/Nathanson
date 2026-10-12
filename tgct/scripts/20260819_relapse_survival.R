@@ -134,69 +134,6 @@ mean(ss2$PRS26_Effect_tertile == ss2$PRS21_Effect_tertile, na.rm = TRUE)
 # 0.5363908
 
 # ========================
-# PRS DISTRIBUTION BY TREATMENT AND HISTOLOGY
-# ========================
-# data: must have PRS26_Effect/PRS26_Z, histology_group, adjuvant_therapy_s1
-# prs_type: "effect" or "z"
-# plot_prs_distribution <- function(data, prs_type = c("effect", "z"), cohort_label = NULL,
-#                                   outdir = here("tgct", "figures")) {
-#     prs_type <- match.arg(prs_type)
-#     prs_var <- if (prs_type == "effect") "PRS26_Effect" else "PRS26_Z"
-#
-#     data <- data |>
-#         filter(!is.na(.data[[prs_var]]), !is.na(histology_group), adjuvant_therapy_s1 %in% c("0", "1")) |>
-#         mutate(
-#             treatment = if_else(adjuvant_therapy_s1 == "1", "Adjuvant Therapy", "Surveillance"),
-#             histology = factor(
-#                 if_else(histology_group == "Nonseminoma", "Non-Seminoma", "Seminoma"),
-#                 levels = c("Non-Seminoma", "Seminoma")
-#             )
-#         )
-#
-#     summary_table <- data |>
-#         group_by(histology, treatment) |>
-#         summarise(
-#             n = n(),
-#             mean = mean(.data[[prs_var]]),
-#             sd = sd(.data[[prs_var]]),
-#             median = median(.data[[prs_var]]),
-#             q1 = quantile(.data[[prs_var]], 0.25),
-#             q3 = quantile(.data[[prs_var]], 0.75),
-#             min = min(.data[[prs_var]]),
-#             max = max(.data[[prs_var]]),
-#             .groups = "drop"
-#         )
-#     print(summary_table)
-#
-#     # Wilcoxon rank-sum test: Adjuvant Therapy vs Surveillance, within each histology facet
-#     p <- ggplot(data, aes(x = treatment, y = .data[[prs_var]], fill = treatment)) +
-#         geom_boxplot() +
-#         facet_wrap(~histology) +
-#         stat_compare_means(method = "wilcox.test", label = "p.format", label.y.npc = 0.97) +
-#         labs(
-#             title = "PRS Distribution: Adjuvant vs Surveillance by Histology",
-#             x = NULL,
-#             y = paste0("PRS (", prs_var, ")")
-#         ) +
-#         theme_bw() +
-#         theme(legend.position = "none")
-#
-#     filename <- paste0(
-#         "tgct_prs_distribution_adjuvant_vs_surveillance",
-#         if (!is.null(cohort_label)) paste0("_", cohort_label) else "",
-#         "_", prs_type, ".png"
-#     )
-#     png(file.path(outdir, filename), width = 5, height = 4, units = "in", res = 300)
-#     print(p)
-#     dev.off()
-#
-#     invisible(list(plot = p, summary = summary_table))
-# }
-#
-# plot_prs_distribution(survival, prs_type = "effect")
-# plot_prs_distribution(survival, prs_type = "z")
-
-# ========================
 # INITIAL TIME DISTRIBUTION
 # ========================
 # distribution of time to event, overlaid by censored vs relapse
@@ -221,10 +158,71 @@ print(p_dist)
 dev.off()
 
 # ========================
+# PRS DISTRIBUTION BY TREATMENT AND HISTOLOGY
+# ========================
+# prs_type: "effect" or "z"
+# just for 2026
+plot_prs_distribution <- function(data, prs_type = c("effect", "z"), cohort_label = NULL,
+                                  outdir = here("tgct", "figures")) {
+    prs_type <- match.arg(prs_type)
+    prs_var <- if (prs_type == "effect") "PRS26_Effect" else "PRS26_Z"
+
+    data <- data |>
+        filter(!is.na(.data[[prs_var]]), !is.na(histology_group), adjuvant_therapy_s1 %in% c("0", "1")) |>
+        mutate(
+            treatment = if_else(adjuvant_therapy_s1 == "1", "Adjuvant Therapy", "Surveillance"),
+            histology = factor(
+                if_else(histology_group == "Nonseminoma", "Non-Seminoma", "Seminoma"),
+                levels = c("Non-Seminoma", "Seminoma")
+            )
+        )
+
+    summary_table <- data |>
+        group_by(histology, treatment) |>
+        summarise(
+            n = n(),
+            mean = mean(.data[[prs_var]]),
+            sd = sd(.data[[prs_var]]),
+            median = median(.data[[prs_var]]),
+            q1 = quantile(.data[[prs_var]], 0.25),
+            q3 = quantile(.data[[prs_var]], 0.75),
+            min = min(.data[[prs_var]]),
+            max = max(.data[[prs_var]]),
+            .groups = "drop"
+        )
+    print(summary_table)
+
+    # Wilcoxon rank-sum test: Adjuvant Therapy vs Surveillance, within each histology facet
+    p <- ggplot(data, aes(x = treatment, y = .data[[prs_var]], fill = treatment)) +
+        geom_boxplot() +
+        facet_wrap(~histology) +
+        stat_compare_means(method = "wilcox.test", label = "p.format", label.y.npc = 0.97) +
+        labs(
+            title = "PRS Distribution: Adjuvant vs Surveillance by Histology",
+            x = NULL,
+            y = paste0("PRS (", prs_var, ")")
+        ) +
+        theme_bw() +
+        theme(legend.position = "none")
+
+    filename <- paste0(
+        "tgct_prs_distribution_adjuvant_vs_surveillance",
+        if (!is.null(cohort_label)) paste0("_", cohort_label) else "",
+        "_", prs_type, ".png"
+    )
+    png(file.path(outdir, filename), width = 5, height = 4, units = "in", res = 300)
+    print(p)
+    dev.off()
+
+    invisible(list(plot = p, summary = summary_table))
+}
+
+plot_prs_distribution(survival, prs_type = "effect")
+plot_prs_distribution(survival, prs_type = "z")
+
+# ========================
 # SURVIVAL - overall test
 # ========================
-# turn event into 1 - no relapse, 2 - relapse
-# 1 is censored, 2 is event
 surv_obj <- Surv(
     time = survival$time_to_event,
     event = as.numeric(as.character(survival$relapse_at_stage_1))
@@ -254,7 +252,7 @@ dev.off()
 #         caller so tertile cutpoints stay fixed across every plot/subgroup
 #         instead of being redefined per call
 # prs_type: "effect26" (PRS26_Effect), "z26" (PRS26_Z),
-#           "effect21" (PRS21_Effect), or "z21" (PRS21_Z)
+#           "effect21" (PRS21_Effect), "z21" (PRS21_Z)
 # coding: NA (default) -> tertiles (Low/Mid/High)
 #         "binary_high" -> High vs Low/Mid
 #         "binary_low"  -> Low vs Mid/High
@@ -363,7 +361,7 @@ p_histology <- ggsurvplot(
     fit_histology,
     data = survival,
     risk.table = TRUE,
-    conf.int = TRUE,
+    conf.int = FALSE,
     pval = TRUE,
     xlab = "Time",
     ylab = "Relapse-free survival probability",

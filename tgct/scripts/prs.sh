@@ -13,24 +13,7 @@
 #
 # Each run creates/reuses $PRS_ROOT/<project_name>/ and does the full pipeline in there,
 # so different score files (or the same file with a different SNP subset)
-# can be run side by side as separate projects without clobbering each
-# other, e.g.:
-#   prs.sh gwas2021_z      gwas2021-hits-z.tsv
-#   prs.sh gwas2021_effect gwas2021-hits-effect.tsv
-#
-# To submit as an LSF job (takes CLI args, so submit as `bsub ... command args`
-# rather than `bsub < prs.sh` -- the latter can't pass positional args through):
-#   mkdir -p /project/knathans_tecac/jenny/prs/logs   # one-time: LSF needs the
-#                                                      # -o/-e directory to already
-#                                                      # exist before job dispatch
-#   bsub -J prs_gwas2021_z \
-#        -o /project/knathans_tecac/jenny/prs/logs/gwas2021_z.%J.o \
-#        -e /project/knathans_tecac/jenny/prs/logs/gwas2021_z.%J.e \
-#        -n 1 -M 16000 -R "rusage[mem=16GB]" -W 8:00 \
-#        bash prs.sh gwas2021_z gwas2021-hits-z.tsv
-# LSF's .o/.e will duplicate what's already in the script's own timestamped
-# log under $PRS_ROOT/logs/ (see LOGGING below) -- that's fine, the .o file
-# also gets LSF's resource-usage summary appended, which the internal log doesn't have.
+
 set -euo pipefail
 
 module load plink/1.9-20210416
